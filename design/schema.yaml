@@ -3,6 +3,9 @@
 
 process :
   type : object
+  required:
+    - pid
+    - name
   properties:
     pid:
       type: string
@@ -16,9 +19,18 @@ process :
       type: string
       description: process description
       example: "Build a Microphone"
+    metadata:
+      type: object
+      description: process metadata
+      $ref: "#/components/schemas/ProcessMetaData"
     variables:
       type: array
       description: process scoped variables
+      items:
+        $ref: "#/components/schemas/Variable"
+    outputs:
+      type: array
+      description: Process outputs
       items:
         $ref: "#/components/schemas/Variable"
     activities:
@@ -27,22 +39,21 @@ process :
       items:
         oneOf:
           - type: string
-          - $ref: "#/Activity"
+          - $ref: "#/components/schemas/Activity"
     activityRepo:
       type: array
       description: Repository of activities
       items:
         $ref: "#/components/schemas/Activity"
-
-  events:
-    type: array
-    description: Events that can trigger or influence the process
-    items:
-      $ref: "#/components/schemas/Event"
-    activity:
-      oneOf:
-        - type: string
-        - $ref: "#/components/schemas/Activity"
+    events:
+      type: array
+      description: Events that can trigger or influence the process
+      items:
+        $ref: "#/components/schemas/Event"
+      activity:
+        oneOf:
+          - type: string
+          - $ref: "#/components/schemas/Activity"
 
 components:
   schemas:
@@ -84,7 +95,9 @@ components:
             ref: "#/components/schemas/VariableConstraint"
           presentation:
             ref: "#/components/schemas/VariablePresentation"  
+    
     VariableConstraint:
+      description: Variable constraints
       type: object
       properties:
         allowedValues:
@@ -117,6 +130,7 @@ components:
           example: "^[a-zA-Z0-9]*$"
 
     VariablePresentation:
+      description: Variable presentation details
       type: object
       properties:
         units:
@@ -134,6 +148,7 @@ components:
 
     # Activity base schema
     Activity:
+      description: Common Activity schema
       type: object
       required:
         - aid
@@ -153,7 +168,6 @@ components:
           type: string
           enum:
             - HumanTask
-            - Compute
             - Terminate
             - Sequence
             - RestAPI
@@ -176,9 +190,52 @@ components:
           enum:
             - Pass
             - Fail
+        lifecycle:
+          type: object
+          description: Lifecycle hooks for this activity
+          properties:
+            beforeExecute:
+              type: object
+              code:
+                description: Script or logic to execute after the activity completes
+                type: object
+                ref: "#/components/schemas/CodeBlock"
+            afterExecute:
+              type: object
+              code:
+                description: Script or logic to execute after the activity completes
+                type: object
+                ref: "#/components/schemas/CodeBlock"
+        errorHandling:
+          type: object
+          description: Defines error handling for the process
+          properties:
+            onError:
+              type: string
+              enum: ["ABORT", "RETRY", "CONTINUE"]
+              description: Action to take on error
+              example: "RETRY"
+            retryCount:
+              type: integer
+              description: Number of retries allowed
+              example: 3
+            retryDelay:
+              type: integer
+              description: Delay between retries in milliseconds
+              example: 1000
+            retryBackoff: 
+              type: string
+              enum: ["CONSTANT", "LINEAR", "EXPONENTIAL"]
+              description: Retry backoff strategy
+              example: "EXPONENTIAL"
+        output:
+          description: Output variables
+          type: array
+          items:
+            $ref: "#/components/schemas/Variable"
 
     # HumanTaskActivity
-    humanTaskActivity:
+    HumanTaskActivity:
       description: Human task activity.  For interacting with a human
       allOf:
         - $ref: "#/Activity"
@@ -255,8 +312,9 @@ components:
                   bytes:
                     type: number
 
+    
     # RestAPIActivity
-    restAPIActivity:
+    RestAPIActivity:
       description: Rest API activity.  For calling a REST API
       allOf:
         - $ref: "#/Activity"
@@ -351,38 +409,6 @@ components:
                   - type: string
                   - $ref: "#/Activity"
 
-    # ComputeActivity
-    computeActivity:
-      description: 
-        - Compute activity.  Executes a block of code
-        - Can be used to perform calculations or set variables
-        - Variables can be referenced from process or activity scope.
-        - Activity scope variables are referenced using $Activity['activity-id'].variable
-
-      allOf:
-        - $ref: "#/Activity"
-        - type: object
-          required:
-            - type
-            - language
-            - code
-          properties:
-            type:
-              const: Compute
-            language:
-              type: string
-              enum:
-                - JS
-            code:
-              type: array
-              description: Lines of code to execute
-              example: ["$Activity['r3-activity'].value = $Activity['r3-activity'].value + 1;"]
-              items:
-                type: string
-            output:
-              type: array
-              items:
-                $ref: "#/variable"
 
     # TerminateActivity
     TerminateActivity:
@@ -405,6 +431,10 @@ components:
       allOf:
         - $ref: "#/Activity"
         - type: object
+          required:
+            - type
+            - condition
+            - then
           properties:
             type:
               const: If
@@ -428,6 +458,9 @@ components:
       allOf:
         - $ref: "#/Activity"
         - type: object
+          required:
+            - type
+            - cases
           properties:
             type:
               const: Case
@@ -449,6 +482,10 @@ components:
       allOf:
         - $ref: "#/Activity"
         - type: object
+          required:
+            - type
+            - condition
+            - activity
           properties:
             type:
               const: While
@@ -460,7 +497,25 @@ components:
               oneOf:
                 - type: string
                 - $ref: "#/Activity"
-
+    CodeBlock:
+      description: Code Exectuion Block
+      type: object
+      required:
+        - language
+        - code
+      properties:
+        language:
+          type: string
+          description: Programming language
+          enum:
+            - JS
+        code:
+          type: array
+          description: Lines of code to execute
+          example: ["$Activity['r3-activity'].value = $Activity['r3-activity'].value + 1;"]
+          items:
+            type: string
+    
     Event:
       type: object
       properties:
@@ -481,3 +536,20 @@ components:
             oneOf:
               - type: string
               - $ref: "#/components/schemas/Activity"
+
+    ProcessMetaData:
+      type: object
+      properties:
+        version:
+          type: string
+          description: Schema version
+          example: "1.0.0"
+        createdBy:
+          type: string
+          description: Creator of the process
+          example: "Admin"
+        createdAt:
+          type: string
+          format: date-time
+          description: Timestamp when the process was created
+          example: "2025-01-01T12:00:00Z"
