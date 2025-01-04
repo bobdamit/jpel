@@ -10,15 +10,15 @@ process :
     pid:
       type: string
       description: process id
-      example: "mic-build"
+      example: mic-build
     name:
       type: string
       description: process name
-      example: "Build a Microphone"
+      example: Build a Microphone
     description:
       type: string
       description: process description
-      example: "Build a Microphone"
+      example: Build a Microphone
     metadata:
       type: object
       description: process metadata
@@ -63,15 +63,15 @@ components:
         name:
           type: string
           description: variable name
-          example: "R3 Value"
+          example: R3 Value
         vid:
           type: string
           description: variable id
-          example: "r3-value"
+          example: r3-value
         description:
           type: string
           description: variable description
-          example: "Valur of R3"
+          example: Value of R3
         value:
           type: any
           description: variable value
@@ -79,7 +79,7 @@ components:
         defaultValue:
           type: any
           description: default value
-          example: "Empty"
+          example: Empty
         type:
           type: string
           enum:
@@ -90,7 +90,7 @@ components:
             - Object
             - Array
           description: variable type
-          example: "String"
+          example: String
           constraint:
             ref: "#/components/schemas/VariableConstraint"
           presentation:
@@ -127,7 +127,7 @@ components:
         pattern:
           type: string
           description: Regular Expression pattern
-          example: "^[a-zA-Z0-9]*$"
+          example: ^[a-zA-Z0-9]*$
 
     VariablePresentation:
       description: Variable presentation details
@@ -144,7 +144,7 @@ components:
         format:
           type: string
           description: variable format
-          example: "foo ${value} bar"
+          example: foo ${value} bar
 
     # Activity base schema
     Activity:
@@ -156,11 +156,11 @@ components:
       properties:
         aid:
           type: string
-          example: "r3-activity"
+          example: r3-activity
           description: activity id. used to reference activity in process
         name:
           type: string
-          example: "Collect R3 value"
+          example: Collect R3 value
           description: activity name
         description:
           type: string
@@ -214,7 +214,7 @@ components:
               type: string
               enum: ["ABORT", "RETRY", "CONTINUE"]
               description: Action to take on error
-              example: "RETRY"
+              example: RETRY
             retryCount:
               type: integer
               description: Number of retries allowed
@@ -227,7 +227,7 @@ components:
               type: string
               enum: ["CONSTANT", "LINEAR", "EXPONENTIAL"]
               description: Retry backoff strategy
-              example: "EXPONENTIAL"
+              example: EXPONENTIAL
         output:
           description: Output variables
           type: array
@@ -238,7 +238,7 @@ components:
     HumanTaskActivity:
       description: Human task activity.  For interacting with a human
       allOf:
-        - $ref: "#/Activity"
+        - $ref: "#/components/schemas/Activity"
         - type: object
           required:
             - type
@@ -252,8 +252,7 @@ components:
               type: array
               items:
                 oneOf:
-                  - type: string
-                  - $ref: "#/value"
+                  - $ref: "#/Variable"
             fieldSets:
               type: array
               items:
@@ -491,7 +490,7 @@ components:
               const: While
             condition:
               type: string
-              example: "i < 10"
+              example: i < 10
             activity:
               description: Activity to execute while condition is true. Can be an activity or a reference to an activity
               oneOf:
@@ -528,7 +527,7 @@ components:
         trigger:
           type: string
           description: Trigger condition
-          example: "onStart"
+          example: onStart
         actions:
           type: array
           description: Actions to perform when the event triggers
@@ -543,13 +542,13 @@ components:
         version:
           type: string
           description: Schema version
-          example: "1.0.0"
+          example: 1.0.0
         createdBy:
           type: string
           description: Creator of the process
-          example: "Admin"
+          example: Admin
         createdAt:
           type: string
           format: date-time
           description: Timestamp when the process was created
-          example: "2025-01-01T12:00:00Z"
+          example: 2025-01-01T12:00:00Z
