@@ -1,0 +1,22 @@
+{"properties": [
+  {
+    "name": "db.mongo.url",
+    "type": "java.lang.String",
+    "description": "Mongo DB Connection URL"
+  },
+  {
+    "name": "db.mongo.password",
+    "type": "java.lang.String",
+    "description": "Mongo DB Password"
+  },
+  {
+    "name": "db.mongo.username",
+    "type": "java.lang.String",
+    "description": "Mongo DB Username"
+  },
+  {
+    "name": "db.mongo.database",
+    "type": "java.lang.String",
+    "description": "A description for 'db.mongo.database'"
+  }
+]}

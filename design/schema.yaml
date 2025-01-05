@@ -89,6 +89,7 @@ components:
             - Enum
             - Object
             - Array
+            - URL
           description: variable type
           example: String
           constraint:
