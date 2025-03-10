@@ -1,13 +1,13 @@
-package net.rockscience.bpjel.runner;
+package net.rockscience.jbel;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication
-public class BpjelRunnerApplication {
+public class JBelRunnerApplication {
 
 	public static void main(String[] args) {
-		SpringApplication.run(BpjelRunnerApplication.class, args);
+		SpringApplication.run(JBelRunnerApplication.class, args);
 	}
 
 }
