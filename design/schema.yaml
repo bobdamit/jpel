@@ -1,5 +1,5 @@
-# BP-JEL Schema.  Describes the schema for the BP-JEL language
-# BP-JEL is a JSON based language for defining business processes
+# JBEL Schema.  Describes the schema for the JBEL language
+# JBEL is a JSON based language for defining business processes
 
 process :
   type : object
