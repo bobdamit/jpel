@@ -373,15 +373,15 @@ components:
               description: Response body set by calling the API
               type: object
 
-    # FlowActivity
-    flowActivity:
-      description: Flow activity.  Executes activities in parallel
+    # ParallelActivity
+    parallelActivity:
+      description: Parallel activity.  Executes activities in parallel
       allOf:
         - $ref: "#/Activity"
         - type: object
           properties:
             type:
-              const: Flow
+              const: Parallel
             activities:
               description: Activities to execute in parallel. Can be activities or references to activities
               type: array
