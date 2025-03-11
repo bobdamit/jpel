@@ -1,10 +1,10 @@
-package net.rockscience.jbel;
+package net.rockscience.jpel;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 
 @SpringBootTest
-class BpjelRunnerApplicationTests {
+class JPelRunnerApplicationTests {
 
 	@Test
 	void contextLoads() {
