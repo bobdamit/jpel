@@ -9,10 +9,10 @@
 		<relativePath/> <!-- lookup parent from repository -->
 	</parent>
 	<groupId>net.rockscience</groupId>
-	<artifactId>jbel-runner</artifactId>
+	<artifactId>jpel-runner</artifactId>
 	<version>0.0.1</version>
-	<name>jbel-runner</name>
-	<description>Baisic Java Runner for JBEL</description>
+	<name>jpel-runner</name>
+	<description>Baisic Java Runner for Json Process Expression Language</description>
 	<url/>
 	<licenses>
 		<license/>
@@ -37,6 +37,12 @@
 			<groupId>org.mongodb</groupId>
 			<artifactId>mongo-java-driver</artifactId>
 			<version>${mongo-version}</version>
+		</dependency>
+
+		<dependency>
+		<groupId>net.rockscience</groupId>
+		<artifactId>rsutil</artifactId>
+		<version>1.0.1</version>
 		</dependency>
 
 		<dependency>

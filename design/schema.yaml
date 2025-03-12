@@ -138,10 +138,6 @@ components:
           type: string
           description: variable units
           example: "kOhm"
-        precision:
-          type: number
-          description: variable precision
-          example: 2
         format:
           type: string
           description: variable format
@@ -171,8 +167,8 @@ components:
             - HumanTask
             - Terminate
             - Sequence
+            - Parallel
             - RestAPI
-            - Flow
             - Case
             - If
             - While
@@ -189,6 +185,7 @@ components:
         passFail:
           type: string
           enum:
+            - NotEvaluated
             - Pass
             - Fail
         lifecycle:
