@@ -34,15 +34,9 @@
 		</dependency>
 
 		<dependency>
-			<groupId>org.mongodb</groupId>
-			<artifactId>mongo-java-driver</artifactId>
-			<version>${mongo-version}</version>
-		</dependency>
-
-		<dependency>
-		<groupId>net.rockscience</groupId>
-		<artifactId>rsutil</artifactId>
-		<version>1.0.1</version>
+			<groupId>net.rockscience</groupId>
+			<artifactId>rsutil</artifactId>
+			<version>1.0.1</version>
 		</dependency>
 
 		<dependency>
