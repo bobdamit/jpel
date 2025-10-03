@@ -1,48 +1,98 @@
-export interface Process {
-	pid: string;
+/**
+ * Process Definition - the template/blueprint for a process
+ */
+export interface ProcessDefinition {
+	id: string;
 	name: string;
 	description?: string;
-	activityRepo?: Activity[];
+	version?: string;
 	variables?: Variable[];
-	activities?: Activity[] | string[];
+	start: string; // Initial activity reference (a:activityId)
+	activities: { [key: string]: Activity };
 }
 
+/**
+ * Process Runtime Instance - a running instance of a process definition
+ */
+export interface ProcessInstance {
+	instanceId: string;
+	processId: string;
+	status: ProcessStatus;
+	startedAt: Date;
+	completedAt?: Date;
+	currentActivity?: string;
+	variables: { [key: string]: any };
+	activities: { [key: string]: ActivityInstance };
+}
+
+export enum ProcessStatus {
+	Running = "Running",
+	Completed = "Completed",
+	Failed = "Failed",
+	Cancelled = "Cancelled"
+}
+
+/**
+ * Activity Definition - the template for an activity
+ */
 interface Activity {
-	aid: string;
+	id: string;
 	name?: string;
 	description?: string;
 	type: ActivityType;
-	status?: ActivityStatus;
+	timeout?: number; // seconds
+}
+
+/**
+ * Activity Runtime Instance - a running instance of an activity
+ */
+export interface ActivityInstance extends Activity {
+	status: ActivityStatus;
 	passFail?: PassFail;
+	startedAt?: Date;
+	completedAt?: Date;
+	data?: { [key: string]: any }; // User input data from forms, API responses, etc.
+	error?: string;
 }
 
-
-// BPEL Activity Types
+// Simplified Activity Types
 export enum ActivityType {
-	HumanTask = "HumanTask",
-	Compute = "Compute",
-	Terminate = "Terminate",
-	Sequence = "Sequence",
-	RestAPI = "RestAPI",
-	Flow = "Flow",
-	Case = "Case",
-	If = "If",
-	While = "While",
-	Catch = "Catch",
+	Human = "human",
+	Compute = "compute",
+	API = "api",
+	Sequence = "sequence",
+	Parallel = "parallel",
+	Branch = "branch",
+	Terminate = "terminate"
 }
 
-export interface HumanTaskActivity extends Activity {
-	type: ActivityType.HumanTask;
-	subject?: string;
-	inputs : Value[] | string[]
-	fieldSets?: FieldSet[];
+export interface HumanActivity extends Activity {
+	type: ActivityType.Human;
+	prompt?: string;
+	inputs?: Field[];
 	fileUploads?: FileUpload[];
 	attachments?: Attachment[];
 }
 
-export interface FieldSet {
+export interface Field {
 	name: string;
-	variables: Variable[];
+	type: FieldType;
+	required?: boolean;
+	options?: string[]; // For select/enum fields
+	min?: number;
+	max?: number;
+	units?: string;
+	defaultValue?: any;
+	description?: string;
+}
+
+export enum FieldType {
+	Text = "text",
+	Number = "number",
+	Boolean = "boolean",
+	Select = "select",
+	Date = "date",
+	File = "file"
 }
 
 /**
@@ -68,180 +118,78 @@ export interface Attachment {
 	bytes	: number;
 }
 
-export interface RestAPIActivity extends Activity {
-	type: ActivityType.RestAPI;
-	timeoutSeconds?: number;
+export interface APIActivity extends Activity {
+	type: ActivityType.API;
 	method: HttpMethod;
 	url: string;
-	headers: KeyValue[];
-	querieParams?: KeyValue[];
-	request?: any;
-	response?: any;
-}
-
-export interface KeyValue {
-	key: string;
-	value: string;
+	headers?: { [key: string]: string };
+	queryParams?: { [key: string]: string };
+	body?: any;
 }
 
 export enum HttpMethod {
 	GET = "GET",
 	POST = "POST",
 	PUT = "PUT",
-	DELETE = "DELETE",
+	DELETE = "DELETE"
 }
 
 /**
- * Execute a group of Activites in Parallel
+ * Execute a group of activities in parallel
  */
-export interface FlowActivity extends Activity {
-	type: ActivityType.Flow;
-	activities?: Activity[] | string[];
+export interface ParallelActivity extends Activity {
+	type: ActivityType.Parallel;
+	activities: string[]; // Array of activity references (a:activityId)
 }
 
 /**
- * Execute a group of Activites in Sequence
+ * Execute a group of activities in sequence
  */
 export interface SequenceActivity extends Activity {
 	type: ActivityType.Sequence;
-	activities?: Activity[] | string[];
+	activities: string[]; // Array of activity references (a:activityId)
 }
 
 /**
- * Execute some scripting code. The script has access
- * to the process and activity variables and can
- * manipulate them.
- * The script also has access to the response model of
- * any RestAPI activity
+ * Execute JavaScript code. The script has access to:
+ * - a:activityId.f:fieldName (activity field values)
+ * - a:activityId.status (activity status)
+ * - this.data (current activity data)
  */
 export interface ComputeActivity extends Activity {
 	type: ActivityType.Compute;
-	language: ScriptLang;
 	code: string[];
-	output?: Variable[];
 }
 
-export enum ScriptLang {
-	JS = "JS",
-}
+
 
 export interface TerminateActivity extends Activity {
 	type: ActivityType.Terminate;
-	reason: string;
-}
-
-/** 
- * Evaluate a condition and branch to one Activity or another 
-*/
-export interface IfActivity extends Activity {
-	type: ActivityType.If;
-	condition?: string;
-	then?: Activity;
-	else?: Activity;
+	reason?: string;
+	result?: 'success' | 'failure';
 }
 
 /**
- * Evaluate a condition and branch to various activites based
- * on the condition
+ * Conditional branching - supports if/else and multiple conditions
  */
-export interface CaseActivity extends Activity {
-	type: ActivityType.Case;
-	cases?: Case[];
-}
-
-export interface Case {
+export interface BranchActivity extends Activity {
+	type: ActivityType.Branch;
 	condition: string;
-	activity?: Activity | string;
+	then: string; // Activity reference (a:activityId)
+	else?: string; // Activity reference (a:activityId)
 }
+
+
 
 /**
- * Execute a group of activities while a condition is true
+ * Process-level variable definition
+ * Can be referenced as: process.variableName
  */
-export interface WhileActivity extends Activity {
-	type: ActivityType.While;
-	condition?: string;
-	activity?: Activity | string;
-}
-
-export interface Value {
+export interface Variable {
 	name: string;
-	description: string;
-	vid: string;
-	value?: any;
-	type: ValueType;
-}
-
-/**
- * Variables are rich data that define the scope,
- * type, constraints and default values of the data
- *
- * They can be referenced with the following format:
- * $Namespace.VariableID
- * $Namespace defines the scope of the variable such as
- * $Process
- * $Activity['activityid']
- *
- * For example:
- * $Process.my-var
- * $Activity['my-activity'].my-var
- *
- * @export
- * @interface Variable
- */
-export interface Variable extends Value {
+	type: FieldType;
 	defaultValue?: any;
-	constraint?: VariableConstraint;
-	presentation?: VariablePresentation;
-}
-
-/**
- * Variable Presentation
- *
- * Some presentation data for a variable
- * Used for HumanTask Activities.
- */
-export interface VariablePresentation {
-	units?: string;
-	precision?: number;
-	format?: string;
-}
-
-
-/**
- * Some constraints for a variable. Can be use for
- * form validation on HumanTask activities
- */
-export interface VariableConstraint {
-	allowedValues?: any[];
-	required?: boolean;
-	pattern?: string;
-	minLength?: number;
-	maxLength?: number;
-	min?: number;
-	max?: number;
-}
-
-/**
- * Variable Scope
- *
- * Some scope data for a variable
- * Used for HumanTask Activities.
- */
-export interface VariableScope {
-	activity: string;
-	process: string;
-}
-
-/**
- * Variable Types
- */
-export enum ValueType {
-	String = "String",
-	Number = "Number",
-	Boolean = "Boolean",
-	Enum = "Enum",
-	Object = "Object",
-	Array = "Array",
+	description?: string;
 }
 
 /**

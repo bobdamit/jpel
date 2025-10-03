@@ -1,552 +1,402 @@
-# JBEL Schema.  Describes the schema for the JBEL language
-# JBEL is a JSON based language for defining business processes
+# JPEL Schema v2 - Simplified JSON-based Process Execution Language
+# Inspired by BPEL4People but designed for simplicity and readability
 
-process :
-  type : object
+process:
+  type: object
   required:
-    - pid
+    - id
     - name
+    - start
+    - activities
   properties:
-    pid:
+    id:
       type: string
-      description: process id
+      description: Unique process identifier
       example: mic-build
     name:
       type: string
-      description: process name
+      description: Human-readable process name
       example: Build a Microphone
     description:
       type: string
-      description: process description
-      example: Build a Microphone
-    metadata:
-      type: object
-      description: process metadata
-      $ref: "#/components/schemas/ProcessMetaData"
+      description: Process description
+      example: Quality control process for microphone assembly
+    version:
+      type: string
+      description: Process version
+      example: "1.0.0"
     variables:
       type: array
-      description: process scoped variables
+      description: Process-level variables
       items:
         $ref: "#/components/schemas/Variable"
-    outputs:
-      type: array
-      description: Process outputs
-      items:
-        $ref: "#/components/schemas/Variable"
+    start:
+      type: string
+      description: Initial activity reference
+      example: "a:askBuildType"
     activities:
-      type: array
-      description: process activities. Can be activities or references to activities
-      items:
-        oneOf:
-          - type: string
-          - $ref: "#/components/schemas/Activity"
-    activityRepo:
-      type: array
-      description: Repository of activities
-      items:
+      type: object
+      description: Map of activity definitions
+      additionalProperties:
         $ref: "#/components/schemas/Activity"
-    events:
-      type: array
-      description: Events that can trigger or influence the process
-      items:
-        $ref: "#/components/schemas/Event"
-      activity:
-        oneOf:
-          - type: string
-          - $ref: "#/components/schemas/Activity"
 
 components:
   schemas:
     Variable:
       type: object
-      properties:
-        name:
-          type: string
-          description: variable name
-          example: R3 Value
-        vid:
-          type: string
-          description: variable id
-          example: r3-value
-        description:
-          type: string
-          description: variable description
-          example: Value of R3
-        value:
-          type: any
-          description: variable value
-          example: 12.87
-        defaultValue:
-          type: any
-          description: default value
-          example: Empty
-        type:
-          type: string
-          enum:
-            - String
-            - Number
-            - Boolean
-            - Enum
-            - Object
-            - Array
-            - URL
-          description: variable type
-          example: String
-          constraint:
-            ref: "#/components/schemas/VariableConstraint"
-          presentation:
-            ref: "#/components/schemas/VariablePresentation"  
-    
-    VariableConstraint:
-      description: Variable constraints
-      type: object
-      properties:
-        allowedValues:
-          type: array
-          description: allowed values
-          example: ["Empty", "Value1", "Value2"]
-        required:
-          type: boolean
-          description: is required
-          example: true
-        min:  
-          type: number
-          description: minimum value
-          example: 0
-        max:
-          type: number
-          description: maximum value
-          example: 100
-        minLength:  
-          type: number
-          description: minimum length
-          example: 0
-        maxLength:
-          type: number
-          description: maximum length
-          example: 100
-        pattern:
-          type: string
-          description: Regular Expression pattern
-          example: ^[a-zA-Z0-9]*$
-
-    VariablePresentation:
-      description: Variable presentation details
-      type: object
-      properties:
-        units:
-          type: string
-          description: variable units
-          example: "kOhm"
-        format:
-          type: string
-          description: variable format
-          example: foo ${value} bar
-
-    # Activity base schema
-    Activity:
-      description: Common Activity schema
-      type: object
       required:
-        - aid
+        - name
         - type
       properties:
-        aid:
-          type: string
-          example: r3-activity
-          description: activity id. used to reference activity in process
         name:
           type: string
-          example: Collect R3 value
-          description: activity name
-        description:
-          type: string
+          description: Variable name
+          example: buildType
         type:
           type: string
-          enum:
-            - HumanTask
-            - Terminate
-            - Sequence
-            - Parallel
-            - RestAPI
-            - Case
-            - If
-            - While
-            - Catch
-        status:
+          enum: [text, number, boolean, select, date, file]
+          description: Variable type
+        defaultValue:
+          description: Default value
+          example: "TC"
+        description:
           type: string
-          enum:
-            - Pending
-            - InProgress
-            - Completed
-            - Failed
-            - Cancelled
-            - TimedOut
-        passFail:
+          description: Variable description
+          example: "Type of microphone build"
+
+    Activity:
+      type: object
+      required:
+        - id
+        - type
+      properties:
+        id:
           type: string
-          enum:
-            - NotEvaluated
-            - Pass
-            - Fail
-        lifecycle:
-          type: object
-          description: Lifecycle hooks for this activity
+          description: Unique activity identifier
+          example: askBuildType
+        name:
+          type: string
+          description: Human-readable activity name
+          example: "Ask Build Type"
+        description:
+          type: string
+          description: Activity description
+        type:
+          type: string
+          enum: [human, compute, api, sequence, parallel, branch, terminate]
+          description: Activity type
+        timeout:
+          type: integer
+          description: Activity timeout in seconds
+          example: 300
+
+    # Human interaction activity
+    HumanActivity:
+      allOf:
+        - $ref: "#/components/schemas/Activity"
+        - type: object
           properties:
-            beforeExecute:
-              type: object
-              code:
-                description: Script or logic to execute after the activity completes
-                type: object
-                ref: "#/components/schemas/CodeBlock"
-            afterExecute:
-              type: object
-              code:
-                description: Script or logic to execute after the activity completes
-                type: object
-                ref: "#/components/schemas/CodeBlock"
-        errorHandling:
-          type: object
-          description: Defines error handling for the process
-          properties:
-            onError:
+            type:
+              const: human
+            prompt:
               type: string
-              enum: ["ABORT", "RETRY", "CONTINUE"]
-              description: Action to take on error
-              example: RETRY
-            retryCount:
-              type: integer
-              description: Number of retries allowed
-              example: 3
-            retryDelay:
-              type: integer
-              description: Delay between retries in milliseconds
-              example: 1000
-            retryBackoff: 
-              type: string
-              enum: ["CONSTANT", "LINEAR", "EXPONENTIAL"]
-              description: Retry backoff strategy
-              example: EXPONENTIAL
-        output:
-          description: Output variables
+              description: Prompt shown to user
+              example: "What type of microphone are you building?"
+            inputs:
+              type: array
+              description: Input fields for user
+              items:
+                $ref: "#/components/schemas/Field"
+            fileUploads:
+              type: array
+              description: File upload specifications
+              items:
+                $ref: "#/components/schemas/FileUpload"
+            attachments:
+              type: array
+              description: Reference attachments
+              items:
+                $ref: "#/components/schemas/Attachment"
+
+    Field:
+      type: object
+      required:
+        - name
+        - type
+      properties:
+        name:
+          type: string
+          description: Field identifier
+          example: buildType
+        type:
+          type: string
+          enum: [text, number, boolean, select, date, file]
+          description: Input field type
+        required:
+          type: boolean
+          description: Whether field is required
+          default: false
+        options:
+          type: array
+          description: Options for select fields
+          items:
+            type: string
+          example: ["TC", "TL"]
+        min:
+          type: number
+          description: Minimum value (for numbers)
+        max:
+          type: number
+          description: Maximum value (for numbers)
+        units:
+          type: string
+          description: Units of measurement
+          example: "VDC"
+        defaultValue:
+          description: Default field value
+        description:
+          type: string
+          description: Field description
+
+    FileUpload:
+      type: object
+      required:
+        - name
+        - allowedTypes
+        - maxBytes
+      properties:
+        name:
+          type: string
+          description: Upload identifier
+        description:
+          type: string
+          description: Upload description
+        allowedTypes:
           type: array
           items:
-            $ref: "#/components/schemas/Variable"
+            type: string
+          description: Allowed MIME types
+          example: ["image/jpeg", "image/png"]
+        maxBytes:
+          type: integer
+          description: Maximum file size in bytes
+        minCount:
+          type: integer
+          description: Minimum number of files
+          default: 1
+        maxCount:
+          type: integer
+          description: Maximum number of files
+          default: 1
 
-    # HumanTaskActivity
-    HumanTaskActivity:
-      description: Human task activity.  For interacting with a human
+    Attachment:
+      type: object
+      required:
+        - name
+        - url
+        - mediaType
+      properties:
+        name:
+          type: string
+          description: Attachment name
+        url:
+          type: string
+          description: Attachment URL
+        mediaType:
+          type: string
+          description: MIME type
+        bytes:
+          type: integer
+          description: File size in bytes
+
+    # API call activity
+    APIActivity:
+      allOf:
+        - $ref: "#/components/schemas/Activity"
+        - type: object
+          properties:
+            type:
+              const: api
+            method:
+              type: string
+              enum: [GET, POST, PUT, DELETE]
+              description: HTTP method
+            url:
+              type: string
+              description: API endpoint URL
+              example: "https://api.example.com/validate"
+            headers:
+              type: object
+              description: HTTP headers
+              additionalProperties:
+                type: string
+            queryParams:
+              type: object
+              description: Query parameters
+              additionalProperties:
+                type: string
+            body:
+              description: Request body
+              type: object
+
+    # JavaScript execution activity
+    ComputeActivity:
+      allOf:
+        - $ref: "#/components/schemas/Activity"
+        - type: object
+          properties:
+            type:
+              const: compute
+            code:
+              type: array
+              description: JavaScript code lines
+              items:
+                type: string
+              example:
+                - "const buildType = a:askBuildType.f:buildType;"
+                - "this.result = buildType === 'TC' ? 'pass' : 'fail';"
+
+    # Sequential execution activity
+    SequenceActivity:
+      allOf:
+        - $ref: "#/components/schemas/Activity"
+        - type: object
+          properties:
+            type:
+              const: sequence
+            activities:
+              type: array
+              description: Activities to execute in order
+              items:
+                type: string
+              example: ["a:step1", "a:step2", "a:step3"]
+
+    # Parallel execution activity
+    ParallelActivity:
+      allOf:
+        - $ref: "#/components/schemas/Activity"
+        - type: object
+          properties:
+            type:
+              const: parallel
+            activities:
+              type: array
+              description: Activities to execute in parallel
+              items:
+                type: string
+              example: ["a:task1", "a:task2", "a:task3"]
+
+    # Conditional branching activity
+    BranchActivity:
       allOf:
         - $ref: "#/components/schemas/Activity"
         - type: object
           required:
-            - type
-            - inputs
-          properties:
-            type:
-              const: HumanTask
-            subject:
-              type: string
-            inputs:
-              type: array
-              items:
-                oneOf:
-                  - $ref: "#/Variable"
-            fieldSets:
-              type: array
-              items:
-                type: object
-                properties:
-                  name:
-                    type: string
-                  variables:
-                    type: array
-                    items:
-                      $ref: "#/Variable"
-            fileUploads:
-              type: array
-              items:
-                type: object
-                required:
-                  - name
-                  - allowedTypes
-                  - maxBytes
-                  - minCount
-                  - maxCount
-                properties:
-                  name:
-                    type: string
-                  description:
-                    type: string
-                  allowedTypes:
-                    type: array
-                    items:
-                      type: string
-                  maxBytes:
-                    type: number
-                  minCount:
-                    type: number
-                  maxCount:
-                    type: number
-            attachments:
-              type: array
-              items:
-                type: object
-                required:
-                  - name
-                  - objectUrl
-                  - previewUrl
-                  - mediaType
-                  - bytes
-                properties:
-                  name:
-                    type: string
-                  objectUrl:
-                    type: string
-                  previewUrl:
-                    type: string
-                  mediaType:
-                    type: string
-                  bytes:
-                    type: number
-
-    
-    # RestAPIActivity
-    RestAPIActivity:
-      description: Rest API activity.  For calling a REST API
-      allOf:
-        - $ref: "#/Activity"
-        - type: object
-          required:
-            - type
-            - method
-            - url
-            - headers
-          properties:
-            type:
-              const: RestAPI
-            timeoutSeconds:
-              description: Timeout in seconds
-              type: number
-              example: 30
-            method:
-              description: HTTP method
-              type: string
-              enum:
-                - GET
-                - POST
-                - PUT
-                - DELETE
-            url:
-              description: API Service URL
-              type: string
-              example: "https://example.com/api/v1/resource"
-            headers:
-              type: array
-              description: HTTP headers
-              items:
-                type: object
-                example: [{"key": "Authorization", "value": "Bearer oiweurlrinineoida987dnf8ehe"}]
-                properties:
-                  key:
-                    type: string
-                  value:
-                    type: string
-            queryParams:
-              type: array
-              description: Query parameters
-              items:
-                type: object
-                example: [{"key": "param1", "value": "value1"}]
-                properties:
-                  key:
-                    type: string
-                  value:
-                    type: string
-            request:
-              description: Request body
-              example: {"key": "value"}
-              type: object
-            response:
-              description: Response body set by calling the API
-              type: object
-
-    # ParallelActivity
-    parallelActivity:
-      description: Parallel activity.  Executes activities in parallel
-      allOf:
-        - $ref: "#/Activity"
-        - type: object
-          properties:
-            type:
-              const: Parallel
-            activities:
-              description: Activities to execute in parallel. Can be activities or references to activities
-              type: array
-              example: ["$Activity['r3-activity']", "$Activity['collect-something-else']"]
-              items:
-                oneOf:
-                  - type: string
-                  - $ref: "#/Activity"
-
-    # SequenceActivity
-    sequenceActivity:
-      description: Sequence activity.  Executes activities in series
-      allOf:
-        - $ref: "#/Activity"
-        - type: object
-          properties:
-            type:
-              const: Sequence
-            activities:
-              description: Activities to execute in series. Can be activities or references to activities
-              type: array
-              example: ["$Activity['r3-activity']", "$Activity['collect-something-else']"]
-              items:
-                oneOf:
-                  - type: string
-                  - $ref: "#/Activity"
-
-
-    # TerminateActivity
-    TerminateActivity:
-      description: Terminate activity.  Ends a process
-      allOf:
-        - $ref: "#/Activity"
-        - type: object
-          required:
-            - type
-            - reason
-          properties:
-            type:
-              const: Terminate
-            reason:
-              type: string
-
-    # IfActivity
-    IfActivity:
-      description: If activity. Conditionally executes activities in an if/else block
-      allOf:
-        - $ref: "#/Activity"
-        - type: object
-          required:
-            - type
             - condition
             - then
           properties:
             type:
-              const: If
+              const: branch
             condition:
               type: string
+              description: JavaScript condition expression
+              example: "a:askBuildType.f:buildType === 'TC'"
             then:
-              description: Activities to execute if condition is true. Can be an activity or a reference to an activity
-              oneOf:
-                - $ref: "#/Activity"
-                - type: string
-            else:
-              description: Activities to execute if condition is false. Can be an activity or a reference to an activity
-              oneOf:
-                - $ref: "#/Activity"
-                - type: string
-
-
-    # CaseActivity schema
-    CaseActivity:
-      description: Case activity.  Conditionally executes activities in a case block
-      allOf:
-        - $ref: "#/Activity"
-        - type: object
-          required:
-            - type
-            - cases
-          properties:
-            type:
-              const: Case
-            cases:
-              type: array
-              items:
-                type: object
-                properties:
-                  condition:
-                    type: string
-                  activity:
-                    oneOf:
-                      - type: string
-                      - $ref: "#/Activity"
-
-    # WhileActivity schema
-    WhileActivity:
-      description: While activity.  Conditionally executes activities while a condition is true
-      allOf:
-        - $ref: "#/Activity"
-        - type: object
-          required:
-            - type
-            - condition
-            - activity
-          properties:
-            type:
-              const: While
-            condition:
               type: string
-              example: i < 10
-            activity:
-              description: Activity to execute while condition is true. Can be an activity or a reference to an activity
-              oneOf:
-                - type: string
-                - $ref: "#/Activity"
-    CodeBlock:
-      description: Code Exectuion Block
-      type: object
-      required:
-        - language
-        - code
-      properties:
-        language:
-          type: string
-          description: Programming language
-          enum:
-            - JS
-        code:
-          type: array
-          description: Lines of code to execute
-          example: ["$Activity['r3-activity'].value = $Activity['r3-activity'].value + 1;"]
-          items:
-            type: string
-    
-    Event:
-      type: object
-      properties:
-        eventId:
-          type: string
-          description: Unique event ID
-        name:
-          type: string
-          description: Event name
-        trigger:
-          type: string
-          description: Trigger condition
-          example: onStart
-        actions:
-          type: array
-          description: Actions to perform when the event triggers
-          items:
-            oneOf:
-              - type: string
-              - $ref: "#/components/schemas/Activity"
+              description: Activity to execute if condition is true
+              example: "a:tcSequence"
+            else:
+              type: string
+              description: Activity to execute if condition is false
+              example: "a:tlSequence"
 
-    ProcessMetaData:
+    # Process termination activity
+    TerminateActivity:
+      allOf:
+        - $ref: "#/components/schemas/Activity"
+        - type: object
+          properties:
+            type:
+              const: terminate
+            reason:
+              type: string
+              description: Termination reason
+              example: "Process completed successfully"
+            result:
+              type: string
+              enum: [success, failure]
+              description: Termination result
+              default: success
+
+# Runtime schemas (for process instances)
+processInstance:
+  type: object
+  required:
+    - instanceId
+    - processId
+    - status
+  properties:
+    instanceId:
+      type: string
+      description: Unique instance identifier
+    processId:
+      type: string
+      description: Reference to process definition
+    status:
+      type: string
+      enum: [running, completed, failed, cancelled]
+      description: Instance execution status
+    startedAt:
+      type: string
+      format: date-time
+      description: Instance start time
+    completedAt:
+      type: string
+      format: date-time
+      description: Instance completion time
+    currentActivity:
+      type: string
+      description: Currently executing activity
+    variables:
       type: object
-      properties:
-        version:
-          type: string
-          description: Schema version
-          example: 1.0.0
-        createdBy:
-          type: string
-          description: Creator of the process
-          example: Admin
-        createdAt:
-          type: string
-          format: date-time
-          description: Timestamp when the process was created
-          example: 2025-01-01T12:00:00Z
+      description: Process variable values
+      additionalProperties: true
+    activities:
+      type: object
+      description: Activity instance states
+      additionalProperties:
+        $ref: "#/components/schemas/ActivityInstance"
+
+activityInstance:
+  type: object
+  required:
+    - id
+    - type
+    - status
+  properties:
+    id:
+      type: string
+      description: Activity identifier
+    type:
+      type: string
+      enum: [human, compute, api, sequence, parallel, branch, terminate]
+    status:
+      type: string
+      enum: [pending, running, completed, failed, cancelled, timeout]
+    passFail:
+      type: string
+      enum: [pass, fail]
+      description: Quality check result
+    startedAt:
+      type: string
+      format: date-time
+    completedAt:
+      type: string
+      format: date-time
+    data:
+      type: object
+      description: Activity execution data
+      additionalProperties: true
+    error:
+      type: string
+      description: Error message if failed

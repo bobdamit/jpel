@@ -1,240 +1,198 @@
 {
-	"pid": "mic-build",
-	"name": "Build a Microphone",
-	"description": "Process to build a microphone with specific quality checks for TC and TL types",
-	"variables": [],
-	"activities": [
-		"$Activity['askBuildType']",
-		{
-			"aid": "checkBuildType",
-			"name": "Check Build Type",
-			"description": "Check the build type and proceed accordingly",
-			"type": "If",
-			"condition": "$Activity['askBuildType'].buildType === 'TC'",
-			"then": {
-				"aid": "tcSequence",
-				"name": "TC Build Sequence",
-				"description": "Sequence of activities for TC build",
-				"type": "Sequence",
-				"activities": [
-					"$Activity['collectBiasRs']",
-					"$Activity['checkR3Values']"
-				],
-				"status": "Pending"
-			},
-			"else": {
-				"aid": "tlSequence",
-				"name": "TL Build Sequence",
-				"description": "Sequence of activities for TL build",
-				"type": "Sequence",
-				"activities": [
-					"$Activity['measureVPolAndVPlus']",
-					"$Activity['validateVPolRatio']"
-				],
-				"status": "Pending"
-			},
-			"status": "Pending"
-		},
-		"$Activity['finish-sequence']"
-	],
-	"activityRepo": [
-		{
-			"aid": "askBuildType",
-			"name": "Collect Basic Build Facts",
-			"description": "Ask user if build is a TC or TL type",
-			"type": "HumanTask",
-			"subject": "What is the build type?",
-			"fieldSets": [
-				{
-					"variables": [
-						{
-							"name": "buildType",
-							"type": "Enum",
-							"constraint": {
-								"required": true,
-								"allowedValues": [
-									"TC",
-									"TL"
-								]
-							},
-							"description": "The type of build (TC or TL)"
-						}
-					]
-				}
-			],
-			"status": "Pending"
-		},
-		{
-			"aid": "collectBiasRs",
-			"name": "Collect Bias Resistors",
-			"description": "Collect numeric value of R3Pot and R3",
-			"type": "HumanTask",
-			"subject": "Enter R3Pot and R3 values",
-			"fields": [
-				{
-					"variables": [
-						{
-							"name": "R3Pot",
-							"type": "Number",
-							"description": "Numeric value of R3Pot",
-							"constraint": {
-								"min": 0,
-								"required": true
-							}
-						},
-						{
-							"name": "R3",
-							"type": "Number",
-							"description": "Numeric value of R3",
-							"constraint": {
-								"min": 0,
-								"required": true
-							}
-						}
-					]
-				}
-			],
-			"status": "Pending"
-		},
-		{
-			"aid": "checkR3Values",
-			"name": "Check R3 Values",
-			"description": "Check if R3 values are within 1.5%",
-			"type": "Compute",
-			"language": "JS",
-			"code": [
-				"const R3Pot = $Activity['collectBiasRs'].R3Pot;",
-				"const R3 = $Activity['collectBiasRs'].R3;",
-				"const withinRange = Math.abs(R3Pot - R3) <= 0.015 * R3;",
-				"$This.passFail = withinRange ? 'Pass' : 'Fail';"
-			],
-			"output": [],
-			"status": "Pending"
-		},
-		{
-			"aid": "measureVPolAndVPlus",
-			"name": "Measure VPol and V+",
-			"description": "Measure numeric values of VPol and V+",
-			"type": "HumanTask",
-			"subject": "Enter VPol and V+ values",
-			"fields": [
-				{
-					"variables": [
-						{
-							"name": "VPol",
-							"vid": "vpol",
-							"type": "Number",
-							"description": "Numeric value of VPol",
-							"constraint": {
-								"min": 0,
-								"max": 100,
-								"required": true
-							},
-							"presentation" : {
-								"units" : "VDC",
-								"precision" : 2
-							}
-						},
-						{
-							"name": "VPlus",
-							"vid" : "vplus",
-							"type": "Number",
-							"description": "Numeric value of V+",
-							"constraint": {
-								"min": 0,
-								"max": 20,
-								"required": true
-							},
-							"presentation" : {
-								"units" : "VDC",
-								"precision" : 2
-							}
-						}
-					]
-				}
-			],
-			"status": "Pending"
-		},
-		{
-			"aid": "validateVPolRatio",
-			"name": "Compute VPol to V+ Ratio",
-			"description": "Compute the ratio of VPol to V+",
-			"type": "Compute",
-			"language": "JS",
-			"code": [
-				"const VPol = $Activity['measureVPolAndVPlus'].vpol;",
-				"const VPlus = $Activity['measureVPolAndVPlus'].vplus;",
-				"const ratio = VPol / VPlus;",
-				"const withinRange = Math.abs(ratio - 6.0) <= 0.02 * 6.0;",
-				"$This.passFail = withinRange ? 'Pass' : 'Fail';"
-			],
-			"output": [],
-			"status": "Pending"
-		},
-		{
-			"aid": "finish-sequence",
-			"name" : "Finish Sequence",
-			"description": "Sequence of activities to finish the build process",
-			"type" : "Sequence",
-			"activities": [
-				{
-					"aid": "final-qc",
-					"name": "Final QC",
-					"description": "Final checks before shipping",
-					"type": "HumanTask",
-					"fieldSets": [
-						{
-							"variables": [
-								{
-									"name": "XLR",
-									"vid" : "xlr",
-									"type": "Boolean",
-									"description": "XLR Pins Straight and Clean?",
-									"constraint": {
-										"required": true
-									}
-								},
-								{
-									"name": "Finish",
-									"vid": "finish",
-									"type": "Boolean",
-									"description": "Paint, Badge, Cosmetics all good?",
-									"constraint": {
-										"required": true
-									}
-								}
-							]
-						}
-					],
-					"fileUploads" : [
-						{
-							"name" : "Photo",
-							"description" : "Upload a photo of the microphone",
-							"required" : true,
-							"maxBytes" : 4096,
-							"minCount" : 1,
-							"maxCount" : 4,
-							"allowedMimeTypes" : [
-								"image/jpeg",
-								"image/png"
-							]
-						}
-					],
-					"status": "Pending"
-				},
-				{
-					"aid" : "check-finish",
-					"name": "Check Finish",
-					"description": "Check if Finish Steps are done",
-					"type" : "Compute",
-					"language": "JS",
-					"code": [
-						"const XLR = $Activity['final-qc'].xlr;",
-						"const Finish = $Activity['final-qc'].finish;",
-						"$Activity['final-qc'].passFail = XLR && Finish ? 'Pass' : 'Fail';"
-					]
-				}
-			]
-		}
-	]
+  "id": "mic-build",
+  "name": "Build a Microphone",
+  "description": "Quality control process for microphone assembly with TC and TL build paths",
+  "version": "2.0.0",
+  "start": "a:askBuildType",
+  "activities": {
+    "askBuildType": {
+      "id": "askBuildType",
+      "name": "Collect Build Information",
+      "type": "human",
+      "prompt": "What type of microphone are you building?",
+      "inputs": [
+        {
+          "name": "buildType",
+          "type": "select",
+          "required": true,
+          "options": ["TC", "TL"],
+          "description": "Type of microphone build"
+        }
+      ]
+    },
+    
+    "checkBuildType": {
+      "id": "checkBuildType",
+      "name": "Route Based on Build Type",
+      "type": "branch",
+      "condition": "a:askBuildType.f:buildType === 'TC'",
+      "then": "a:tcSequence",
+      "else": "a:tlSequence"
+    },
+    
+    "tcSequence": {
+      "id": "tcSequence",
+      "name": "TC Build Quality Checks",
+      "type": "sequence",
+      "activities": [
+        "a:collectBiasRs",
+        "a:checkR3Values"
+      ]
+    },
+    
+    "tlSequence": {
+      "id": "tlSequence", 
+      "name": "TL Build Quality Checks",
+      "type": "sequence",
+      "activities": [
+        "a:measureVoltages",
+        "a:validateVPolRatio"
+      ]
+    },
+    
+    "collectBiasRs": {
+      "id": "collectBiasRs",
+      "name": "Collect Bias Resistor Values",
+      "type": "human",
+      "prompt": "Measure and enter the bias resistor values",
+      "inputs": [
+        {
+          "name": "R3Pot",
+          "type": "number",
+          "required": true,
+          "min": 0,
+          "units": "Ω",
+          "description": "R3 Potentiometer resistance value"
+        },
+        {
+          "name": "R3",
+          "type": "number", 
+          "required": true,
+          "min": 0,
+          "units": "Ω",
+          "description": "R3 resistor value"
+        }
+      ]
+    },
+    
+    "checkR3Values": {
+      "id": "checkR3Values",
+      "name": "Validate R3 Tolerance",
+      "type": "compute",
+      "code": [
+        "const R3Pot = a:collectBiasRs.f:R3Pot;",
+        "const R3 = a:collectBiasRs.f:R3;",
+        "const tolerance = Math.abs(R3Pot - R3) / R3;",
+        "const withinTolerance = tolerance <= 0.015;",
+        "this.passFail = withinTolerance ? 'pass' : 'fail';",
+        "this.data = { tolerance: tolerance, withinSpec: withinTolerance };"
+      ]
+    },
+    
+    "measureVoltages": {
+      "id": "measureVoltages",
+      "name": "Measure Voltage Values", 
+      "type": "human",
+      "prompt": "Measure the voltage values with a multimeter",
+      "inputs": [
+        {
+          "name": "VPol",
+          "type": "number",
+          "required": true,
+          "min": 0,
+          "max": 100,
+          "units": "VDC",
+          "description": "Polarization voltage measurement"
+        },
+        {
+          "name": "VPlus",
+          "type": "number",
+          "required": true, 
+          "min": 0,
+          "max": 20,
+          "units": "VDC",
+          "description": "Positive supply voltage measurement"
+        }
+      ]
+    },
+    
+    "validateVPolRatio": {
+      "id": "validateVPolRatio",
+      "name": "Calculate VPol to V+ Ratio",
+      "type": "compute",
+      "code": [
+        "const VPol = a:measureVoltages.f:VPol;",
+        "const VPlus = a:measureVoltages.f:VPlus;", 
+        "const ratio = VPol / VPlus;",
+        "const targetRatio = 6.0;",
+        "const tolerance = Math.abs(ratio - targetRatio) / targetRatio;",
+        "const withinSpec = tolerance <= 0.02;",
+        "this.passFail = withinSpec ? 'pass' : 'fail';",
+        "this.data = { ratio: ratio, tolerance: tolerance, withinSpec: withinSpec };"
+      ]
+    },
+    
+    "finalSequence": {
+      "id": "finalSequence",
+      "name": "Final Quality Control",
+      "type": "sequence", 
+      "activities": [
+        "a:finalInspection",
+        "a:validateFinalQC",
+        "a:completeProcess"
+      ]
+    },
+    
+    "finalInspection": {
+      "id": "finalInspection",
+      "name": "Final Visual Inspection",
+      "type": "human",
+      "prompt": "Perform final visual inspection and photo documentation",
+      "inputs": [
+        {
+          "name": "xlrPins",
+          "type": "boolean",
+          "required": true,
+          "description": "Are XLR pins straight and clean?"
+        },
+        {
+          "name": "cosmetics",
+          "type": "boolean", 
+          "required": true,
+          "description": "Are paint, badge, and cosmetics acceptable?"
+        }
+      ],
+      "fileUploads": [
+        {
+          "name": "photos",
+          "description": "Photos of completed microphone",
+          "allowedTypes": ["image/jpeg", "image/png"],
+          "maxBytes": 5242880,
+          "minCount": 1,
+          "maxCount": 4
+        }
+      ]
+    },
+    
+    "validateFinalQC": {
+      "id": "validateFinalQC",
+      "name": "Validate Final QC Results",
+      "type": "compute",
+      "code": [
+        "const xlrOk = a:finalInspection.f:xlrPins;",
+        "const cosmeticsOk = a:finalInspection.f:cosmetics;",
+        "const allChecksPass = xlrOk && cosmeticsOk;",
+        "this.passFail = allChecksPass ? 'pass' : 'fail';",
+        "this.data = { finalQCPassed: allChecksPass };"
+      ]
+    },
+    
+    "completeProcess": {
+      "id": "completeProcess", 
+      "name": "Complete Build Process",
+      "type": "terminate",
+      "reason": "Microphone build process completed",
+      "result": "success"
+    }
+  }
 }
