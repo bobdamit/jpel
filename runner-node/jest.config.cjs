@@ -7,30 +7,18 @@ module.exports = {
     '**/?(*.)+(spec|test).ts'
   ],
   transform: {
-    '^.+\\.ts$': ['ts-jest', {
-      tsconfig: 'tsconfig.json',
-      useESM: true
-    }],
+    '^.+\\.(ts|js)$': ['ts-jest', { tsconfig: 'tsconfig.json', useESM: true }]
   },
+  // Treat TypeScript files as ESM modules
   extensionsToTreatAsEsm: ['.ts'],
   // Transform ESM-only dependencies like `uuid` by excluding them from the ignore pattern
   transformIgnorePatterns: ['node_modules/(?!(uuid)/)'],
-  extensionsToTreatAsEsm: ['.ts'],
-  transform: {
-    '^.+\\.ts$': ['ts-jest', { tsconfig: 'tsconfig.json', useESM: true }],
-    '^.+\\.js$': ['ts-jest', { tsconfig: 'tsconfig.json', useESM: true }]
-  },
-  globals: {
-    'ts-jest': {
-      useESM: true
-    }
-  },
   collectCoverageFrom: [
     'src/**/*.ts',
     '!src/index.ts',
-    '!src/**/*.d.ts',
+    '!src/**/*.d.ts'
   ],
   coverageDirectory: 'coverage',
   coverageReporters: ['text', 'lcov', 'html'],
-  setupFilesAfterEnv: ['<rootDir>/tests/setup.ts'],
+  setupFilesAfterEnv: ['<rootDir>/tests/setup.ts']
 };
