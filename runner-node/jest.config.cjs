@@ -13,6 +13,13 @@ module.exports = {
     }],
   },
   extensionsToTreatAsEsm: ['.ts'],
+  // Transform ESM-only dependencies like `uuid` by excluding them from the ignore pattern
+  transformIgnorePatterns: ['node_modules/(?!(uuid)/)'],
+  extensionsToTreatAsEsm: ['.ts'],
+  transform: {
+    '^.+\\.ts$': ['ts-jest', { tsconfig: 'tsconfig.json', useESM: true }],
+    '^.+\\.js$': ['ts-jest', { tsconfig: 'tsconfig.json', useESM: true }]
+  },
   globals: {
     'ts-jest': {
       useESM: true
