@@ -12,6 +12,7 @@ const logger = {
 /**
  * In-memory implementation of ProcessInstanceRepository
  * Good for development, testing, and small deployments
+ * Stores instances in memory only (not persisted to disk)
  */
 export class InMemoryProcessInstanceRepository implements ProcessInstanceRepository {
   private instances = new Map<string, ProcessInstance>();

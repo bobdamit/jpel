@@ -7,7 +7,7 @@
 	"variables": [
 		{
 			"name": "finalStatus",
-			"type": "string",
+			"type": "text",
 			"description": "Final approval status"
 		}
 	],

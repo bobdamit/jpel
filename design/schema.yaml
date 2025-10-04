@@ -166,6 +166,20 @@ components:
           description: Human-readable description of the pattern requirements
           example: "Please enter a valid email address (e.g., user@example.com)"
 
+# Runtime conversion notes
+# When a process instance is created from a Process Template, HumanActivity.inputs
+# (which are arrays of `Field` objects) MUST be converted into `FieldValue` objects
+# where each FieldValue extends the Field schema with an additional `value` field.
+#
+# Conversion rules:
+# - Field.defaultValue -> FieldValue.value when creating a new instance (if present)
+# - If no defaultValue is present, FieldValue.value may be undefined
+# - When a human task is submitted, engine updates both activityInstance.data and
+#   activityInstance.inputs[*].value to ensure expressions and UI binding both work.
+# - API endpoints must return FieldValue[] for current human tasks so clients can
+#   bind to `field.value` for pre-population during re-run or resume.
+
+
     FileUpload:
       type: object
       required:
@@ -398,6 +412,36 @@ processInstance:
       type: object
       description: Process variable values
       additionalProperties: true
+
+# Conversion rules and runtime notes
+# ==================================================
+# When a Process Template (definition) is instantiated into a Process Run Instance,
+# the following conversion rules are applied to ensure runtime state is captured
+# and the UI can bind to runtime values.
+#
+# - Field -> FieldValue conversion:
+#   * For each HumanActivity.inputs (an array of `Field` objects) in the process template,
+#     the engine creates a corresponding `inputs` array on the ActivityInstance where each
+#     item is a `FieldValue` (i.e., a Field with an added `value` property).
+#   * The initial `value` is set to the Field's `defaultValue` if present, otherwise left
+#     undefined.
+#
+# - Storing runtime data:
+#   * When a human task is submitted, the submitted key/value pairs are stored in two places:
+#     1) activityInstance.data (a plain map used by expressions and legacy code), and
+#     2) activityInstance.inputs (an array of `FieldValue`) — each matching field's `.value` is
+#        updated so UI clients can read a consistent runtime model.
+#
+# - Re-run behavior:
+#   * When re-running an instance, previous activityInstance.data values are copied into the
+#     new instance's `inputs` (FieldValue[].value) so that human tasks are pre-populated with
+#     prior values.
+#
+# - API behavior:
+#   * Endpoints that return human tasks (e.g., `/api/instances/:id/current-task`, `createInstance`)
+#     must return `FieldValue[]` (not `Field[]`) in the `humanTask.fields` payload so UI code can
+#     safely access `field.value`.
+
     activities:
       type: object
       description: Activity instance states

@@ -182,6 +182,51 @@ npm run dev
 
 Complete schema documentation is available in `/design/schema.yaml`.
 
+## Process Template vs Process Run Instance (Important)
+
+There are two distinct concepts used throughout JPEL:
+
+- Process Template (aka Process Definition)
+  - Stored under `/samples` or loaded via the API.
+  - Describes the static structure of a process: activities, variables, prompts, and field definitions.
+  - Uses `Field` objects for human activity inputs. `Field` is a schema-only definition and does NOT contain runtime values.
+
+- Process Run Instance (aka Process Instance)
+  - Created from a Process Template when you start or re-run a process instance (e.g. `POST /api/processes/:id/instances`).
+  - Represents runtime state: current activity, activity instances, persisted values, and history.
+  - Uses `FieldValue` objects for human activity inputs inside the running instance. `FieldValue` extends `Field` and adds a `value` property that holds runtime data.
+
+Key principles and lifecycle:
+
+1. When an instance is created from a template, every `Field` in a `HumanActivity.inputs` array is converted into a `FieldValue` in the corresponding activity instance. The conversion sets `value` to the field's `defaultValue` (or `null`/`undefined` when no default exists).
+2. When a human task is submitted, the engine stores submitted data both in the activity instance `data` map (legacy and for expression access) and by updating the activity instance's `inputs` array of `FieldValue` objects. This ensures UI code can always bind to `field.value`.
+3. When an instance is re-run, the engine replays or copies previous `FieldValue` data into the new instance's `FieldValue[]`, so UI forms are pre-populated from the previous run.
+4. API endpoints that return current human tasks (for UI rendering) always return `FieldValue[]` (not `Field[]`) so clients can safely read `field.value` for pre-population.
+
+Quick example (template -> instance):
+
+Template excerpt (HumanActivity.inputs):
+
+```json
+{
+  "inputs": [
+    { "name": "userName", "type": "text", "defaultValue": "" }
+  ]
+}
+```
+
+Instance activity inputs (FieldValue[]):
+
+```json
+{
+  "inputs": [
+    { "name": "userName", "type": "text", "defaultValue": "", "value": "Alice" }
+  ]
+}
+```
+
+If you are implementing a UI or integration, bind to `field.value` rather than assuming `field` contains values. The tests and engine logic now enforce this pattern.
+
 ## 🤝 Contributing
 
 1. Fork the repository

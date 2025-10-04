@@ -31,7 +31,7 @@
 			"inputs": [
 				{
 					"name": "employeeName",
-					"type": "string",
+					"type": "text",
 					"label": "Employee Name",
 					"required": true,
 					"placeholder": "Full name",

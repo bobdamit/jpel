@@ -103,6 +103,14 @@ export interface Field {
 	patternDescription?: string; // Description of the pattern for UI display
 }
 
+/**
+ * Runtime field value that extends the field definition with actual data
+ * Used in process instances to store collected/computed field values
+ */
+export interface FieldValue extends Field {
+	value: any; // The actual runtime value
+}
+
 export enum FieldType {
 	Text = "text",
 	Number = "number",
@@ -197,9 +205,10 @@ export interface ApiResponse<T = any> {
 export interface HumanTaskData {
 	activityId: string;
 	prompt?: string;
-	fields: Field[];
+	fields: FieldValue[]; // Runtime fields with values for UI
 	fileUploads?: FileUpload[];
 	attachments?: Attachment[];
+	context?: { [key: string]: any }; // Additional context data, e.g., previous run data
 }
 
 export interface ProcessExecutionResult {

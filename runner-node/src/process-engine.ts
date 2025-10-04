@@ -17,6 +17,8 @@ import {
 	BranchActivity,
 	SwitchActivity,
 	TerminateActivity,
+	Field,
+	FieldValue,
 	ProcessExecutionResult,
 	HumanTaskData
 } from './types';
@@ -88,7 +90,7 @@ export class ProcessEngine {
 	}
 
 	// Create a new process instance
-	async createInstance(processId: string): Promise<ProcessExecutionResult> {
+	async createInstance(processId: string, contextData?: { [activityId: string]: any }): Promise<ProcessExecutionResult> {
 		logger.info(`ProcessEngine: Creating instance for process '${processId}'`);
 
 		const processDefinition = await this.processDefinitionRepo.findById(processId);
@@ -154,7 +156,7 @@ export class ProcessEngine {
 		await this.processInstanceRepo.save(instance);
 		logger.info(`ProcessEngine: Instance '${instanceId}' saved to repository`);
 
-		return await this.executeNextStep(instanceId);
+		return await this.executeNextStep(instanceId, contextData);
 	}
 
 	// Get process instance
@@ -163,7 +165,7 @@ export class ProcessEngine {
 	}
 
 	// Execute the next step in a process instance
-	async executeNextStep(instanceId: string): Promise<ProcessExecutionResult> {
+	async executeNextStep(instanceId: string, contextData?: { [activityId: string]: any }): Promise<ProcessExecutionResult> {
 		logger.info(`ProcessEngine: Executing next step for instance '${instanceId}'`);
 
 		const instance = await this.processInstanceRepo.findById(instanceId);
@@ -217,7 +219,16 @@ export class ProcessEngine {
 		}
 
 		logger.info(`ProcessEngine: Executing activity '${instance.currentActivity}' of type '${activity.type}'`);
-		return await this.executeActivity(instanceId, activity);
+		try {
+			return await this.executeActivity(instanceId, activity, contextData);
+		} catch (error) {
+			logger.error(`ProcessEngine: Error executing activity '${instance.currentActivity}' for instance '${instanceId}'`, error);
+			return {
+				instanceId,
+				status: ProcessStatus.Failed,
+				message: `Error executing activity: ${error instanceof Error ? error.message : String(error)}`
+			};
+		}
 	}
 
 	// Submit data for a human task
@@ -289,6 +300,15 @@ export class ProcessEngine {
 			activityInstance.data._files = files;
 		}
 
+		// Update FieldValue objects in the activity instance inputs array
+		if ((activityInstance as any).inputs && Array.isArray((activityInstance as any).inputs)) {
+			(activityInstance as any).inputs.forEach((fieldValue: FieldValue) => {
+				if (data.hasOwnProperty(fieldValue.name)) {
+					fieldValue.value = data[fieldValue.name];
+				}
+			});
+		}
+
 		logger.debug(`ProcessEngine: Stored human task data`, {
 			activityId,
 			dataStored: activityInstance.data
@@ -307,7 +327,7 @@ export class ProcessEngine {
 		return await this.continueExecution(instanceId);
 	}
 
-	private async executeActivity(instanceId: string, activity: Activity): Promise<ProcessExecutionResult> {
+	private async executeActivity(instanceId: string, activity: Activity, contextData?: { [activityId: string]: any }): Promise<ProcessExecutionResult> {
 		logger.info(`ProcessEngine: Executing activity '${activity.id}' of type '${activity.type}' for instance '${instanceId}'`);
 
 		const instance = await this.processInstanceRepo.findById(instanceId);
@@ -339,12 +359,10 @@ export class ProcessEngine {
 			let result: ProcessExecutionResult;
 
 			switch (activity.type) {
-				case ActivityType.Human:
-					logger.info(`ProcessEngine: Executing human activity '${activity.id}'`);
-					result = await this.executeHumanActivity(instanceId, activity as HumanActivity);
-					break;
-
-				case ActivityType.Compute:
+			case ActivityType.Human:
+				logger.info(`ProcessEngine: Executing human activity '${activity.id}'`);
+				result = await this.executeHumanActivity(instanceId, activity as HumanActivity, contextData);
+				break;				case ActivityType.Compute:
 					logger.info(`ProcessEngine: Executing compute activity '${activity.id}'`);
 					result = await this.executeComputeActivity(instanceId, activity as ComputeActivity);
 					break;
@@ -410,14 +428,41 @@ export class ProcessEngine {
 		}
 	}
 
-	private async executeHumanActivity(instanceId: string, activity: HumanActivity): Promise<ProcessExecutionResult> {
+	private async executeHumanActivity(instanceId: string, activity: HumanActivity, contextData?: { [activityId: string]: any }): Promise<ProcessExecutionResult> {
 		// Human activities wait for external input
+		const instance = await this.processInstanceRepo.findById(instanceId);
+		if (!instance) {
+			return {
+				instanceId,
+				status: ProcessStatus.Failed,
+				message: 'Process instance not found'
+			};
+		}
+
+		const activityInstance = instance.activities[activity.id];
+		
+		// If we have context data from a re-run, update the FieldValue objects
+		if (contextData?.[activity.id]) {
+			const previousData = contextData[activity.id];
+			if ((activityInstance as any).inputs && Array.isArray((activityInstance as any).inputs)) {
+				(activityInstance as any).inputs.forEach((fieldValue: FieldValue) => {
+					if (previousData.hasOwnProperty(fieldValue.name)) {
+						fieldValue.value = previousData[fieldValue.name];
+					}
+				});
+			}
+		}
+		
+		// Use the FieldValue objects directly from the activity instance
+		const fieldsWithValues: FieldValue[] = (activityInstance as any).inputs || [];
+		
 		const humanTaskData: HumanTaskData = {
 			activityId: activity.id,
 			prompt: activity.prompt,
-			fields: activity.inputs || [],
+			fields: fieldsWithValues,
 			fileUploads: activity.fileUploads,
-			attachments: activity.attachments
+			attachments: activity.attachments,
+			context: contextData?.[activity.id] ? { previousRunData: contextData[activity.id] } : undefined
 		};
 
 		return {
@@ -877,10 +922,23 @@ export class ProcessEngine {
 		const result: { [key: string]: ActivityInstance } = {};
 
 		Object.values(activities).forEach(activity => {
-			result[activity.id] = {
+			const activityInstance: ActivityInstance = {
 				...activity,
 				status: ActivityStatus.Pending
 			};
+
+			// For human activities, convert Field[] to FieldValue[] with default values
+			if (activity.type === ActivityType.Human) {
+				const humanActivity = activity as HumanActivity;
+				if (humanActivity.inputs) {
+					(activityInstance as any).inputs = humanActivity.inputs.map(field => ({
+						...field,
+						value: field.defaultValue
+					}));
+				}
+			}
+
+			result[activity.id] = activityInstance;
 		});
 
 		return result;
@@ -897,6 +955,25 @@ export class ProcessEngine {
 
 	async getInstancesWaitingForHumanTask(): Promise<ProcessInstance[]> {
 		return await this.processInstanceRepo.findInstancesWaitingForHumanTask();
+	}
+
+	async reRunInstance(instanceId: string): Promise<ProcessExecutionResult> {
+		// Get the existing instance
+		const existingInstance = await this.processInstanceRepo.findById(instanceId);
+		if (!existingInstance) {
+			throw new Error(`Instance ${instanceId} not found`);
+		}
+
+		// Extract context data from completed activities with human task data
+		const contextData: { [activityId: string]: any } = {};
+		for (const [activityId, activity] of Object.entries(existingInstance.activities)) {
+			if (activity.data && Object.keys(activity.data).length > 0) {
+				contextData[activityId] = activity.data;
+			}
+		}
+
+		// Create a new instance with context data from the previous run
+		return await this.createInstance(existingInstance.processId, contextData);
 	}
 
 	async getProcessStatistics(): Promise<{ [key: string]: number }> {

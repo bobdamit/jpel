@@ -293,23 +293,20 @@ app.get(
 			currentActivity.status === "running" &&
 			currentActivity.type === "human"
 		) {
-			// This is a waiting human task - we need to reconstruct the task data
-			const processDefinition = await processEngine.getProcess(instance.processId);
-			const activityDef =
-				processDefinition?.activities[instance.currentActivity];
+			// This is a waiting human task - return the FieldValue[] directly from activity instance
+			const fieldsWithValues = (currentActivity as any).inputs || [];
 
-			if (activityDef) {
-				const humanTaskData = {
-					activityId: currentActivity.id,
-					prompt: (activityDef as any).prompt,
-					fields: (activityDef as any).inputs || [],
-					fileUploads: (activityDef as any).fileUploads,
-					attachments: (activityDef as any).attachments,
-				};
+			const humanTaskData = {
+				activityId: currentActivity.id,
+				prompt: (currentActivity as any).prompt,
+				fields: fieldsWithValues, // These are already FieldValue[] objects
+				fileUploads: (currentActivity as any).fileUploads,
+				attachments: (currentActivity as any).attachments,
+				context: currentActivity.data && Object.keys(currentActivity.data).length > 0 ? { previousRunData: currentActivity.data } : undefined
+			};
 
-				res.json(createResponse(true, { humanTask: humanTaskData }));
-				return;
-			}
+			res.json(createResponse(true, { humanTask: humanTaskData }));
+			return;
 		}
 
 		res.json(
@@ -320,6 +317,31 @@ app.get(
 			})
 		);
 	}
+);
+
+// Get process instances for a specific process
+app.get("/api/processes/:processId/instances", async (req: Request, res: Response): Promise<void> => {
+	const { processId } = req.params;
+	const instances = await processEngine.getInstancesByProcessId(processId);
+
+	res.json(createResponse(true, instances));
+});
+
+// Re-run a process instance
+app.post(
+	"/api/instances/:instanceId/rerun",
+	asyncHandler(async (req: Request, res: Response): Promise<void> => {
+		const { instanceId } = req.params;
+
+		const result: ProcessExecutionResult = await processEngine.reRunInstance(instanceId);
+
+		if (result.status === "failed") {
+			res.status(400).json(createResponse(false, null, result.message));
+			return;
+		}
+
+		res.json(createResponse(true, result));
+	})
 );
 
 // Error handling middleware

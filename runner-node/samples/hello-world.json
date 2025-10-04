@@ -16,7 +16,7 @@
 			"inputs": [
 				{
 					"name": "userName",
-					"type": "string",
+					"type": "text",
 					"label": "Your Name",
 					"required": true,
 					"placeholder": "Enter your full name"
