@@ -1,4 +1,4 @@
-import { ProcessDefinition } from '../types';
+import { ProcessDefinition, ProcessTemplateFlyweight } from '../types';
 import { ProcessDefinitionRepository } from './process-definition-repository';
 
 // Logger instance for this repository
@@ -91,6 +91,47 @@ export class MongoProcessDefinitionRepository implements ProcessDefinitionReposi
         error: error instanceof Error ? error.message : String(error)
       });
       throw error;
+    }
+  }
+
+  /**
+   * List available process templates without loading them into memory
+   */
+  async listAvailableTemplates(): Promise<ProcessTemplateFlyweight[]> {
+    try {
+      logger.debug('Listing available process templates from MongoDB');
+
+      // Group by process ID and get the latest version for each
+      const pipeline = [
+        {
+          $group: {
+            _id: '$id',
+            latestDoc: { $first: '$$ROOT' },
+            versions: { $push: '$version' }
+          }
+        },
+        {
+          $replaceRoot: { newRoot: '$latestDoc' }
+        }
+      ];
+
+      const results = await this.collection.aggregate(pipeline).toArray();
+
+      const templates: ProcessTemplateFlyweight[] = results.map((doc: any) => ({
+        id: doc.id,
+        name: doc.name,
+        description: doc.description,
+        version: doc.version
+      }));
+
+      logger.info(`Found ${templates.length} available process templates in MongoDB`);
+      return templates;
+
+    } catch (error) {
+      logger.error('Failed to list available templates from MongoDB', {
+        error: error instanceof Error ? error.message : String(error)
+      });
+      return [];
     }
   }
 

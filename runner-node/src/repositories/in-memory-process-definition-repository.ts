@@ -1,4 +1,4 @@
-import { ProcessDefinition } from '../types';
+import { ProcessDefinition, ProcessTemplateFlyweight } from '../types';
 import { ProcessDefinitionRepository } from './process-definition-repository';
 
 // Logger setup
@@ -15,72 +15,136 @@ const logger = {
  */
 export class InMemoryProcessDefinitionRepository implements ProcessDefinitionRepository {
   private processes = new Map<string, ProcessDefinition>();
+  private samplesDir: string;
 
   constructor() {
+    this.samplesDir = require('path').join(require('process').cwd(), 'samples');
     logger.info('Initializing in-memory process definition repository');
-    this.loadSampleProcesses();
   }
 
   /**
-   * Load all process JSON files from the /samples directory
+   * List available process templates without loading them into memory
    */
-  private async loadSampleProcesses(): Promise<void> {
+  async listAvailableTemplates(): Promise<ProcessTemplateFlyweight[]> {
     try {
       const fs = require('fs');
       const path = require('path');
-      
-      // Get the samples directory path (relative to the project root)
-      const samplesDir = path.join(process.cwd(), 'samples');
-      
-      logger.debug('Loading sample processes from directory', { samplesDir });
-      
+
       // Check if samples directory exists
-      if (!fs.existsSync(samplesDir)) {
-        logger.warn('Samples directory not found, skipping sample process loading', { samplesDir });
-        return;
+      if (!fs.existsSync(this.samplesDir)) {
+        logger.warn('Samples directory not found', { samplesDir: this.samplesDir });
+        return [];
       }
-      
+
       // Read all .json files from the samples directory
-      const files = fs.readdirSync(samplesDir)
+      const files = fs.readdirSync(this.samplesDir)
         .filter((file: string) => file.endsWith('.json'))
-        .map((file: string) => path.join(samplesDir, file));
-      
-      logger.info(`Found ${files.length} sample process files`);
-      
-      // Load each process file
+        .map((file: string) => path.join(this.samplesDir, file));
+
+      const templates: ProcessTemplateFlyweight[] = [];
+
+      // Load just the metadata from each file (flyweight pattern)
       for (const filePath of files) {
         try {
           const fileContent = fs.readFileSync(filePath, 'utf8');
           const processDefinition: ProcessDefinition = JSON.parse(fileContent);
-          
+
           // Validate basic structure
           if (!processDefinition.id || !processDefinition.name) {
             logger.warn('Skipping invalid process definition (missing id or name)', { filePath });
             continue;
           }
-          
-          // Save the process
-          await this.save(processDefinition);
-          logger.info('Loaded sample process', {
+
+          // Create flyweight with just essential metadata
+          templates.push({
             id: processDefinition.id,
             name: processDefinition.name,
-            file: path.basename(filePath)
+            description: processDefinition.description,
+            version: processDefinition.version
           });
-          
+
         } catch (error) {
-          logger.error('Failed to load sample process file', {
+          logger.error('Failed to read process template metadata', {
             filePath,
             error: error instanceof Error ? error.message : String(error)
           });
         }
       }
-      
-      logger.info('Sample process loading completed', { totalLoaded: this.processes.size });
-      
+
+      logger.info(`Found ${templates.length} available process templates`);
+      return templates;
+
     } catch (error) {
-      logger.error('Failed to load sample processes', {
+      logger.error('Failed to list available templates', {
         error: error instanceof Error ? error.message : String(error)
       });
+      return [];
+    }
+  }
+
+  /**
+   * Find the file path for a process ID by scanning the samples directory
+   */
+  private async findFilePathForProcess(processId: string): Promise<string | null> {
+    try {
+      const fs = require('fs');
+      const path = require('path');
+
+      if (!fs.existsSync(this.samplesDir)) {
+        return null;
+      }
+
+      const files = fs.readdirSync(this.samplesDir)
+        .filter((file: string) => file.endsWith('.json'))
+        .map((file: string) => path.join(this.samplesDir, file));
+
+      // Find the file that contains this process ID
+      for (const filePath of files) {
+        try {
+          const fileContent = fs.readFileSync(filePath, 'utf8');
+          const processDefinition: ProcessDefinition = JSON.parse(fileContent);
+
+          if (processDefinition.id === processId) {
+            return filePath;
+          }
+        } catch (error) {
+          // Skip files that can't be parsed
+          continue;
+        }
+      }
+
+      return null;
+    } catch (error) {
+      logger.error('Failed to find file path for process', {
+        processId,
+        error: error instanceof Error ? error.message : String(error)
+      });
+      return null;
+    }
+  }
+
+  /**
+   * Load a process definition from file on-demand
+   */
+  private async loadProcessFromFile(filePath: string): Promise<ProcessDefinition | null> {
+    try {
+      const fs = require('fs');
+      const fileContent = fs.readFileSync(filePath, 'utf8');
+      const processDefinition: ProcessDefinition = JSON.parse(fileContent);
+
+      // Validate basic structure
+      if (!processDefinition.id || !processDefinition.name) {
+        logger.warn('Invalid process definition loaded from file', { filePath });
+        return null;
+      }
+
+      return processDefinition;
+    } catch (error) {
+      logger.error('Failed to load process from file', {
+        filePath,
+        error: error instanceof Error ? error.message : String(error)
+      });
+      return null;
     }
   }
 
@@ -93,13 +157,13 @@ export class InMemoryProcessDefinitionRepository implements ProcessDefinitionRep
     });
 
     // Create a versioned key if version is specified
-    const key = processDefinition.version 
+    const key = processDefinition.version
       ? `${processDefinition.id}:${processDefinition.version}`
       : processDefinition.id;
-    
+
     const existedBefore = this.processes.has(key);
     this.processes.set(key, { ...processDefinition });
-    
+
     // Also store as latest version without version suffix
     this.processes.set(processDefinition.id, { ...processDefinition });
 
@@ -111,9 +175,29 @@ export class InMemoryProcessDefinitionRepository implements ProcessDefinitionRep
 
   async findById(processId: string): Promise<ProcessDefinition | null> {
     logger.debug(`Looking up process definition by ID: '${processId}'`);
-    
-    const result = this.processes.get(processId) || null;
-    
+
+    // First check if it's already loaded in memory
+    let result = this.processes.get(processId) || null;
+
+    if (!result) {
+      // Try to find a template with this ID and load it on-demand
+      const templates = await this.listAvailableTemplates();
+      const template = templates.find(t => t.id === processId);
+
+      if (template) {
+        const filePath = await this.findFilePathForProcess(processId);
+        if (filePath) {
+          logger.debug(`Loading process definition from file on-demand`, { processId, filePath });
+          result = await this.loadProcessFromFile(filePath);
+
+          if (result) {
+            // Cache it in memory for future use
+            await this.save(result);
+          }
+        }
+      }
+    }
+
     if (result) {
       logger.debug(`Found process definition`, {
         id: result.id,
@@ -121,39 +205,53 @@ export class InMemoryProcessDefinitionRepository implements ProcessDefinitionRep
         version: result.version
       });
     } else {
-      logger.warn(`Process definition not found for ID: '${processId}'`, {
-        availableKeys: Array.from(this.processes.keys())
-      });
+      logger.warn(`Process definition not found for ID: '${processId}'`);
     }
-    
+
     return result;
   }
 
   async findAll(): Promise<ProcessDefinition[]> {
     logger.debug('Retrieving all process definitions');
-    
+
+    // Get all available templates first
+    const templates = await this.listAvailableTemplates();
+
+    // Load any that aren't already in memory
+    for (const template of templates) {
+      if (!this.processes.has(template.id)) {
+        const filePath = await this.findFilePathForProcess(template.id);
+        if (filePath) {
+          const process = await this.loadProcessFromFile(filePath);
+          if (process) {
+            await this.save(process);
+          }
+        }
+      }
+    }
+
     // Return only the latest versions (without version suffix in key)
     const result: ProcessDefinition[] = [];
     const seen = new Set<string>();
-    
+
     for (const [key, process] of this.processes.entries()) {
       if (!key.includes(':') && !seen.has(process.id)) {
         result.push({ ...process });
         seen.add(process.id);
       }
     }
-    
+
     logger.info(`Retrieved ${result.length} process definitions`, {
       processIds: result.map(p => p.id),
       totalStoredKeys: this.processes.size
     });
-    
+
     return result;
   }
 
   async delete(processId: string): Promise<boolean> {
     const existed = this.processes.has(processId);
-    
+
     // Delete all versions of this process
     const keysToDelete: string[] = [];
     for (const key of this.processes.keys()) {
@@ -161,25 +259,35 @@ export class InMemoryProcessDefinitionRepository implements ProcessDefinitionRep
         keysToDelete.push(key);
       }
     }
-    
+
     keysToDelete.forEach(key => this.processes.delete(key));
-    
+
     return existed;
   }
 
   async exists(processId: string): Promise<boolean> {
-    return this.processes.has(processId);
+    // Check if it's in memory first
+    if (this.processes.has(processId)) {
+      return true;
+    }
+
+    // Check if it exists as a template
+    const templates = await this.listAvailableTemplates();
+    return templates.some(t => t.id === processId);
   }
 
   async findByName(name: string): Promise<ProcessDefinition[]> {
+    // First ensure all processes are loaded
+    await this.findAll();
+
     const result: ProcessDefinition[] = [];
-    
+
     for (const process of this.processes.values()) {
       if (process.name.toLowerCase().includes(name.toLowerCase())) {
         result.push({ ...process });
       }
     }
-    
+
     return result;
   }
 
@@ -189,14 +297,17 @@ export class InMemoryProcessDefinitionRepository implements ProcessDefinitionRep
   }
 
   async findAllVersions(processId: string): Promise<ProcessDefinition[]> {
+    // First ensure the process is loaded
+    await this.findById(processId);
+
     const result: ProcessDefinition[] = [];
-    
+
     for (const [key, process] of this.processes.entries()) {
       if (key === processId || key.startsWith(`${processId}:`)) {
         result.push({ ...process });
       }
     }
-    
+
     // Sort by version (latest first)
     return result.sort((a, b) => {
       const versionA = a.version || '0.0.0';
@@ -211,14 +322,8 @@ export class InMemoryProcessDefinitionRepository implements ProcessDefinitionRep
   }
 
   async count(): Promise<number> {
-    // Count only unique process IDs (not versions)
-    const uniqueIds = new Set<string>();
-    for (const [key] of this.processes.entries()) {
-      if (!key.includes(':')) {
-        uniqueIds.add(key);
-      }
-    }
-    return uniqueIds.size;
+    const templates = await this.listAvailableTemplates();
+    return templates.length;
   }
 
   async clear(): Promise<void> {

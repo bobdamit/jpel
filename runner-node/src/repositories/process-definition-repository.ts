@@ -1,4 +1,4 @@
-import { ProcessDefinition } from '../types';
+import { ProcessDefinition, ProcessTemplateFlyweight } from '../types';
 
 /**
  * Repository interface for process definitions
@@ -21,4 +21,7 @@ export interface ProcessDefinitionRepository {
   // Metadata operations
   count(): Promise<number>;
   clear(): Promise<void>;
+  
+  // Template listing (flyweight pattern)
+  listAvailableTemplates(): Promise<ProcessTemplateFlyweight[]>;
 }

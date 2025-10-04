@@ -9,6 +9,17 @@ export interface ProcessDefinition {
 	activities: { [key: string]: Activity };
 }
 
+/**
+ * Lightweight representation of a process template for listing purposes
+ * Contains only essential metadata without loading the full process definition
+ */
+export interface ProcessTemplateFlyweight {
+	id: string;
+	name: string;
+	description?: string;
+	version?: string;
+}
+
 export interface ProcessInstance {
 	instanceId: string;
 	processId: string;

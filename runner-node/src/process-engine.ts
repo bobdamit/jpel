@@ -1,6 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import {
 	ProcessDefinition,
+	ProcessTemplateFlyweight,
 	ProcessInstance,
 	ProcessStatus,
 	Activity,
@@ -76,9 +77,9 @@ export class ProcessEngine {
 		logger.info(`ProcessEngine: Process definition '${processDefinition.id}' loaded successfully`);
 	}
 
-	// Get all loaded processes
-	async getProcesses(): Promise<ProcessDefinition[]> {
-		return await this.processDefinitionRepo.findAll();
+	// Get all available process templates (flyweights)
+	async getProcesses(): Promise<ProcessTemplateFlyweight[]> {
+		return await this.processDefinitionRepo.listAvailableTemplates();
 	}
 
 	// Get a specific process definition
