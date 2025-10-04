@@ -18,6 +18,70 @@ export class InMemoryProcessDefinitionRepository implements ProcessDefinitionRep
 
   constructor() {
     logger.info('Initializing in-memory process definition repository');
+    this.loadSampleProcesses();
+  }
+
+  /**
+   * Load all process JSON files from the /samples directory
+   */
+  private async loadSampleProcesses(): Promise<void> {
+    try {
+      const fs = require('fs');
+      const path = require('path');
+      
+      // Get the samples directory path (relative to the project root)
+      const samplesDir = path.join(process.cwd(), 'samples');
+      
+      logger.debug('Loading sample processes from directory', { samplesDir });
+      
+      // Check if samples directory exists
+      if (!fs.existsSync(samplesDir)) {
+        logger.warn('Samples directory not found, skipping sample process loading', { samplesDir });
+        return;
+      }
+      
+      // Read all .json files from the samples directory
+      const files = fs.readdirSync(samplesDir)
+        .filter((file: string) => file.endsWith('.json'))
+        .map((file: string) => path.join(samplesDir, file));
+      
+      logger.info(`Found ${files.length} sample process files`);
+      
+      // Load each process file
+      for (const filePath of files) {
+        try {
+          const fileContent = fs.readFileSync(filePath, 'utf8');
+          const processDefinition: ProcessDefinition = JSON.parse(fileContent);
+          
+          // Validate basic structure
+          if (!processDefinition.id || !processDefinition.name) {
+            logger.warn('Skipping invalid process definition (missing id or name)', { filePath });
+            continue;
+          }
+          
+          // Save the process
+          await this.save(processDefinition);
+          logger.info('Loaded sample process', {
+            id: processDefinition.id,
+            name: processDefinition.name,
+            file: path.basename(filePath)
+          });
+          
+        } catch (error) {
+          logger.error('Failed to load sample process file', {
+            filePath,
+            error: error instanceof Error ? error.message : String(error)
+          });
+        }
+      }
+      
+      logger.info('Sample process loading completed', { totalLoaded: this.processes.size });
+      
+    } catch (error) {
+      logger.error('Failed to load sample processes', {
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
   }
 
   async save(processDefinition: ProcessDefinition): Promise<void> {

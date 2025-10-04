@@ -55,8 +55,8 @@ app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 
 // Serve static files (demo interface and samples)
-app.use(express.static(path.join(__dirname, '../public')));
-app.use('/samples', express.static(path.join(__dirname, '../samples')));
+app.use(express.static(path.join(process.cwd(), 'public')));
+app.use('/samples', express.static(path.join(process.cwd(), 'samples')));
 
 // File upload configuration
 const upload = multer({
