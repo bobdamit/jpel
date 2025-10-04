@@ -1,5 +1,7 @@
 import { ProcessDefinition, ProcessTemplateFlyweight } from '../types';
 import { ProcessDefinitionRepository } from './process-definition-repository';
+import fs from 'fs';
+import path from 'path';
 
 // Logger setup
 const logger = {
@@ -18,7 +20,7 @@ export class InMemoryProcessDefinitionRepository implements ProcessDefinitionRep
   private samplesDir: string;
 
   constructor() {
-    this.samplesDir = require('path').join(require('process').cwd(), 'samples');
+    this.samplesDir = path.join(process.cwd(), 'samples');
     logger.info('Initializing in-memory process definition repository');
   }
 
@@ -27,9 +29,6 @@ export class InMemoryProcessDefinitionRepository implements ProcessDefinitionRep
    */
   async listAvailableTemplates(): Promise<ProcessTemplateFlyweight[]> {
     try {
-      const fs = require('fs');
-      const path = require('path');
-
       // Check if samples directory exists
       if (!fs.existsSync(this.samplesDir)) {
         logger.warn('Samples directory not found', { samplesDir: this.samplesDir });
@@ -87,9 +86,6 @@ export class InMemoryProcessDefinitionRepository implements ProcessDefinitionRep
    */
   private async findFilePathForProcess(processId: string): Promise<string | null> {
     try {
-      const fs = require('fs');
-      const path = require('path');
-
       if (!fs.existsSync(this.samplesDir)) {
         return null;
       }
@@ -128,7 +124,6 @@ export class InMemoryProcessDefinitionRepository implements ProcessDefinitionRep
    */
   private async loadProcessFromFile(filePath: string): Promise<ProcessDefinition | null> {
     try {
-      const fs = require('fs');
       const fileContent = fs.readFileSync(filePath, 'utf8');
       const processDefinition: ProcessDefinition = JSON.parse(fileContent);
 

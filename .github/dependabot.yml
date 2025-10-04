@@ -1,0 +1,13 @@
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/runner-node"
+    schedule:
+      interval: "daily"
+    open-pull-requests-limit: 10
+    # Create separate PRs for major version updates so you can review them individually
+    # Dependabot will create PRs per package by default; you can configure grouping later.
+    # Optionally, you can set "allow" or "ignore" rules here to control which packages get updates.
+    # Example: to ignore express major updates until ready, add an ignore section.
+    # For now, allow all updates so you get visibility into available upgrades.
+    # Optionally set "target-branch" if you want PRs against a non-default branch.
