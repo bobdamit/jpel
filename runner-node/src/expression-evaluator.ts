@@ -7,8 +7,21 @@ export class ExpressionEvaluator {
       // Create a safe evaluation context
       const context = this.createEvaluationContext(instance);
       
+      // Debug logging to see what data is available
+      console.log('=== CONDITION EVALUATION DEBUG ===');
+      console.log('Condition:', condition);
+      console.log('Instance activities:', Object.keys(instance.activities));
+      console.log('ReviewDocument activity:', instance.activities.reviewDocument);
+      if (instance.activities.reviewDocument) {
+        console.log('ReviewDocument data:', instance.activities.reviewDocument.data);
+        console.log('ReviewDocument status:', instance.activities.reviewDocument.status);
+      }
+      console.log('Context keys:', Object.keys(context));
+      console.log('===================================');
+      
       // Replace JPEL syntax with JavaScript
       const jsExpression = this.translateJPELToJS(condition, instance);
+      console.log('Translated JS expression:', jsExpression);
       
       // Evaluate the expression
       const result = this.safeEval(jsExpression, context);
@@ -35,12 +48,12 @@ export class ExpressionEvaluator {
           const thisMatch = line.match(/this\.(\w+)\s*=\s*(.+);?$/);
           if (thisMatch) {
             const [, property] = thisMatch;
-            result[property] = context.this[property];
+            result[property] = context.currentActivity[property];
           }
         }
       }
       
-      return Object.keys(result).length > 0 ? result : context.this;
+      return Object.keys(result).length > 0 ? result : context.currentActivity;
     } catch (error) {
       throw new Error(`Code execution failed: ${error instanceof Error ? error.message : String(error)}`);
     }
@@ -51,8 +64,11 @@ export class ExpressionEvaluator {
       // Process variables
       process: instance.variables,
       
+      // Complete instance object for full access
+      instance: instance,
+      
       // Current activity context
-      this: currentActivityId ? (instance.activities[currentActivityId].data || {}) : {},
+      currentActivity: currentActivityId ? (instance.activities[currentActivityId].data || {}) : {},
       
       // Helper functions
       Math,
@@ -64,7 +80,7 @@ export class ExpressionEvaluator {
       }
     };
 
-    // Add activity data accessors
+    // Add activity data accessors for backward compatibility
     Object.keys(instance.activities).forEach(activityId => {
       const activity = instance.activities[activityId];
       if (activity.data) {
@@ -88,6 +104,9 @@ export class ExpressionEvaluator {
     // Replace a:activityId.property with activityId.property
     jsExpression = jsExpression.replace(/a:(\w+)\.(\w+)/g, '$1.$2');
     
+    // Replace this.property with currentActivity.property
+    jsExpression = jsExpression.replace(/this\.(\w+)/g, 'currentActivity.$1');
+    
     // Replace process.variable with process.variable
     // (already correct format)
     
@@ -99,16 +118,34 @@ export class ExpressionEvaluator {
     const paramNames = Object.keys(context);
     const paramValues = Object.values(context);
     
+    console.log('=== SAFE EVAL DEBUG ===');
+    console.log('Expression to evaluate:', expression);
+    console.log('Param names:', paramNames);
+    console.log('Checking instance param:', context.instance ? 'EXISTS' : 'MISSING');
+    if (context.instance) {
+      console.log('Instance.activities keys:', Object.keys(context.instance.activities || {}));
+      if (context.instance.activities?.reviewDocument) {
+        console.log('ReviewDocument in instance:', context.instance.activities.reviewDocument);
+      }
+    }
+    console.log('=======================');
+    
     try {
       // Create and execute the function
       const func = new Function(...paramNames, `return ${expression}`);
-      return func(...paramValues);
+      const result = func(...paramValues);
+      console.log('Expression evaluation result:', result);
+      return result;
     } catch (error) {
+      console.log('Expression evaluation error:', error);
       // If it's not an expression, try as a statement
       try {
         const func = new Function(...paramNames, expression);
-        return func(...paramValues);
+        const result = func(...paramValues);
+        console.log('Statement evaluation result:', result);
+        return result;
       } catch (statementError) {
+        console.log('Statement evaluation error:', statementError);
         throw new Error(`Expression evaluation failed: ${expression}`);
       }
     }

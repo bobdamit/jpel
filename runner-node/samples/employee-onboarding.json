@@ -1,0 +1,134 @@
+{
+  "id": "employee-onboarding",
+  "name": "Employee Onboarding Process",
+  "description": "Complete employee onboarding workflow with parallel tasks and API integration",
+  "version": "1.0.0",
+  "start": "a:onboardingSequence",
+  "variables": [
+    {
+      "name": "employeeName",
+      "type": "string",
+      "description": "New employee's full name"
+    },
+    {
+      "name": "department",
+      "type": "string",
+      "description": "Department the employee will join"
+    },
+    {
+      "name": "startDate",
+      "type": "string",
+      "description": "Employee start date"
+    },
+    {
+      "name": "equipmentAssigned",
+      "type": "boolean",
+      "description": "Whether equipment has been assigned"
+    },
+    {
+      "name": "accountsCreated",
+      "type": "boolean",
+      "description": "Whether user accounts have been created"
+    },
+    {
+      "name": "onboardingComplete",
+      "type": "boolean",
+      "description": "Whether onboarding is complete"
+    }
+  ],
+  "activities": {
+    "onboardingSequence": {
+      "id": "onboardingSequence",
+      "name": "Employee Onboarding Sequence",
+      "type": "sequence",
+      "activities": ["a:collectEmployeeInfo", "a:parallelSetup", "a:verifySetup", "a:welcomeEmployee"]
+    },
+    "collectEmployeeInfo": {
+      "id": "collectEmployeeInfo",
+      "name": "Collect Employee Information",
+      "type": "human",
+      "prompt": "Please provide new employee details:",
+      "inputs": [
+        {
+          "name": "employeeName",
+          "type": "string",
+          "label": "Employee Name",
+          "required": true,
+          "placeholder": "Full name"
+        },
+        {
+          "name": "department",
+          "type": "select",
+          "label": "Department",
+          "required": true,
+          "options": ["Engineering", "Sales", "Marketing", "HR", "Finance"]
+        },
+        {
+          "name": "startDate",
+          "type": "date",
+          "label": "Start Date",
+          "required": true
+        }
+      ]
+    },
+    "parallelSetup": {
+      "id": "parallelSetup",
+      "name": "Parallel Setup Tasks",
+      "type": "parallel",
+      "activities": ["a:assignEquipment", "a:createAccounts"]
+    },
+    "assignEquipment": {
+      "id": "assignEquipment",
+      "name": "Assign Equipment",
+      "type": "human",
+      "prompt": "Please assign equipment to the new employee:",
+      "inputs": [
+        {
+          "name": "equipmentAssigned",
+          "type": "checkbox",
+          "label": "Equipment has been assigned",
+          "required": true
+        }
+      ]
+    },
+    "createAccounts": {
+      "id": "createAccounts",
+      "name": "Create User Accounts",
+      "type": "human",
+      "prompt": "Please create necessary user accounts:",
+      "inputs": [
+        {
+          "name": "accountsCreated",
+          "type": "checkbox",
+          "label": "User accounts have been created",
+          "required": true
+        }
+      ]
+    },
+    "verifySetup": {
+      "id": "verifySetup",
+      "name": "Verify Setup Complete",
+      "type": "compute",
+      "code": [
+        "// Check if both setup tasks are complete",
+        "const equipmentDone = instance.activities.assignEquipment.data.equipmentAssigned;",
+        "const accountsDone = instance.activities.createAccounts.data.accountsCreated;",
+        "currentActivity.onboardingComplete = equipmentDone && accountsDone;"
+      ]
+    },
+    "welcomeEmployee": {
+      "id": "welcomeEmployee",
+      "name": "Welcome New Employee",
+      "type": "human",
+      "prompt": "Send welcome message to the new employee:",
+      "inputs": [
+        {
+          "name": "welcomeSent",
+          "type": "checkbox",
+          "label": "Welcome message sent",
+          "required": true
+        }
+      ]
+    }
+  }
+}

@@ -6,9 +6,10 @@
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
-    "dev": "ts-node src/index.ts",
+    "dev": "ts-node-dev src/index.ts",
     "watch": "tsc --watch",
-    "clean": "rimraf dist"
+    "clean": "rimraf dist",
+    "demo": "node demo.js"
   },
   "keywords": ["jpel", "bpel", "workflow", "process", "automation"],
   "author": "JPEL Team",
@@ -18,7 +19,7 @@
     "cors": "^2.8.5",
     "helmet": "^7.1.0",
     "uuid": "^9.0.1",
-    "multer": "^1.4.5-lts.1",
+    "multer": "^1.4.5-lts.3",
     "axios": "^1.6.0",
     "joi": "^17.11.0"
   },

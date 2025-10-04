@@ -1,0 +1,60 @@
+{
+  "id": "test-hello-world",
+  "name": "Test Hello World Process",
+  "description": "A simple test process to validate repository integration",
+  "version": "1.0.0",
+  "variables": {
+    "name": {
+      "type": "string",
+      "required": true,
+      "description": "User's name"
+    },
+    "greeting": {
+      "type": "string",
+      "required": false,
+      "description": "Generated greeting message"
+    }
+  },
+  "activities": {
+    "start": {
+      "id": "start",
+      "name": "Start Process",
+      "type": "sequence",
+      "next": "getUserName"
+    },
+    "getUserName": {
+      "id": "getUserName",
+      "name": "Get User Name",
+      "type": "human",
+      "prompt": "Please provide your name:",
+      "inputs": [
+        {
+          "name": "name",
+          "type": "string",
+          "label": "Your Name",
+          "required": true
+        }
+      ],
+      "outputs": {
+        "name": "v:name"
+      },
+      "next": "generateGreeting"
+    },
+    "generateGreeting": {
+      "id": "generateGreeting",
+      "name": "Generate Greeting",
+      "type": "compute",
+      "expression": "Hello, a:getUserName.f:name!",
+      "outputs": {
+        "greeting": "v:greeting"
+      },
+      "next": "end"
+    },
+    "end": {
+      "id": "end",
+      "name": "End Process",
+      "type": "terminate"
+    }
+  },
+  "startActivity": "start"
+}

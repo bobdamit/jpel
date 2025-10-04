@@ -1,0 +1,55 @@
+{
+  "id": "hello-world",
+  "name": "Hello World Process",
+  "description": "A simple greeting process demonstrating human tasks and compute activities",
+  "version": "1.0.0",
+  "start": "a:getUserName",
+  "variables": [
+    {
+      "name": "userName",
+      "type": "string",
+      "description": "The user's name"
+    },
+    {
+      "name": "greeting",
+      "type": "string", 
+      "description": "The generated greeting message"
+    }
+  ],
+  "activities": {
+    "getUserName": {
+      "id": "getUserName",
+      "name": "Get User Name",
+      "type": "human",
+      "prompt": "Welcome! Please tell us your name:",
+      "inputs": [
+        {
+          "name": "userName",
+          "type": "string",
+          "label": "Your Name",
+          "required": true,
+          "placeholder": "Enter your full name"
+        }
+      ]
+    },
+    "generateGreeting": {
+      "id": "generateGreeting", 
+      "name": "Generate Greeting",
+      "type": "compute",
+      "code": [
+        "// Get the user name from the previous activity",
+        "const userName = instance.activities.getUserName.data.userName;",
+        "// Generate a greeting",
+        "const greeting = `Hello, ${userName}! Welcome to JPEL!`;",
+        "// Store the greeting",
+        "return { greeting: greeting };"
+      ]
+    },
+    "end": {
+      "id": "end",
+      "name": "Process Complete", 
+      "type": "terminate",
+      "reason": "Process completed successfully"
+    }
+  }
+}

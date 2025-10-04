@@ -1,290 +1,386 @@
-# JPEL Runner - Node.js TypeScript Service
+# 🚀 JPEL Runner - JSON Process Execution Language
 
-A Node.js TypeScript service for executing JPEL (JSON Process Execution Language) processes. This service provides a REST API to load process definitions, create instances, and step through process execution.
+A powerful, extensible process execution engine that runs JSON-based business processes inspired by BPEL4People. Perfect for building workflow applications, approval systems, and automated business processes.
 
-## Features
+## ✨ Features
 
-- 🔄 **Process Execution**: Load and execute JPEL process definitions
-- 👤 **Human Tasks**: Handle human interaction steps with form inputs and file uploads
-- 🧮 **Compute Activities**: Execute JavaScript code within process context
-- 🌐 **API Calls**: Make HTTP requests to external services
-- 🔀 **Control Flow**: Support for sequences, parallel execution, and conditional branching
-- 📝 **Expression Evaluation**: Use `a:activityId.f:fieldName` syntax to access activity data
+- **� Human Tasks**: Interactive forms and approvals
+- **🔄 Process Control**: Sequences, parallel execution, conditional branching
+- **� Compute Activities**: Expression evaluation and data transformation
+- **🌐 API Integration**: External service calls and webhooks
+- **📊 Persistence**: Repository pattern with in-memory and MongoDB support
+- **🎨 Interactive Demo**: Built-in web interface for testing processes
 
-## Quick Start
+## 🏗️ Architecture
 
-1. **Install dependencies**:
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   Web Demo UI   │    │   REST API      │    │ Process Engine  │
+│                 │───▶│                 │───▶│                 │
+│ - Load samples  │    │ - Start process │    │ - Execute steps │
+│ - Human tasks   │    │ - Submit tasks  │    │ - Handle state  │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+                                                       │
+                                               ┌─────────────────┐
+                                               │  Repositories   │
+                                               │                 │
+                                               │ - In-Memory     │
+                                               │ - MongoDB       │
+                                               │ - Extensible    │
+                                               └─────────────────┘
+```
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+- Node.js 18+ 
+- npm or yarn
+
+### Installation & Demo
+
+1. **Clone and setup:**
    ```bash
-   cd runner-node
+   git clone <repository-url>
+   cd jpel/runner-node
    npm install
-   ```
-
-2. **Build the project**:
-   ```bash
    npm run build
    ```
 
-3. **Start the server**:
+2. **Start the server:**
    ```bash
-   npm start
-   # or for development with auto-reload:
-   npm run dev
+   npm run start
    ```
 
-4. **Test the API**:
+3. **Try the Interactive Web Demo:**
+   Open http://localhost:3000 in your browser
+
+4. **Or run the API demo:**
    ```bash
-   curl http://localhost:3000/health
+   # In a new terminal (keep server running)
+   npm run demo
    ```
 
-## API Endpoints
+### 🎮 Try the Demo
 
-### Process Management
+**Option 1: Interactive Web Interface (Recommended)**
+1. Open http://localhost:3000
+2. Click "Load Process" on any sample
+3. Click "Start Instance" 
+4. Complete human tasks when prompted
+5. Watch the process execute automatically!
 
-- `GET /health` - Health check
-- `POST /api/processes` - Load process definition from JSON body
-- `POST /api/processes/load` - Load process definition from file
-- `GET /api/processes` - Get all loaded processes
-- `GET /api/processes/:processId` - Get specific process definition
-
-### Process Execution
-
-- `POST /api/processes/:processId/instances` - Create new process instance
-- `GET /api/instances/:instanceId` - Get instance details
-- `POST /api/instances/:instanceId/step` - Execute next step
-- `GET /api/instances/:instanceId/current-task` - Get current human task
-- `POST /api/instances/:instanceId/activities/:activityId/submit` - Submit human task data
-
-## Usage Example
-
-### 1. Load a Process Definition
-
+**Option 2: API Demo Script**
 ```bash
-curl -X POST http://localhost:3000/api/processes \\
-  -H "Content-Type: application/json" \\
-  -d @../design/process.json
+npm run demo
 ```
 
-### 2. Create Process Instance
+The demo includes three sample processes:
 
-```bash
-curl -X POST http://localhost:3000/api/processes/mic-build/instances
-```
+1. **👋 Hello World** - Simple greeting with human input
+2. **📋 Approval Workflow** - Document approval with conditional logic
+3. **👨‍💼 Employee Onboarding** - Multi-step process with parallel tasks
 
-Response:
-```json
-{
-  "success": true,
-  "data": {
-    "instanceId": "550e8400-e29b-41d4-a716-446655440000",
-    "status": "running",
-    "currentActivity": "askBuildType",
-    "humanTask": {
-      "activityId": "askBuildType",
-      "prompt": "What type of microphone are you building?",
-      "fields": [
-        {
-          "name": "buildType",
-          "type": "select",
-          "required": true,
-          "options": ["TC", "TL"]
-        }
-      ]
-    }
-  }
-}
-```
+**Demo Flow:**
+- Load → Start → Interact → Complete
+- All sample processes are fully functional
+- Real-time process execution with human interaction
 
-### 3. Submit Human Task Data
+## 📝 JPEL Process Format
 
-```bash
-curl -X POST http://localhost:3000/api/instances/550e8400-e29b-41d4-a716-446655440000/activities/askBuildType/submit \\
-  -H "Content-Type: application/json" \\
-  -d '{"buildType": "TC"}'
-```
-
-### 4. Continue Process Execution
-
-The process will automatically continue after submitting human task data. For manual stepping:
-
-```bash
-curl -X POST http://localhost:3000/api/instances/550e8400-e29b-41d4-a716-446655440000/step
-```
-
-## Process Definition Format
-
-JPEL processes use a simplified JSON format with the new `a:` and `f:` syntax:
+JPEL processes use a modern JSON schema with activity references:
 
 ```json
 {
   "id": "my-process",
   "name": "My Process",
+  "description": "Process description",
+  "version": "1.0.0",
   "start": "a:firstActivity",
+  "variables": [
+    {
+      "name": "myVar",
+      "type": "string",
+      "description": "Variable description"
+    }
+  ],
   "activities": {
     "firstActivity": {
       "id": "firstActivity",
+      "name": "First Step",
       "type": "human",
-      "prompt": "Enter some data",
+      "prompt": "Enter your information:",
       "inputs": [
         {
-          "name": "userInput",
-          "type": "text",
+          "name": "myVar",
+          "type": "string",
+          "label": "My Variable",
           "required": true
         }
-      ]
-    },
-    "processData": {
-      "id": "processData",
-      "type": "compute",
-      "code": [
-        "const input = a:firstActivity.f:userInput;",
-        "this.result = input.toUpperCase();"
       ]
     }
   }
 }
 ```
 
-## Activity Types
+### Activity Types
 
-### Human Activities
-Wait for user input through forms, file uploads, etc.
+| Type | Description | Example Use Case |
+|------|-------------|------------------|
+| `human` | Wait for user input | Approval forms, data entry |
+| `compute` | Execute JavaScript code | Calculate values, transform data |
+| `api` | Call external services | Send emails, update databases |
+| `sequence` | Execute activities in order | Orchestrate workflow steps |
+| `parallel` | Execute simultaneously | Concurrent approvals |
+| `branch` | Conditional logic | Route based on decisions |
+| `terminate` | End process | Completion handling |
 
-```json
-{
-  "type": "human",
-  "prompt": "Please enter values",
-  "inputs": [
-    {
-      "name": "fieldName",
-      "type": "text|number|boolean|select|date|file",
-      "required": true,
-      "options": ["option1", "option2"]
-    }
-  ]
-}
-```
+### Activity References
 
-### Compute Activities
-Execute JavaScript code with access to process context.
+Activities are referenced using the format `a:activityId`:
+- `"start": "a:getUserInfo"` - Start with getUserInfo activity
+- `"then": "a:processData"` - Branch to processData activity
 
+### Expression Examples
+
+Compute activities use JavaScript code arrays:
 ```json
 {
   "type": "compute",
   "code": [
-    "const value = a:previousActivity.f:someField;",
-    "this.result = value * 2;",
-    "this.passFail = value > 10 ? 'pass' : 'fail';"
+    "// Get user input from previous activity",
+    "const userName = instance.activities.getUserInfo.data.name;",
+    "// Generate greeting",
+    "const greeting = `Hello, ${userName}!`;",
+    "return { greeting: greeting };"
   ]
 }
 ```
 
-### API Activities
-Make HTTP requests to external services.
-
-```json
-{
-  "type": "api",
-  "method": "POST",
-  "url": "https://api.example.com/validate",
-  "headers": {
-    "Authorization": "Bearer token"
-  },
-  "body": {
-    "data": "a:inputActivity.f:inputField"
-  }
-}
-```
-
-### Control Flow Activities
-
-**Sequence**: Execute activities in order
-```json
-{
-  "type": "sequence",
-  "activities": ["a:step1", "a:step2", "a:step3"]
-}
-```
-
-**Branch**: Conditional execution
+Branch conditions use JavaScript expressions:
 ```json
 {
   "type": "branch",
-  "condition": "a:checkActivity.f:value === 'TC'",
-  "then": "a:tcPath",
-  "else": "a:tlPath"
+  "condition": "instance.activities.approval.data.decision === 'approved'",
+  "then": "a:processApproval",
+  "else": "a:handleRejection"
 }
 ```
 
-## Expression Syntax
+## 🔌 REST API
 
-JPEL uses a simplified expression syntax:
+### Process Management
 
-- `a:activityId.f:fieldName` - Access field data from an activity
-- `a:activityId.status` - Access activity execution status  
-- `a:activityId.passFail` - Access activity pass/fail result
-- `process.variableName` - Access process-level variables
-- `this.propertyName` - Set properties on current activity
+```http
+# Load process definition
+POST /api/processes
+Content-Type: application/json
+{ "id": "my-process", "name": "My Process", ... }
 
-## Development
+# List loaded processes  
+GET /api/processes
+
+# Get specific process
+GET /api/processes/{processId}
+```
+
+### Instance Execution
+
+```http
+# Start new instance
+POST /api/processes/{processId}/instances
+
+# Execute next step
+POST /api/instances/{instanceId}/step
+
+# Submit human task
+POST /api/instances/{instanceId}/activities/{activityId}/submit
+Content-Type: application/json
+{ "fieldName": "fieldValue" }
+
+# Get current human task
+GET /api/instances/{instanceId}/current-task
+```
+
+### Response Format
+
+```json
+{
+  "success": true,
+  "data": { /* response data */ },
+  "error": null,
+  "timestamp": "2025-10-03T10:00:00.000Z"
+}
+```
+
+## 🗄️ Database Configuration
+
+### In-Memory (Default)
+Perfect for development and demos. No setup required.
+
+### MongoDB Setup
+
+1. **Install MongoDB** or use MongoDB Atlas
+
+2. **Update configuration:**
+   ```typescript
+   // In your application startup
+   await RepositoryFactory.initializeMongoDB({
+     connectionString: 'mongodb://localhost:27017/jpel',
+     databaseName: 'jpel'
+   });
+   ```
+
+3. **Environment variables:**
+   ```bash
+   MONGODB_URL=mongodb://localhost:27017/jpel
+   MONGODB_DATABASE=jpel
+   ```
+
+## 🏭 Production Deployment
+
+### Docker
+
+```dockerfile
+FROM node:18-alpine
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --only=production
+COPY dist ./dist
+COPY public ./public
+COPY samples ./samples
+EXPOSE 3000
+CMD ["npm", "start"]
+```
+
+### Environment Variables
+
+```bash
+PORT=3000
+NODE_ENV=production
+MONGODB_URL=mongodb://your-db-url/jpel
+MONGODB_DATABASE=jpel
+LOG_LEVEL=info
+```
+
+### Health Monitoring
+
+```http
+GET /health
+```
+
+## 🔧 Development
 
 ### Project Structure
 
 ```
 runner-node/
 ├── src/
-│   ├── types.ts              # Type definitions
+│   ├── index.ts              # Express server
 │   ├── process-engine.ts     # Core execution engine
-│   ├── expression-evaluator.ts # JPEL expression evaluation
-│   ├── api-executor.ts       # HTTP API execution
-│   └── index.ts              # Express server
-├── package.json
-├── tsconfig.json
-└── README.md
+│   ├── types.ts              # TypeScript definitions
+│   ├── expression-evaluator.ts # Expression parsing
+│   ├── api-executor.ts       # External API calls
+│   └── repositories/         # Data persistence
+│       ├── interfaces/       # Repository contracts
+│       ├── in-memory/        # In-memory implementations
+│       └── mongo/            # MongoDB implementations
+├── samples/                  # Example processes
+├── public/                   # Demo web interface
+└── dist/                     # Compiled JavaScript
 ```
 
-### Scripts
+### Adding New Activity Types
 
-- `npm run build` - Compile TypeScript
-- `npm run dev` - Development mode with auto-reload
-- `npm start` - Start production server
-- `npm run watch` - Watch mode for compilation
-- `npm run clean` - Clean dist folder
+1. **Update types:**
+   ```typescript
+   // In types.ts
+   export type ActivityType = 'human' | 'compute' | 'api' | 'your-new-type';
+   ```
 
-## Error Handling
+2. **Implement executor:**
+   ```typescript
+   // In process-engine.ts
+   case 'your-new-type':
+     return await this.executeYourNewType(activity, instance);
+   ```
 
-The API returns consistent error responses:
+### Adding Repository Backends
 
-```json
-{
-  "success": false,
-  "error": "Error description",
-  "timestamp": "2025-10-03T12:00:00.000Z"
-}
-```
+1. **Implement interfaces:**
+   ```typescript
+   export class YourRepository implements ProcessDefinitionRepository {
+     // Implement all interface methods
+   }
+   ```
 
-## File Uploads
+2. **Register in factory:**
+   ```typescript
+   // In repository-factory.ts
+   static async initializeYourBackend(config: YourConfig) {
+     // Setup your repository
+   }
+   ```
 
-Human activities can accept file uploads:
+## 📚 Example Use Cases
+
+### Approval Workflows
+- Document review and approval
+- Expense report processing  
+- Contract approvals
+- Policy change requests
+
+### Onboarding Processes
+- Employee setup workflows
+- Customer registration
+- Account provisioning
+- Training completion tracking
+
+### Business Automation
+- Order processing
+- Invoice handling
+- Support ticket routing
+- Compliance checking
+
+## 🤝 Contributing
+
+1. **Fork the repository**
+2. **Create feature branch:** `git checkout -b feature/amazing-feature`
+3. **Commit changes:** `git commit -m 'Add amazing feature'`
+4. **Push to branch:** `git push origin feature/amazing-feature`
+5. **Open Pull Request**
+
+### Development Commands
 
 ```bash
-curl -X POST http://localhost:3000/api/instances/INSTANCE_ID/activities/ACTIVITY_ID/submit \\
-  -F "field1=value1" \\
-  -F "files=@photo1.jpg" \\
-  -F "files=@photo2.jpg"
+# Install dependencies
+npm install
+
+# Build TypeScript
+npm run build
+
+# Start development server
+npm run dev
+
+# Run tests
+npm test
+
+# Lint code
+npm run lint
 ```
 
-## Security Considerations
+## 📄 License
 
-- Input validation on all endpoints
-- File upload size limits (10MB default)
-- CORS and security headers via helmet
-- Expression evaluation runs in controlled context
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## Next Steps
+## 🆘 Support
 
-- Add MongoDB persistence layer
-- Implement proper parallel activity execution
-- Add process versioning and migration
-- Build web UI for process monitoring
-- Add authentication and authorization
-- Implement process templates and reusable components
+- **📧 Issues:** [GitHub Issues](../../issues)
+- **💬 Discussions:** [GitHub Discussions](../../discussions)
+- **📖 Documentation:** [Wiki](../../wiki)
+
+---
+
+**Built with ❤️ for the business process automation community**
+
+Ready to build powerful workflow applications? Start with the demo and explore the possibilities! 🚀

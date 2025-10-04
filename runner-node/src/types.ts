@@ -51,6 +51,7 @@ export enum ActivityType {
   Sequence = "sequence",
   Parallel = "parallel",
   Branch = "branch",
+  Switch = "switch",
   Terminate = "terminate"
 }
 
@@ -87,6 +88,8 @@ export interface Field {
   units?: string;
   defaultValue?: any;
   description?: string;
+  pattern?: string; // Regex pattern for validation
+  patternDescription?: string; // Description of the pattern for UI display
 }
 
 export enum FieldType {
@@ -150,6 +153,13 @@ export interface BranchActivity extends Activity {
   condition: string;
   then: string;
   else?: string;
+}
+
+export interface SwitchActivity extends Activity {
+  type: ActivityType.Switch;
+  expression: string;
+  cases: { [key: string]: string };
+  default?: string;
 }
 
 export interface TerminateActivity extends Activity {
