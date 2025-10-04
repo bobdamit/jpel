@@ -4,24 +4,10 @@ export class ExpressionEvaluator {
 
 	evaluateCondition(condition: string, instance: ProcessInstance): boolean {
 		try {
-			// Create a safe evaluation context
 			const context = this.createEvaluationContext(instance);
-
-			// Debug logging to see what data is available
-			console.log('=== CONDITION EVALUATION DEBUG ===');
-			console.log('Condition:', condition);
-			console.log('Instance activities:', Object.keys(instance.activities));
-			console.log('ReviewDocument activity:', instance.activities.reviewDocument);
-			if (instance.activities.reviewDocument) {
-				console.log('ReviewDocument data:', instance.activities.reviewDocument.data);
-				console.log('ReviewDocument status:', instance.activities.reviewDocument.status);
-			}
-			console.log('Context keys:', Object.keys(context));
-			console.log('===================================');
 
 			// Replace JPEL syntax with JavaScript
 			const jsExpression = this.translateJPELToJS(condition, instance);
-			console.log('Translated JS expression:', jsExpression);
 
 			// Evaluate the expression
 			const result = this.safeEval(jsExpression, context);
@@ -117,33 +103,36 @@ export class ExpressionEvaluator {
 	}
 
 	private translateJPELToJS(expression: string, instance: ProcessInstance): string {
-		let jsExpression = expression;
+		// Split by quotes to avoid replacing inside string literals
+		const parts = expression.split(/(".*?")/);
+		const translatedParts = parts.map(part => {
+			// Only translate if not inside quotes (even parts are outside quotes)
+			if (!part.startsWith('"') && !part.endsWith('"')) {
+				// Replace a:activityId.f:fieldName with activityId.f.fieldName
+				part = part.replace(/a:(\w+)\.f:(\w+)/g, '$1.f.$2');
 
-		// Replace a:activityId.f:fieldName with activityId.f.fieldName
-		jsExpression = jsExpression.replace(/a:(\w+)\.f:(\w+)/g, '$1.f.$2');
+				// Replace a:activityId.property with activityId.property
+				part = part.replace(/a:(\w+)\.(\w+)/g, '$1.$2');
 
-		// Replace a:activityId.property with activityId.property
-		jsExpression = jsExpression.replace(/a:(\w+)\.(\w+)/g, '$1.$2');
+				// Replace v:variableName = value with process.variableName = value
+				part = part.replace(/v:(\w+)\s*=/g, 'process.$1 =');
 
-		// Replace v:variableName = value with process.variableName = value
-		jsExpression = jsExpression.replace(/v:(\w+)\s*=/g, 'process.$1 =');
+				// Replace var:variableName = value with process.variableName = value
+				part = part.replace(/var:(\w+)\s*=/g, 'process.$1 =');
 
-		// Replace var:variableName = value with process.variableName = value
-		jsExpression = jsExpression.replace(/var:(\w+)\s*=/g, 'process.$1 =');
+				// Replace v:variableName (reading) with process.variableName
+				part = part.replace(/v:(\w+)/g, 'process.$1');
 
-		// Replace v:variableName (reading) with process.variableName
-		jsExpression = jsExpression.replace(/v:(\w+)/g, 'process.$1');
+				// Replace var:variableName (reading) with process.variableName
+				part = part.replace(/var:(\w+)/g, 'process.$1');
 
-		// Replace var:variableName (reading) with process.variableName
-		jsExpression = jsExpression.replace(/var:(\w+)/g, 'process.$1');
+				// Replace this.property with currentActivity.property
+				part = part.replace(/this\.(\w+)/g, 'currentActivity.$1');
+			}
+			return part;
+		});
 
-		// Replace this.property with currentActivity.property
-		jsExpression = jsExpression.replace(/this\.(\w+)/g, 'currentActivity.$1');
-
-		// Replace process.variable with process.variable
-		// (already correct format)
-
-		return jsExpression;
+		return translatedParts.join('');
 	}
 
 	private safeEval(expression: string, context: any): any {
