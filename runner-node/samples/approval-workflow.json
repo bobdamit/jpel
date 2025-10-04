@@ -1,111 +1,112 @@
 {
-  "id": "approval-workflow",
-  "name": "Document Approval Workflow",
-  "description": "A process demonstrating conditional branching and multi-step approvals",
-  "version": "1.0.0",
-  "start": "a:submitDocument",
-  "variables": [
-    {
-      "name": "documentTitle",
-      "type": "string",
-      "description": "Title of the document to approve"
-    },
-    {
-      "name": "documentType",
-      "type": "string",
-      "description": "Type of document (policy, procedure, manual)"
-    },
-    {
-      "name": "approverDecision",
-      "type": "string",
-      "description": "Approval decision (approved, rejected, needs-revision)"
-    },
-    {
-      "name": "finalStatus",
-      "type": "string",
-      "description": "Final approval status"
-    }
-  ],
-  "activities": {
-    "submitDocument": {
-      "id": "submitDocument",
-      "name": "Submit Document for Approval",
-      "type": "human",
-      "prompt": "Please provide document details for approval:",
-      "inputs": [
-        {
-          "name": "documentTitle",
-          "type": "string",
-          "label": "Document Title",
-          "required": true,
-          "placeholder": "Enter document title",
-			 "pattern": "^[\\w\\s]{5,100}$",
-			 "patternDescription": "Title must be 5-100 characters, letters and spaces only"
-        },
-        {
-          "name": "documentType",
-          "type": "select",
-          "label": "Document Type",
-          "required": true,
-          "options": ["policy", "procedure", "manual"]
-        }
-      ],
-      "next": "a:reviewDocument"
-    },
-    "reviewDocument": {
-      "id": "reviewDocument",
-      "name": "Review Document",
-      "type": "human",
-      "prompt": "Please review the document and make your decision:",
-      "inputs": [
-        {
-          "name": "approverDecision",
-          "type": "select",
-          "label": "Approval Decision",
-          "required": true,
-          "options": ["approved", "rejected", "needs-revision"]
-        }
-      ],
-      "next": "a:processDecision"
-    },
-    "processDecision": {
-      "id": "processDecision",
-      "name": "Process Approval Decision",
-      "type": "switch",
-      "expression": "a:reviewDocument.f:approverDecision",
-      "cases": {
-        "approved": "a:documentApproved",
-        "rejected": "a:documentRejected",
-        "needs-revision": "a:documentNeedsRevision"
-      },
-      "default": "a:documentRejected"
-    },
-    "documentApproved": {
-      "id": "documentApproved",
-      "name": "Document Approved",
-      "type": "compute",
-      "code": [
-        "// Document was approved",
-        "currentActivity.finalStatus = 'Document approved successfully';"
-      ]
-    },
-    "documentRejected": {
-      "id": "documentRejected",
-      "name": "Document Rejected",
-      "type": "compute",
-      "code": [
-        "// Document was rejected",
-        "currentActivity.finalStatus = 'Document rejected';"
-      ]
-    },
-    "documentNeedsRevision": {
-      "id": "documentNeedsRevision",
-      "name": "Document Needs Revision",
-      "type": "compute",
-      "code": [
-        "// Document needs revision",
-        "currentActivity.finalStatus = 'Document requires revision';"
-      ]
-    }
-  }
+	"id": "approval-workflow",
+	"name": "Document Approval Workflow",
+	"description": "A process demonstrating conditional branching and multi-step approvals",
+	"version": "1.0.0",
+	"start": "a:approvalSequence",
+	"variables": [
+		{
+			"name": "finalStatus",
+			"type": "string",
+			"description": "Final approval status"
+		}
+	],
+	"activities": {
+		"approvalSequence": {
+			"id": "approvalSequence",
+			"name": "Document Approval Sequence",
+			"type": "sequence",
+			"activities": [
+				"a:submitDocument",
+				"a:reviewDocument",
+				"a:processDecision"
+			]
+		},
+		"submitDocument": {
+			"id": "submitDocument",
+			"name": "Submit Document for Approval",
+			"type": "human",
+			"prompt": "Please provide document details for approval:",
+			"inputs": [
+				{
+					"name": "documentTitle",
+					"type": "string",
+					"label": "Document Title",
+					"required": true,
+					"placeholder": "Enter document title",
+					"pattern": "^[\\w\\s]{5,100}$",
+					"patternDescription": "Title must be 5-100 characters, letters and spaces only"
+				},
+				{
+					"name": "documentType",
+					"type": "select",
+					"label": "Document Type",
+					"required": true,
+					"options": [
+						"policy",
+						"procedure",
+						"manual"
+					]
+				}
+			]
+		},
+		"reviewDocument": {
+			"id": "reviewDocument",
+			"name": "Review Document",
+			"type": "human",
+			"prompt": "Please review the document and make your decision:",
+			"inputs": [
+				{
+					"name": "approverDecision",
+					"type": "select",
+					"label": "Approval Decision",
+					"required": true,
+					"options": [
+						"approved",
+						"rejected",
+						"needs-revision"
+					]
+				}
+			]
+		},
+		"processDecision": {
+			"id": "processDecision",
+			"name": "Process Approval Decision",
+			"type": "switch",
+			"expression": "a:reviewDocument.f:approverDecision",
+			"cases": {
+				"approved": "a:documentApproved",
+				"rejected": "a:documentRejected",
+				"needs-revision": "a:documentNeedsRevision"
+			},
+			"default": "a:documentRejected"
+		},
+		"documentApproved": {
+			"id": "documentApproved",
+			"name": "Document Approved",
+			"type": "compute",
+			"code": [
+				"// Document was approved",
+				"v:finalStatus = 'Document approved successfully';"
+			]
+		},
+		"documentRejected": {
+			"id": "documentRejected",
+			"name": "Document Rejected",
+			"type": "compute",
+			"code": [
+				"// Document was rejected",
+				"v:finalStatus = 'Document rejected';"
+			]
+		},
+		"documentNeedsRevision": {
+			"id": "documentNeedsRevision",
+			"name": "Document Needs Revision",
+			"type": "compute",
+			"code": [
+				"// Document needs revision",
+				"v:finalStatus = 'Document requires revision';"
+			]
+		}
+	}
 }

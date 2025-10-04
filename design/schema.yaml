@@ -83,7 +83,7 @@ components:
           description: Activity description
         type:
           type: string
-          enum: [human, compute, api, sequence, parallel, branch, terminate]
+          enum: [human, compute, api, sequence, parallel, branch, switch, terminate]
           description: Activity type
         timeout:
           type: integer
@@ -157,6 +157,14 @@ components:
         description:
           type: string
           description: Field description
+        pattern:
+          type: string
+          description: Regular expression pattern for validation
+          example: "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
+        patternDescription:
+          type: string
+          description: Human-readable description of the pattern requirements
+          example: "Please enter a valid email address (e.g., user@example.com)"
 
     FileUpload:
       type: object
@@ -310,6 +318,35 @@ components:
               description: Activity to execute if condition is false
               example: "a:tlSequence"
 
+    # Multi-case conditional branching activity
+    SwitchActivity:
+      allOf:
+        - $ref: "#/components/schemas/Activity"
+        - type: object
+          required:
+            - expression
+            - cases
+          properties:
+            type:
+              const: switch
+            expression:
+              type: string
+              description: JavaScript expression to evaluate
+              example: "a:reviewDocument.f:approverDecision"
+            cases:
+              type: object
+              description: Map of case values to activity references
+              additionalProperties:
+                type: string
+              example:
+                approved: "a:documentApproved"
+                rejected: "a:documentRejected"
+                needs-revision: "a:documentNeedsRevision"
+            default:
+              type: string
+              description: Default activity if no case matches
+              example: "a:documentRejected"
+
     # Process termination activity
     TerminateActivity:
       allOf:
@@ -379,7 +416,7 @@ activityInstance:
       description: Activity identifier
     type:
       type: string
-      enum: [human, compute, api, sequence, parallel, branch, terminate]
+      enum: [human, compute, api, sequence, parallel, branch, switch, terminate]
     status:
       type: string
       enum: [pending, running, completed, failed, cancelled, timeout]
