@@ -1,14 +1,31 @@
-# 🚀## ✨ Features
+# 🚀## ✨ What This Runner Provides
 
-- **👤 Human Tasks**: Interactive forms and approvals
-- **🔄 Process Control**: Sequences, parallel execution, conditional branching
-- **🔁 Re-Run Capability**: Execute completed instances again with preserved data
-- **🧮 Compute Activities**: Expression evaluation and data transformation
-- **🌐 API Integration**: External service calls and webhooks
-- **📊 Persistence**: Repository pattern with in-memory and MongoDB support
-- **🎨 Interactive Demo**: Built-in web interface for testing processesnner - JSON Process Execution Language
+The Node.js runner is the primary implementation of JPEL, offering:
 
-A powerful, extensible process execution engine that runs JSON-based business processes inspired by BPEL4People. Perfect for building workflow applications, approval systems, and automated business processes.
+### 🎨 Interactive Web Demo
+- **Live Process Testing**: Load and execute sample processes instantly
+- **Visual Interface**: User-friendly forms for human tasks
+- **Real-time Execution**: Watch processes run step-by-step
+- **Process Status**: Live monitoring of activity states and data flow
+
+### 🔌 REST API
+- **Process Management**: Load, list, and manage process definitions
+- **Instance Execution**: Start, step through, and monitor process instances
+- **Human Task Handling**: Submit forms and handle user interactions
+- **Re-run Capability**: Execute completed processes again with preserved data
+
+### 💾 Flexible Storage
+- **In-Memory**: Perfect for development and demos (no setup required)
+- **MongoDB**: Production-ready persistence with connection pooling
+- **Extensible**: Plugin architecture for custom storage backends
+
+### 🛠️ Development Tools
+- **TypeScript**: Full type safety and modern JavaScript features
+- **Jest Testing**: Comprehensive test suite with 90+ passing tests
+- **Hot Reload**: Development mode with automatic rebuilding
+- **Linting**: Code quality enforcement with ESLintde.js Runner
+
+The official Node.js implementation of the JPEL (JSON Process Expression Language) process engine. This runner provides a complete development and production environment for executing JPEL processes with an interactive web interface, REST API, and multiple storage backends.
 
 ## ✨ Features
 
@@ -27,6 +44,7 @@ A powerful, extensible process execution engine that runs JSON-based business pr
 │                 │───▶│                 │───▶│                 │
 │ - Load samples  │    │ - Start process │    │ - Execute steps │
 │ - Human tasks   │    │ - Submit tasks  │    │ - Handle state  │
+│ - Live status   │    │ - Monitor exec  │    │ - Data flow     │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
                                                        │
                                                ┌─────────────────┐
@@ -69,30 +87,25 @@ A powerful, extensible process execution engine that runs JSON-based business pr
    npm run demo
    ```
 
-### 🎮 Try the Demo
+## 🎮 Using the Web Demo
 
-**Option 1: Interactive Web Interface (Recommended)**
-1. Open http://localhost:3000
-2. Click "Load Process" on any sample
-3. Click "Start Instance" 
-4. Complete human tasks when prompted
-5. Watch the process execute automatically!
+The web interface provides an intuitive way to explore JPEL processes:
 
-**Option 2: API Demo Script**
-```bash
-npm run demo
-```
+### Main Interface
+- **Left Panel**: Human tasks requiring user input
+- **Right Panel**: Live process status and activity states
+- **Compact View**: Shows activity names and key variables (no excessive scrolling)
 
-The demo includes three sample processes:
+### Demo Flow
+1. **Load Process**: Click "Load Process" on any sample
+2. **Start Instance**: Click "Start Instance" to begin execution
+3. **Complete Tasks**: Fill out forms when human tasks appear
+4. **Watch Execution**: See the process run automatically in real-time
 
-1. **👋 Hello World** - Simple greeting with human input
-2. **📋 Approval Workflow** - Document approval with conditional logic
-3. **👨‍💼 Employee Onboarding** - Multi-step process with parallel tasks
-
-**Demo Flow:**
-- Load → Start → Interact → Complete
-- All sample processes are fully functional
-- Real-time process execution with human interaction
+### Sample Processes
+- **👋 Hello World** - Simple greeting with user input
+- **📋 Approval Workflow** - Document approval with conditional logic
+- **👨‍💼 Employee Onboarding** - Multi-step process with parallel tasks
 
 ## 📝 JPEL Process Format
 
@@ -322,55 +335,64 @@ GET /health
 ## 🔧 Development
 
 ### Project Structure
-
 ```
 runner-node/
 ├── src/
 │   ├── index.ts              # Express server
 │   ├── process-engine.ts     # Core execution engine
-│   ├── types.ts              # TypeScript definitions
-│   ├── expression-evaluator.ts # Expression parsing
-│   ├── api-executor.ts       # External API calls
+│   ├── expression-evaluator.ts # JPEL→JS translation
+│   ├── process-normalizer.ts # Validation & normalization
 │   └── repositories/         # Data persistence
 │       ├── interfaces/       # Repository contracts
 │       ├── in-memory/        # In-memory implementations
 │       └── mongo/            # MongoDB implementations
 ├── samples/                  # Example processes
 ├── public/                   # Demo web interface
+├── tests/                    # Jest test suite (90+ tests)
 └── dist/                     # Compiled JavaScript
 ```
 
-### Adding New Activity Types
+### Development Commands
+```bash
+# Install dependencies
+npm install
 
-1. **Update types:**
-   ```typescript
-   // In types.ts
-   export type ActivityType = 'human' | 'compute' | 'api' | 'your-new-type';
-   ```
+# Build TypeScript
+npm run build
 
-2. **Implement executor:**
-   ```typescript
-   // In process-engine.ts
-   case 'your-new-type':
-     return await this.executeYourNewType(activity, instance);
-   ```
+# Start development server
+npm run dev
 
-### Adding Repository Backends
+# Run tests
+npm test
 
-1. **Implement interfaces:**
-   ```typescript
-   export class YourRepository implements ProcessDefinitionRepository {
-     // Implement all interface methods
-   }
-   ```
+# Lint code
+npm run lint
+```
 
-2. **Register in factory:**
-   ```typescript
-   // In repository-factory.ts
-   static async initializeYourBackend(config: YourConfig) {
-     // Setup your repository
-   }
-   ```
+### Adding New Features
+
+**New Activity Types:**
+1. Update `src/types.ts` with the new activity type
+2. Implement executor logic in `src/process-engine.ts`
+3. Add validation in `src/process-normalizer.ts`
+4. Write tests in `tests/`
+
+**New Repository Backends:**
+1. Implement repository interfaces in `src/repositories/interfaces/`
+2. Create concrete implementation in `src/repositories/your-backend/`
+3. Register in `src/repository-factory.ts`
+
+## 📚 Key Components
+
+### Expression Evaluator
+Translates JPEL shorthand (`a:activityId.f:fieldName`) to JavaScript and executes in a safe context.
+
+### Process Normalizer
+Validates process definitions at load time, catching field reference errors before execution.
+
+### Web Interface
+Built with vanilla JavaScript, featuring a responsive two-column layout for optimal usability.
 
 ## 📚 Example Use Cases
 
@@ -431,6 +453,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-**Built with ❤️ for the business process automation community**
-
-Ready to build powerful workflow applications? Start with the demo and explore the possibilities! 🚀
+**Ready to build powerful workflow applications? Start with the demo and explore the possibilities!** 🚀
