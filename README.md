@@ -1,4 +1,4 @@
-# JPEL - JSON P### 📊 Data Collection
+# JPEL - JSON Process Expression Language
 Build forms and data capture workflows with validation. Data can be obtained through:
 - **Human Forms**: Interactive forms for customer intake, surveys, and feedback collection
 - **API Integration**: Connect to external systems to fetch or submit data automatically
