@@ -6,7 +6,6 @@
 	"start": "a:userRegistration",
 	"activities": {
 		"userRegistration": {
-			"id": "userRegistration",
 			"name": "User Registration Form",
 			"type": "human",
 			"prompt": "Please fill out the registration form with valid information:",
