@@ -1,13 +1,8 @@
 import { ProcessInstance, ProcessStatus } from '../types';
 import { ProcessInstanceRepository } from './process-instance-repository';
+import { logger } from '../logger';
 
-// Logger instance for this repository
-const logger = {
-	info: (message: string, data?: any) => console.log(`[INFO] ${new Date().toISOString()} - ProcessInstanceRepo: ${message}`, data || ''),
-	warn: (message: string, data?: any) => console.warn(`[WARN] ${new Date().toISOString()} - ProcessInstanceRepo: ${message}`, data || ''),
-	error: (message: string, data?: any) => console.error(`[ERROR] ${new Date().toISOString()} - ProcessInstanceRepo: ${message}`, data || ''),
-	debug: (message: string, data?: any) => console.log(`[DEBUG] ${new Date().toISOString()} - ProcessInstanceRepo: ${message}`, data || '')
-};
+// using centralized logger
 
 /**
  * In-memory implementation of ProcessInstanceRepository
@@ -53,8 +48,8 @@ export class InMemoryProcessInstanceRepository implements ProcessInstanceReposit
 		const stepFieldValues: any = {};
 		if (instance.activities) {
 			Object.entries(instance.activities).forEach(([activityId, activity]) => {
-				if (activity.type === 'human' && activity.data) {
-					stepFieldValues[activityId] = activity.data;
+				if (activity.type === 'human' && (activity as any).formData) {
+					stepFieldValues[activityId] = (activity as any).formData;
 				}
 			});
 		}

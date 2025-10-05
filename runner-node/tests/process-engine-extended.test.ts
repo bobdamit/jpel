@@ -135,10 +135,10 @@ describe('ProcessEngine Extended Coverage', () => {
                 return;
             }
             
-            // If successful, check the data
-            expect(computeActivity.data).toBeDefined();
-            expect(computeActivity.data!.calculation).toBe(4);
-            expect(computeActivity.data!.message).toBe('Hello World');
+            // If successful, check the computed values
+            expect((computeActivity as any).computedValues).toBeDefined();
+            expect((computeActivity as any).computedValues!.calculation).toBe(4);
+            expect((computeActivity as any).computedValues!.message).toBe('Hello World');
         });
 
         test('should handle compute activity errors', async () => {
@@ -241,8 +241,7 @@ describe('ProcessEngine Extended Coverage', () => {
             const sequenceActivity = instance!.activities['sequence'];
             
             expect(sequenceActivity).toBeDefined();
-            expect(sequenceActivity.data).toBeDefined();
-            expect(sequenceActivity.data!.sequenceIndex).toBeDefined();
+            expect((sequenceActivity as any).sequenceIndex).toBeDefined();
         });
 
         test('should handle empty sequence activities', async () => {
@@ -304,9 +303,7 @@ describe('ProcessEngine Extended Coverage', () => {
             const instance = await processEngine.getInstance(result.instanceId);
             const parallelActivity = instance!.activities['parallel'];
             
-            expect(parallelActivity.data).toBeDefined();
-            // Parallel activity should have some state tracking
-            expect(parallelActivity.data!.parallelState || parallelActivity.data!.activeActivities).toBeDefined();
+            expect((parallelActivity as any).parallelState || (parallelActivity as any).activeActivities).toBeDefined();
         });
     });
 
@@ -349,8 +346,8 @@ describe('ProcessEngine Extended Coverage', () => {
             const branchActivity = instance!.activities['branch'];
             
             expect(branchActivity.status).toBe(ActivityStatus.Completed);
-            expect(branchActivity.data!.conditionResult).toBe(true);
-            expect(branchActivity.data!.nextActivity).toBe('a:thenStep');
+            expect((branchActivity as any).conditionResult).toBe(true);
+            expect((branchActivity as any).nextActivity).toBe('a:thenStep');
         });
 
         test('should execute else branch when condition is false', async () => {
@@ -391,8 +388,8 @@ describe('ProcessEngine Extended Coverage', () => {
             const branchActivity = instance!.activities['branch'];
             
             expect(branchActivity.status).toBe(ActivityStatus.Completed);
-            expect(branchActivity.data!.conditionResult).toBe(false);
-            expect(branchActivity.data!.nextActivity).toBe('a:elseStep');
+            expect((branchActivity as any).conditionResult).toBe(false);
+            expect((branchActivity as any).nextActivity).toBe('a:elseStep');
         });
 
         test('should handle branch with no else clause', async () => {
@@ -478,8 +475,8 @@ describe('ProcessEngine Extended Coverage', () => {
             const switchActivity = instance!.activities['switch'];
             
             expect(switchActivity.status).toBe(ActivityStatus.Completed);
-            expect(switchActivity.data!.expressionValue).toBeDefined();
-            expect(switchActivity.data!.nextActivity).toBeDefined();
+            expect((switchActivity as any).expressionValue).toBeDefined();
+            expect((switchActivity as any).nextActivity).toBeDefined();
         });
 
         test('should execute default case when no match found', async () => {
@@ -528,7 +525,7 @@ describe('ProcessEngine Extended Coverage', () => {
             const switchActivity = instance!.activities['switch'];
             
             expect(switchActivity.status).toBe(ActivityStatus.Completed);
-            expect(switchActivity.data!.matchedCase).toBe('default');
+            expect((switchActivity as any).matchedCase).toBe('default');
         });
     });
 

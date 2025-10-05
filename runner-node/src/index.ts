@@ -6,11 +6,45 @@ import * as fs from "fs";
 import * as path from "path";
 import { ProcessEngine } from "./process-engine";
 import { RepositoryFactory } from "./repositories/repository-factory";
+import { logger } from './logger';
 import {
 	ProcessDefinition,
 	ApiResponse,
 	ProcessExecutionResult,
 } from "./types";
+
+/**
+ * Extracts data from typed activity instances for API responses
+ */
+function getActivityData(activity: any): any {
+	if (!activity) return {};
+	
+	// Return data based on activity type
+	if (activity.formData) {
+		// HumanActivityInstance
+		return activity.formData;
+	} else if (activity.responseData) {
+		// APIActivityInstance  
+		return activity.responseData;
+	} else if (activity.computedValues) {
+		// ComputeActivityInstance
+		return activity.computedValues;
+	} else if (activity.sequenceIndex !== undefined) {
+		// SequenceActivityInstance
+		return { sequenceIndex: activity.sequenceIndex, activities: activity.sequenceActivities };
+	} else if (activity.parallelState) {
+		// ParallelActivityInstance
+		return { parallelState: activity.parallelState, activeActivities: activity.activeActivities, completedActivities: activity.completedActivities };
+	} else if (activity.conditionResult !== undefined) {
+		// BranchActivityInstance
+		return { conditionResult: activity.conditionResult, nextActivity: activity.nextActivity };
+	} else if (activity.expressionValue !== undefined) {
+		// SwitchActivityInstance
+		return { expressionValue: activity.expressionValue, matchedCase: activity.matchedCase, nextActivity: activity.nextActivity };
+	}
+	
+	return {};
+}
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -19,12 +53,12 @@ const port = process.env.PORT || 3000;
 async function initializeApplication() {
 	try {
 		// Initialize repositories (in-memory for now)
-		await RepositoryFactory.initializeInMemory();
-		console.log('✅ Repositories initialized');
+	await RepositoryFactory.initializeInMemory();
+	logger.info('Repositories initialized');
 
-		// Test repository health
-		const health = await RepositoryFactory.healthCheck();
-		console.log('📊 Repository health:', health);
+	// Test repository health
+	const health = await RepositoryFactory.healthCheck();
+	logger.info('Repository health:', health);
 
 	} catch (error) {
 		console.error('❌ Failed to initialize application:', error);
@@ -296,13 +330,14 @@ app.get(
 			// This is a waiting human task - return the FieldValue[] directly from activity instance
 			const fieldsWithValues = (currentActivity as any).inputs || [];
 
+			const activityData = getActivityData(currentActivity);
 			const humanTaskData = {
 				activityId: currentActivity.id,
 				prompt: (currentActivity as any).prompt,
 				fields: fieldsWithValues, // These are already FieldValue[] objects
 				fileUploads: (currentActivity as any).fileUploads,
 				attachments: (currentActivity as any).attachments,
-				context: currentActivity.data && Object.keys(currentActivity.data).length > 0 ? { previousRunData: currentActivity.data } : undefined
+				context: activityData && Object.keys(activityData).length > 0 ? { previousRunData: activityData } : undefined
 			};
 
 			res.json(createResponse(true, { humanTask: humanTaskData }));
@@ -361,12 +396,12 @@ async function startServer() {
 
 	// Initialize process engine with repositories
 	processEngine = new ProcessEngine();
-	console.log('✅ Process engine initialized');
+	logger.info('Process engine initialized');
 
 	app.listen(port, () => {
-		console.log(`🚀 JPEL Runner API server started on port ${port}`);
-		console.log(`📖 Health check: http://localhost:${port}/health`);
-		console.log(`📋 API base URL: http://localhost:${port}/api`);
+		logger.info(`JPEL Runner API server started on port ${port}`);
+		logger.info(`Health check: http://localhost:${port}/health`);
+		logger.info(`API base URL: http://localhost:${port}/api`);
 	});
 }
 

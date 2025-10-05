@@ -2,14 +2,9 @@ import { ProcessDefinition, ProcessTemplateFlyweight } from '../types';
 import { ProcessDefinitionRepository } from './process-definition-repository';
 import fs from 'fs';
 import path from 'path';
+import { logger } from '../logger';
 
-// Logger setup
-const logger = {
-	info: (message: string, data?: any) => console.log(`[INFO] ${new Date().toISOString()} - ProcessDefinitionRepo: ${message}`, data || ''),
-	warn: (message: string, data?: any) => console.warn(`[WARN] ${new Date().toISOString()} - ProcessDefinitionRepo: ${message}`, data || ''),
-	error: (message: string, data?: any) => console.error(`[ERROR] ${new Date().toISOString()} - ProcessDefinitionRepo: ${message}`, data || ''),
-	debug: (message: string, data?: any) => console.log(`[DEBUG] ${new Date().toISOString()} - ProcessDefinitionRepo: ${message}`, data || '')
-};
+// using centralized logger
 
 /**
  * In-memory implementation of ProcessDefinitionRepository

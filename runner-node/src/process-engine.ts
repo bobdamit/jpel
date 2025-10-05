@@ -10,12 +10,19 @@ import {
 	ActivityType,
 	PassFail,
 	HumanActivity,
+	HumanActivityInstance,
 	ComputeActivity,
+	ComputeActivityInstance,
 	APIActivity,
+	APIActivityInstance,
 	SequenceActivity,
+	SequenceActivityInstance,
 	ParallelActivity,
+	ParallelActivityInstance,
 	BranchActivity,
+	BranchActivityInstance,
 	SwitchActivity,
+	SwitchActivityInstance,
 	TerminateActivity,
 	Field,
 	FieldValue,
@@ -28,14 +35,9 @@ import { FieldValidator } from './field-validator';
 import { RepositoryFactory } from './repositories/repository-factory';
 import { ProcessDefinitionRepository } from './repositories/process-definition-repository';
 import { ProcessInstanceRepository } from './repositories/process-instance-repository';
+import { logger } from './logger';
 
-// Logger setup
-const logger = {
-	info: (message: string, data?: any) => console.log(`[INFO] ${new Date().toISOString()} - ${message}`, data || ''),
-	warn: (message: string, data?: any) => console.warn(`[WARN] ${new Date().toISOString()} - ${message}`, data || ''),
-	error: (message: string, data?: any) => console.error(`[ERROR] ${new Date().toISOString()} - ${message}`, data || ''),
-	debug: (message: string, data?: any) => console.log(`[DEBUG] ${new Date().toISOString()} - ${message}`, data || '')
-};
+// Using centralized logger
 
 export class ProcessEngine {
 	private processDefinitionRepo: ProcessDefinitionRepository;
@@ -254,7 +256,7 @@ export class ProcessEngine {
 			status: instance.status
 		});
 
-		const activityInstance = instance.activities[activityId];
+		const activityInstance = instance.activities[activityId] as HumanActivityInstance;
 		if (!activityInstance || activityInstance.status !== ActivityStatus.Running) {
 			logger.error(`ProcessEngine: Activity '${activityId}' not found or not waiting for input`, {
 				activityExists: !!activityInstance,
@@ -269,7 +271,7 @@ export class ProcessEngine {
 		}
 
 		// Store the submitted data
-		activityInstance.data = activityInstance.data || {};
+		activityInstance.formData = activityInstance.formData || {};
 
 		// Get the process definition to access field definitions for validation
 		const processDefinition = await this.processDefinitionRepo.findById(instance.processId);
@@ -295,14 +297,14 @@ export class ProcessEngine {
 			}
 		}
 
-		Object.assign(activityInstance.data, data);
+		Object.assign(activityInstance.formData, data);
 		if (files) {
-			activityInstance.data._files = files;
+			activityInstance._files = files;
 		}
 
 		// Update FieldValue objects in the activity instance inputs array
-		if ((activityInstance as any).inputs && Array.isArray((activityInstance as any).inputs)) {
-			(activityInstance as any).inputs.forEach((fieldValue: FieldValue) => {
+		if (activityInstance.inputs && Array.isArray(activityInstance.inputs)) {
+			activityInstance.inputs.forEach((fieldValue: FieldValue) => {
 				if (data.hasOwnProperty(fieldValue.name)) {
 					fieldValue.value = data[fieldValue.name];
 				}
@@ -311,7 +313,7 @@ export class ProcessEngine {
 
 		logger.debug(`ProcessEngine: Stored human task data`, {
 			activityId,
-			dataStored: activityInstance.data
+			dataStored: activityInstance.formData
 		});
 
 		// Complete the human task
@@ -475,7 +477,7 @@ export class ProcessEngine {
 			};
 		}
 
-		const activityInstance = instance.activities[activity.id];
+		const activityInstance = instance.activities[activity.id] as ComputeActivityInstance;
 
 		try {
 			// Execute JavaScript code
@@ -483,7 +485,7 @@ export class ProcessEngine {
 
 			// Store any results
 			if (result) {
-				activityInstance.data = result;
+				activityInstance.computedValues = result;
 			}
 
 			// Complete the activity
@@ -515,12 +517,12 @@ export class ProcessEngine {
 			};
 		}
 
-		const activityInstance = instance.activities[activity.id];
+		const activityInstance = instance.activities[activity.id] as APIActivityInstance;
 
 		try {
 			const response = await this.apiExecutor.execute(activity, instance);
 
-			activityInstance.data = response;
+			activityInstance.responseData = response;
 			activityInstance.status = ActivityStatus.Completed;
 			activityInstance.completedAt = new Date();
 
@@ -555,17 +557,15 @@ export class ProcessEngine {
 			instance.currentActivity = firstActivity;
 
 			// Store sequence state for continuation
-			const activityInstance = instance.activities[activity.id];
-			activityInstance.data = {
-				sequenceIndex: 0,
-				activities: activity.activities
-			};
+			const activityInstance = instance.activities[activity.id] as SequenceActivityInstance;
+			activityInstance.sequenceIndex = 0;
+			activityInstance.sequenceActivities = activity.activities;
 
 			await this.processInstanceRepo.save(instance);
 			return await this.executeNextStep(instanceId);
 		} else {
 			// Empty sequence completes immediately
-			const activityInstance = instance.activities[activity.id];
+			const activityInstance = instance.activities[activity.id] as SequenceActivityInstance;
 			activityInstance.status = ActivityStatus.Completed;
 			activityInstance.completedAt = new Date();
 
@@ -584,16 +584,14 @@ export class ProcessEngine {
 			};
 		}
 
-		const activityInstance = instance.activities[activity.id];
+		const activityInstance = instance.activities[activity.id] as ParallelActivityInstance;
 		logger.info(`ProcessEngine: Executing parallel activity '${activity.id}' with ${activity.activities.length} child activities`);
 
 		// Initialize parallel state if not already done
-		if (!activityInstance.data?.parallelState) {
-			activityInstance.data = {
-				parallelState: 'running',
-				activeActivities: activity.activities.map(a => this.extractActivityId(a)),
-				completedActivities: []
-			};
+		if (!activityInstance.parallelState) {
+			activityInstance.parallelState = 'running';
+			activityInstance.activeActivities = activity.activities.map(a => this.extractActivityId(a));
+			activityInstance.completedActivities = [];
 
 			// Start the first activity (we'll simulate parallel by allowing any to be worked on)
 			const firstActivity = this.extractActivityId(activity.activities[0]);
@@ -604,9 +602,8 @@ export class ProcessEngine {
 		}
 
 		// Check if all parallel activities are completed
-		const parallelData = activityInstance.data;
-		const allActivities = parallelData.activeActivities as string[];
-		const completedActivities = parallelData.completedActivities as string[];
+		const allActivities = activityInstance.activeActivities as string[];
+		const completedActivities = activityInstance.completedActivities as string[];
 
 		logger.debug(`ProcessEngine: Parallel status - Total: ${allActivities.length}, Completed: ${completedActivities.length}`);
 
@@ -615,7 +612,7 @@ export class ProcessEngine {
 			logger.info(`ProcessEngine: All parallel activities completed for '${activity.id}'`);
 			activityInstance.status = ActivityStatus.Completed;
 			activityInstance.completedAt = new Date();
-			activityInstance.data.parallelState = 'completed';
+			activityInstance.parallelState = 'completed';
 
 			// Set current activity to the parallel activity itself so sequence continuation works
 			instance.currentActivity = activity.id;
@@ -648,7 +645,7 @@ export class ProcessEngine {
 			};
 		}
 
-		const activityInstance = instance.activities[activity.id];
+		const activityInstance = instance.activities[activity.id] as BranchActivityInstance;
 
 		try {
 			const conditionResult = this.expressionEvaluator.evaluateCondition(activity.condition, instance);
@@ -659,7 +656,8 @@ export class ProcessEngine {
 
 				activityInstance.status = ActivityStatus.Completed;
 				activityInstance.completedAt = new Date();
-				activityInstance.data = { conditionResult, nextActivity };
+				activityInstance.conditionResult = conditionResult;
+				activityInstance.nextActivity = nextActivity;
 
 				await this.processInstanceRepo.save(instance);
 				return await this.executeNextStep(instanceId);
@@ -694,7 +692,7 @@ export class ProcessEngine {
 			};
 		}
 
-		const activityInstance = instance.activities[activity.id];
+		const activityInstance = instance.activities[activity.id] as SwitchActivityInstance;
 		logger.info(`ProcessEngine: Executing switch activity '${activity.id}'`);
 
 		try {
@@ -724,11 +722,9 @@ export class ProcessEngine {
 
 			activityInstance.status = ActivityStatus.Completed;
 			activityInstance.completedAt = new Date();
-			activityInstance.data = {
-				expressionValue: switchValue,
-				matchedCase: activity.cases[switchValue] ? switchValue : 'default',
-				nextActivity
-			};
+			activityInstance.expressionValue = switchValue;
+			activityInstance.matchedCase = activity.cases[switchValue] ? switchValue : 'default';
+			activityInstance.nextActivity = nextActivity;
 
 			await this.processInstanceRepo.save(instance);
 			return await this.executeNextStep(instanceId);
@@ -803,20 +799,18 @@ export class ProcessEngine {
 					const parallelActivity = activityDef as ParallelActivity;
 					const parallelInstance = instance.activities[activityId];
 
-					// Check if this parallel activity contains our current activity
-					if (parallelInstance?.data?.parallelState === 'running' &&
-						parallelActivity.activities.some(a => this.extractActivityId(a) === instance.currentActivity)) {
+				// Check if this parallel activity contains our current activity
+				if ((parallelInstance as any).parallelState === 'running' &&
+					parallelActivity.activities.some(a => this.extractActivityId(a) === instance.currentActivity)) {
 
-						logger.debug(`ProcessEngine: Current activity '${instance.currentActivity}' is part of parallel '${activityId}'`);
-						const parallelData = parallelInstance.data;
+					logger.debug(`ProcessEngine: Current activity '${instance.currentActivity}' is part of parallel '${activityId}'`);
+					const parallelActivityInstance = parallelInstance as ParallelActivityInstance;
 
-						// Mark current activity as completed in parallel tracking
-						if (!parallelData.completedActivities.includes(instance.currentActivity)) {
-							parallelData.completedActivities.push(instance.currentActivity);
-							logger.info(`ProcessEngine: Marked '${instance.currentActivity}' as completed in parallel '${activityId}'`);
-						}
-
-						// Continue parallel execution
+					// Mark current activity as completed in parallel tracking
+					if (!parallelActivityInstance.completedActivities!.includes(instance.currentActivity)) {
+						parallelActivityInstance.completedActivities!.push(instance.currentActivity);
+						logger.info(`ProcessEngine: Marked '${instance.currentActivity}' as completed in parallel '${activityId}'`);
+					}						// Continue parallel execution
 						await this.processInstanceRepo.save(instance);
 						return await this.executeParallelActivity(instanceId, parallelActivity);
 					}
@@ -829,21 +823,17 @@ export class ProcessEngine {
 					const sequenceActivity = activityDef as SequenceActivity;
 					const sequenceInstance = instance.activities[activityId];
 
-					// Check if this sequence contains our current activity and has sequence data
-					if (sequenceInstance?.data?.sequenceIndex !== undefined &&
-						sequenceActivity.activities.some(a => this.extractActivityId(a) === instance.currentActivity)) {
+				// Check if this sequence contains our current activity and has sequence data
+				if ((sequenceInstance as any).sequenceIndex !== undefined &&
+					sequenceActivity.activities.some(a => this.extractActivityId(a) === instance.currentActivity)) {					logger.debug(`ProcessEngine: Found parent sequence '${activityId}' for current activity '${instance.currentActivity}'`);
+					const sequenceActivityInstance = sequenceInstance as SequenceActivityInstance;
+					const nextIndex = sequenceActivityInstance.sequenceIndex! + 1;
 
-						logger.debug(`ProcessEngine: Found parent sequence '${activityId}' for current activity '${instance.currentActivity}'`);
-						const sequenceData = sequenceInstance.data;
-						const nextIndex = sequenceData.sequenceIndex + 1;
-
-						if (nextIndex < sequenceData.activities.length) {
-							// Continue with next activity in sequence
-							sequenceData.sequenceIndex = nextIndex;
-							const nextActivity = this.extractActivityId(sequenceData.activities[nextIndex]);
-							instance.currentActivity = nextActivity;
-
-							logger.info(`ProcessEngine: Continuing sequence '${activityId}' - moving to activity '${nextActivity}' (index ${nextIndex})`);
+					if (nextIndex < sequenceActivityInstance.sequenceActivities!.length) {
+						// Continue with next activity in sequence
+						sequenceActivityInstance.sequenceIndex = nextIndex;
+						const nextActivity = this.extractActivityId(sequenceActivityInstance.sequenceActivities![nextIndex]);
+						instance.currentActivity = nextActivity;							logger.info(`ProcessEngine: Continuing sequence '${activityId}' - moving to activity '${nextActivity}' (index ${nextIndex})`);
 							await this.processInstanceRepo.save(instance);
 							return await this.executeNextStep(instanceId);
 						} else {
@@ -981,7 +971,7 @@ export class ProcessEngine {
 			activity.startedAt = undefined;
 			activity.completedAt = undefined;
 			activity.error = undefined;
-			// NOTE: We deliberately keep activity.data and activity.inputs with their values
+			// NOTE: We deliberately keep activity-specific fields with their values
 			// so they can be displayed when re-running
 		}
 

@@ -1,4 +1,5 @@
 import { ProcessInstance } from './types';
+import { logger } from './logger';
 
 export class ExpressionEvaluator {
 
@@ -29,15 +30,7 @@ export class ExpressionEvaluator {
 			// on previously-declared temps.
 			const jsCodeBlock = codeLines.map(line => this.translateJPELToJS(line, instance)).join('\n');
 
-			// Debug: show the actual JS code block we're about to execute.
-			// Emit debug to stderr (not mocked by tests) so we can inspect during CI/test runs
-			try {
-				process.stderr.write('--- JS CODE BLOCK ---\n');
-				process.stderr.write(jsCodeBlock + '\n');
-				process.stderr.write('--- CONTEXT.process BEFORE ---\n' + JSON.stringify(context.process) + '\n');
-			} catch (err) {
-				// swallow if write not available
-			}
+			// (debug output removed)
 
 			// Determine properties assigned to `this.xxx` so we can return only
 			// those properties (preserves previous behaviour where callers
@@ -52,11 +45,7 @@ export class ExpressionEvaluator {
 			// fall back to statement execution, so this covers most compute scripts.
 			const execResult = this.safeEval(jsCodeBlock, context);
 
-			try {
-				process.stderr.write('--- CONTEXT.process AFTER ---\n' + JSON.stringify(context.process) + '\n');
-			} catch (err) {
-				// swallow
-			}
+			// (debug output removed)
 
 			if (thisProps.size > 0) {
 				const out: any = {};
@@ -78,6 +67,39 @@ export class ExpressionEvaluator {
 		}
 	}
 
+	/**
+	 * Extracts data from typed activity instances for expression evaluation
+	 */
+	private getActivityData(activity: any): any {
+		if (!activity) return {};
+		
+		// Return data based on activity type
+		if (activity.formData) {
+			// HumanActivityInstance
+			return activity.formData;
+		} else if (activity.responseData) {
+			// APIActivityInstance  
+			return activity.responseData;
+		} else if (activity.computedValues) {
+			// ComputeActivityInstance
+			return activity.computedValues;
+		} else if (activity.sequenceIndex !== undefined) {
+			// SequenceActivityInstance
+			return { sequenceIndex: activity.sequenceIndex, activities: activity.sequenceActivities };
+		} else if (activity.parallelState) {
+			// ParallelActivityInstance
+			return { parallelState: activity.parallelState, activeActivities: activity.activeActivities, completedActivities: activity.completedActivities };
+		} else if (activity.conditionResult !== undefined) {
+			// BranchActivityInstance
+			return { conditionResult: activity.conditionResult, nextActivity: activity.nextActivity };
+		} else if (activity.expressionValue !== undefined) {
+			// SwitchActivityInstance
+			return { expressionValue: activity.expressionValue, matchedCase: activity.matchedCase, nextActivity: activity.nextActivity };
+		}
+		
+		return {};
+	}
+
 	private createEvaluationContext(instance: ProcessInstance, currentActivityId?: string): any {
 		const context: any = {
 			// Process variables
@@ -87,7 +109,7 @@ export class ExpressionEvaluator {
 			instance: instance,
 
 			// Current activity context
-			currentActivity: currentActivityId ? (instance.activities[currentActivityId].data || {}) : {},
+			currentActivity: currentActivityId ? this.getActivityData(instance.activities[currentActivityId]) : {},
 
 			// Helper functions
 			Math,
@@ -105,7 +127,8 @@ export class ExpressionEvaluator {
 					const activityMatch = reference.match(/^a:(\w+)\.f:(\w+)$/);
 					if (activityMatch) {
 						const [, activityId, fieldName] = activityMatch;
-						return instance.activities[activityId]?.data?.[fieldName];
+						const activityData = this.getActivityData(instance.activities[activityId]);
+						return activityData?.[fieldName];
 					}
 				} else if (reference.startsWith('v:')) {
 					// Variable reference: v:variableName
@@ -123,9 +146,10 @@ export class ExpressionEvaluator {
 		// Add activity data accessors for backward compatibility
 		Object.keys(instance.activities).forEach(activityId => {
 			const activity = instance.activities[activityId];
-			if (activity.data) {
+			const activityData = this.getActivityData(activity);
+			if (activityData && Object.keys(activityData).length > 0) {
 				context[activityId] = {
-					f: activity.data, // Field data
+					f: activityData, // Field data
 					status: activity.status,
 					passFail: activity.passFail
 				};
@@ -173,17 +197,8 @@ export class ExpressionEvaluator {
 		const paramNames = Object.keys(context);
 		const paramValues = Object.values(context);
 
-		console.log('=== SAFE EVAL DEBUG ===');
-		console.log('Expression to evaluate:', expression);
-		console.log('Param names:', paramNames);
-		console.log('Checking instance param:', context.instance ? 'EXISTS' : 'MISSING');
-		if (context.instance) {
-			console.log('Instance.activities keys:', Object.keys(context.instance.activities || {}));
-			if (context.instance.activities?.reviewDocument) {
-				console.log('ReviewDocument in instance:', context.instance.activities.reviewDocument);
-			}
-		}
-		console.log('=======================');
+	// Minimal debug via centralized logger
+	logger.debug('Expression to evaluate (truncated):', expression && expression.length > 200 ? expression.substring(0,200) + '...' : expression);
 
 		try {
 			// If expression contains multiple lines or semicolons, treat it as a
@@ -196,18 +211,18 @@ export class ExpressionEvaluator {
 				const func = new Function(...paramNames, `return ${expression}`);
 				result = func(...paramValues);
 			}
-			console.log('Expression evaluation result:', result);
+			logger.debug('Expression evaluation result:', result);
 			return result;
 		} catch (error) {
-			console.log('Expression evaluation error:', error);
+			logger.error('Expression evaluation error:', error instanceof Error ? error.message : error);
 			// If it's not an expression, try as a statement
 			try {
 				const func = new Function(...paramNames, expression);
 				const result = func(...paramValues);
-				console.log('Statement evaluation result:', result);
+				logger.debug('Statement evaluation result:', result);
 				return result;
 			} catch (statementError) {
-				console.log('Statement evaluation error:', statementError);
+				logger.error('Statement evaluation error:', statementError instanceof Error ? statementError.message : statementError);
 				throw new Error(`Expression evaluation failed: ${expression}`);
 			}
 		}

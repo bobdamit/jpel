@@ -30,7 +30,13 @@
     "helmet": "^8.1.0",
     "joi": "^18.0.1",
     "multer": "^2.0.2",
+    "pino": "^8.21.0",
     "uuid": "^13.0.0"
+  },
+  "dependenciesMeta": {
+    "pino": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",

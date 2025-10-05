@@ -2,14 +2,7 @@ import { ProcessDefinitionRepository } from './process-definition-repository';
 import { ProcessInstanceRepository } from './process-instance-repository';
 import { InMemoryProcessDefinitionRepository } from './in-memory-process-definition-repository';
 import { InMemoryProcessInstanceRepository } from './in-memory-process-instance-repository';
-
-// Logger instance for this factory
-const logger = {
-	info: (message: string, data?: any) => console.log(`[INFO] ${new Date().toISOString()} - RepositoryFactory: ${message}`, data || ''),
-	warn: (message: string, data?: any) => console.warn(`[WARN] ${new Date().toISOString()} - RepositoryFactory: ${message}`, data || ''),
-	error: (message: string, data?: any) => console.error(`[ERROR] ${new Date().toISOString()} - RepositoryFactory: ${message}`, data || ''),
-	debug: (message: string, data?: any) => console.log(`[DEBUG] ${new Date().toISOString()} - RepositoryFactory: ${message}`, data || '')
-};
+import { logger } from '../logger';
 
 /**
  * Configuration for repository implementations

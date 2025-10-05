@@ -1,13 +1,6 @@
 import { ProcessDefinition, ProcessTemplateFlyweight } from '../types';
 import { ProcessDefinitionRepository } from './process-definition-repository';
-
-// Logger instance for this repository
-const logger = {
-	info: (message: string, data?: any) => console.log(`[INFO] ${new Date().toISOString()} - MongoProcessDefinitionRepo: ${message}`, data || ''),
-	warn: (message: string, data?: any) => console.warn(`[WARN] ${new Date().toISOString()} - MongoProcessDefinitionRepo: ${message}`, data || ''),
-	error: (message: string, data?: any) => console.error(`[ERROR] ${new Date().toISOString()} - MongoProcessDefinitionRepo: ${message}`, data || ''),
-	debug: (message: string, data?: any) => console.log(`[DEBUG] ${new Date().toISOString()} - MongoProcessDefinitionRepo: ${message}`, data || '')
-};
+import { logger } from '../logger';
 
 /**
  * MongoDB implementation of ProcessDefinitionRepository

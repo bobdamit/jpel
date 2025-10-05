@@ -9,6 +9,39 @@ import {
     HumanActivity 
 } from '../src/types';
 
+/**
+ * Extracts data from typed activity instances for test API responses
+ */
+function getActivityData(activity: any): any {
+	if (!activity) return {};
+	
+	// Return data based on activity type
+	if (activity.formData) {
+		// HumanActivityInstance
+		return activity.formData;
+	} else if (activity.responseData) {
+		// APIActivityInstance  
+		return activity.responseData;
+	} else if (activity.computedValues) {
+		// ComputeActivityInstance
+		return activity.computedValues;
+	} else if (activity.sequenceIndex !== undefined) {
+		// SequenceActivityInstance
+		return { sequenceIndex: activity.sequenceIndex, activities: activity.sequenceActivities };
+	} else if (activity.parallelState) {
+		// ParallelActivityInstance
+		return { parallelState: activity.parallelState, activeActivities: activity.activeActivities, completedActivities: activity.completedActivities };
+	} else if (activity.conditionResult !== undefined) {
+		// BranchActivityInstance
+		return { conditionResult: activity.conditionResult, nextActivity: activity.nextActivity };
+	} else if (activity.expressionValue !== undefined) {
+		// SwitchActivityInstance
+		return { expressionValue: activity.expressionValue, matchedCase: activity.matchedCase, nextActivity: activity.nextActivity };
+	}
+	
+	return {};
+}
+
 // Create a minimal Express app for testing API endpoints
 const createTestApp = (processEngine: ProcessEngine) => {
     const app = express();
@@ -55,13 +88,14 @@ const createTestApp = (processEngine: ProcessEngine) => {
                 // Return FieldValue[] directly from activity instance
                 const fieldsWithValues = (currentActivity as any).inputs || [];
 
+                const activityData = getActivityData(currentActivity);
                 const humanTaskData = {
                     activityId: currentActivity.id,
                     prompt: (currentActivity as any).prompt,
                     fields: fieldsWithValues,
                     fileUploads: (currentActivity as any).fileUploads,
                     attachments: (currentActivity as any).attachments,
-                    context: currentActivity.data && Object.keys(currentActivity.data).length > 0 ? { previousRunData: currentActivity.data } : undefined
+                    context: activityData && Object.keys(activityData).length > 0 ? { previousRunData: activityData } : undefined
                 };
 
                 res.json(createResponse(true, { humanTask: humanTaskData }));

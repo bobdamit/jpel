@@ -15,16 +15,16 @@ describe('ExpressionEvaluator', () => {
       },
       activities: {
         getUserName: createMockActivityInstance({
-          data: { userName: 'Jane Smith' },
+          formData: { userName: 'Jane Smith' },
         }),
         checkAge: createMockActivityInstance({
-          data: { age: 25 },
+          formData: { age: 25 },
         }),
         confirmActive: createMockActivityInstance({
-          data: { isActive: false },
+          formData: { isActive: false },
         }),
         testActivity: createMockActivityInstance({
-          data: { name: 'Test User', email: 'test@example.com' },
+          formData: { name: 'Test User', email: 'test@example.com' },
         }),
       },
     });

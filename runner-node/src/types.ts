@@ -55,9 +55,6 @@ export interface ActivityInstance extends Activity {
 	startedAt?: Date;
 	completedAt?: Date;
 	error?: string;
-	data?: { [key: string]: any }; // Generic runtime data (specific types override with typed versions)
-	// Note: Specific activity types should extend this and add their typed runtime data
-	// e.g., HumanActivityInstance adds inputs: FieldValue[] and typed data
 }
 
 export enum ActivityType {
@@ -100,7 +97,8 @@ export interface HumanActivity extends Activity {
 export interface HumanActivityInstance extends ActivityInstance, HumanActivity {
 	type: ActivityType.Human;
 	inputs?: FieldValue[]; // Runtime: fields with actual collected values
-	data?: { [key: string]: any }; // Submitted form data in key-value format
+	formData?: { [key: string]: any }; // Submitted form data in key-value format
+	_files?: any[]; // Uploaded files
 }
 
 export interface Field {
@@ -131,7 +129,7 @@ export enum FieldType {
 	Boolean = "boolean",
 	Select = "select",
 	Date = "date",
-	File = "file"
+	File = "file",
 }
 
 export interface FileUpload {
@@ -164,7 +162,7 @@ export interface APIActivity extends Activity {
  */
 export interface APIActivityInstance extends ActivityInstance, APIActivity {
 	type: ActivityType.API;
-	data?: { [key: string]: any }; // API response data
+	responseData?: any; // API response data
 }
 
 export enum HttpMethod {
@@ -184,7 +182,7 @@ export interface ComputeActivity extends Activity {
  */
 export interface ComputeActivityInstance extends ActivityInstance, ComputeActivity {
 	type: ActivityType.Compute;
-	data?: { [key: string]: any }; // Computed values from code execution
+	computedValues?: { [key: string]: any }; // Computed values from code execution
 }
 
 export interface SequenceActivity extends Activity {
@@ -197,10 +195,8 @@ export interface SequenceActivity extends Activity {
  */
 export interface SequenceActivityInstance extends ActivityInstance, SequenceActivity {
 	type: ActivityType.Sequence;
-	data?: {
-		sequenceIndex: number;
-		activities: string[];
-	};
+	sequenceIndex?: number;
+	sequenceActivities?: string[];
 }
 
 export interface ParallelActivity extends Activity {
@@ -208,11 +204,30 @@ export interface ParallelActivity extends Activity {
 	activities: string[];
 }
 
+/**
+ * Runtime instance of a parallel activity with execution state
+ */
+export interface ParallelActivityInstance extends ActivityInstance, ParallelActivity {
+	type: ActivityType.Parallel;
+	parallelState?: 'running' | 'completed';
+	activeActivities?: string[];
+	completedActivities?: string[];
+}
+
 export interface BranchActivity extends Activity {
 	type: ActivityType.Branch;
 	condition: string;
 	then: string;
 	else?: string;
+}
+
+/**
+ * Runtime instance of a branch activity with execution result
+ */
+export interface BranchActivityInstance extends ActivityInstance, BranchActivity {
+	type: ActivityType.Branch;
+	conditionResult?: boolean;
+	nextActivity?: string;
 }
 
 export interface SwitchActivity extends Activity {
@@ -227,11 +242,9 @@ export interface SwitchActivity extends Activity {
  */
 export interface SwitchActivityInstance extends ActivityInstance, SwitchActivity {
 	type: ActivityType.Switch;
-	data?: {
-		expressionValue: any;
-		matchedCase?: string;
-		nextActivity?: string;
-	};
+	expressionValue?: any;
+	matchedCase?: string;
+	nextActivity?: string;
 }
 
 export interface TerminateActivity extends Activity {

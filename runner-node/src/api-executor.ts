@@ -42,8 +42,9 @@ export class APIExecutor {
 		// Replace a:activityId.f:fieldName references
 		result = result.replace(/a:(\w+)\.f:(\w+)/g, (match, activityId, fieldName) => {
 			const activity = instance.activities[activityId];
-			if (activity?.data?.[fieldName] !== undefined) {
-				return String(activity.data[fieldName]);
+			const activityData = this.getActivityData(activity);
+			if (activityData?.[fieldName] !== undefined) {
+				return String(activityData[fieldName]);
 			}
 			return match; // Return original if not found
 		});
@@ -57,6 +58,39 @@ export class APIExecutor {
 		});
 
 		return result;
+	}
+
+	/**
+	 * Extracts data from typed activity instances for variable substitution
+	 */
+	private getActivityData(activity: any): any {
+		if (!activity) return {};
+		
+		// Return data based on activity type
+		if (activity.formData) {
+			// HumanActivityInstance
+			return activity.formData;
+		} else if (activity.responseData) {
+			// APIActivityInstance  
+			return activity.responseData;
+		} else if (activity.computedValues) {
+			// ComputeActivityInstance
+			return activity.computedValues;
+		} else if (activity.sequenceIndex !== undefined) {
+			// SequenceActivityInstance
+			return { sequenceIndex: activity.sequenceIndex, activities: activity.sequenceActivities };
+		} else if (activity.parallelState) {
+			// ParallelActivityInstance
+			return { parallelState: activity.parallelState, activeActivities: activity.activeActivities, completedActivities: activity.completedActivities };
+		} else if (activity.conditionResult !== undefined) {
+			// BranchActivityInstance
+			return { conditionResult: activity.conditionResult, nextActivity: activity.nextActivity };
+		} else if (activity.expressionValue !== undefined) {
+			// SwitchActivityInstance
+			return { expressionValue: activity.expressionValue, matchedCase: activity.matchedCase, nextActivity: activity.nextActivity };
+		}
+		
+		return {};
 	}
 
 	private substituteObjectVariables(obj: { [key: string]: string }, instance: ProcessInstance): { [key: string]: string } {

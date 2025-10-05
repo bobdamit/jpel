@@ -162,11 +162,11 @@ describe('ProcessEngine FieldValue Architecture', () => {
             expect(userAgeField.value).toBe(30);
             expect(isActiveField.value).toBe(false);
             
-            // Also check that data is stored in activity.data for backward compatibility
-            expect(userFormActivity.data).toBeDefined();
-            expect(userFormActivity.data!.userName).toBe('John Doe');
-            expect(userFormActivity.data!.userAge).toBe(30);
-            expect(userFormActivity.data!.isActive).toBe(false);
+            // Also check that form data is stored in activity.formData
+            expect((userFormActivity as any).formData).toBeDefined();
+            expect((userFormActivity as any).formData!.userName).toBe('John Doe');
+            expect((userFormActivity as any).formData!.userAge).toBe(30);
+            expect((userFormActivity as any).formData!.isActive).toBe(false);
         });
     });
 
