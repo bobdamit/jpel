@@ -41,7 +41,6 @@ Implement approval workflows and validation processes:
 - **Conditional Flow**: Branch and switch activities for complex logic
 - **Parallel Execution**: Run multiple activities simultaneously
 - **Re-run Capability**: Execute completed processes again with preserved data
-- **Multiple Runners**: Node.js, Java, and extensible architecture
 
 ## 📝 Quick Example
 
