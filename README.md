@@ -1,4 +1,9 @@
-# JPEL - JSON Process Expression Language
+# JPEL - JSON P### 📊 Data Collection
+Build forms and data capture workflows with validation. Data can be obtained through:
+- **Human Forms**: Interactive forms for customer intake, surveys, and feedback collection
+- **API Integration**: Connect to external systems to fetch or submit data automatically
+- Audit and inspection data collection
+- Regulatory compliance reporting Expression Language
 
 A lightweight, JSON-native business process language for building task lists, data collection workflows, and quality control processes. JPEL makes it easy to define and execute structured business processes without complex workflow engines.
 
