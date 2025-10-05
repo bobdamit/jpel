@@ -152,15 +152,32 @@ export class ExpressionEvaluator {
 		};
 
 		// Add activity data accessors for backward compatibility
+		context.activities = {};
 		Object.keys(instance.activities).forEach(activityId => {
 			const activity = instance.activities[activityId];
 			const activityData = this.getActivityData(activity);
-			if (activityData && Object.keys(activityData).length > 0) {
-				context[activityId] = {
-					f: activityData, // Field data
-					status: activity.status,
-					passFail: activity.passFail
-				};
+
+			// Ensure the runtime activity instance exposes an f property that maps
+			// to the most relevant data (formData/responseData/computedValues)
+			// so scripts can access fields via `.f` and also write back.
+			if (!(activity as any).f) {
+				(activity as any).f = activityData || {};
+			}
+
+			// Expose the actual activity instance so assignments (e.g. passFail)
+			// mutate the runtime instance and will be persisted when the engine saves.
+			context.activities[activityId] = activity as any;
+
+			// Also expose top-level shortcut when the id is a valid JS identifier
+			// but avoid exposing if the identifier is a JS reserved word which would
+			// make it invalid as a function parameter name when we build the
+			// evaluation function.
+			const isIdentifier = /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(activityId);
+			const jsReserved = new Set([
+				'break','case','catch','class','const','continue','debugger','default','delete','do','else','export','extends','finally','for','function','if','import','in','instanceof','let','new','return','super','switch','this','throw','try','typeof','var','void','while','with','yield','enum','await','implements','package','protected','static','interface','private','public'
+			]);
+			if (isIdentifier && !jsReserved.has(activityId)) {
+				context[activityId] = context.activities[activityId];
 			}
 		});
 
@@ -173,23 +190,39 @@ export class ExpressionEvaluator {
 		const translatedParts = parts.map(part => {
 			// Only translate if not inside quotes (even parts are outside quotes)
 			if (!part.startsWith('"') && !part.endsWith('"')) {
-				// Replace a:activityId.f:fieldName with activityId.f.fieldName
-				part = part.replace(/a:(\w+)\.f:(\w+)/g, '$1.f.$2');
+				// Replace a:activityId.f:fieldName with activities["activityId"].f["fieldName"]
+				part = part.replace(/a:([^\.\s]+)\.f:([^\.\s]+)/g, (m, activityId, fieldName) => {
+					return `activities[${JSON.stringify(activityId)}].f[${JSON.stringify(fieldName)}]`;
+				});
 
-				// Replace a:activityId.property with activityId.property
-				part = part.replace(/a:(\w+)\.(\w+)/g, '$1.$2');
+				// Replace a:activityId.property with activities["activityId"].property
+				part = part.replace(/a:([^\.\s]+)\.(\w+)/g, (m, activityId, prop) => {
+					return `activities[${JSON.stringify(activityId)}].${prop}`;
+				});
 
-				// Replace v:variableName = value with process.variableName = value
-				part = part.replace(/v:(\w+)\s*=/g, 'process.$1 =');
+				// Replace v:variableName = value with process.variableName = value (use bracket if needed)
+				part = part.replace(/v:([^\.\s]+)\s*=/g, (m, varName) => {
+					if (/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(varName)) return `process.${varName} =`;
+					return `process[${JSON.stringify(varName)}] =`;
+				});
 
 				// Replace var:variableName = value with process.variableName = value
-				part = part.replace(/var:(\w+)\s*=/g, 'process.$1 =');
+				part = part.replace(/var:([^\.\s]+)\s*=/g, (m, varName) => {
+					if (/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(varName)) return `process.${varName} =`;
+					return `process[${JSON.stringify(varName)}] =`;
+				});
 
-				// Replace v:variableName (reading) with process.variableName
-				part = part.replace(/v:(\w+)/g, 'process.$1');
+				// Replace v:variableName (reading) with process.variableName (or bracket)
+				part = part.replace(/v:([^\.\s]+)/g, (m, varName) => {
+					if (/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(varName)) return `process.${varName}`;
+					return `process[${JSON.stringify(varName)}]`;
+				});
 
 				// Replace var:variableName (reading) with process.variableName
-				part = part.replace(/var:(\w+)/g, 'process.$1');
+				part = part.replace(/var:([^\.\s]+)/g, (m, varName) => {
+					if (/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(varName)) return `process.${varName}`;
+					return `process[${JSON.stringify(varName)}]`;
+				});
 
 				// Replace this.property with currentActivity.property
 				part = part.replace(/this\.(\w+)/g, 'currentActivity.$1');
