@@ -128,6 +128,8 @@ export class InMemoryProcessDefinitionRepository implements ProcessDefinitionRep
 				return null;
 			}
 
+			// No normalization here - ProcessEngine will normalize after loading from repo
+
 			return processDefinition;
 		} catch (error) {
 			logger.error('Failed to load process from file', {

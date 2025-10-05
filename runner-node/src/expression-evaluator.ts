@@ -63,7 +63,15 @@ export class ExpressionEvaluator {
 
 			return context.currentActivity;
 		} catch (error) {
-			throw new Error(`Code execution failed: ${error instanceof Error ? error.message : String(error)}`);
+			// Log error with context so UI-visible failures also appear in logs
+			const msg = error instanceof Error ? error.message : String(error);
+			logger.error('Code execution failed', {
+				instanceId: instance?.instanceId,
+				currentActivityId,
+				codePreview: (codeLines || []).join('\n').substring(0, 1000),
+				error: msg
+			});
+			throw new Error(`Code execution failed: ${msg}`);
 		}
 	}
 
@@ -214,7 +222,11 @@ export class ExpressionEvaluator {
 			logger.debug('Expression evaluation result:', result);
 			return result;
 		} catch (error) {
-			logger.error('Expression evaluation error:', error instanceof Error ? error.message : error);
+			logger.error('Expression evaluation error', {
+				expression: expression.substring(0, 1000),
+				instanceId: context?.instance?.instanceId,
+				message: error instanceof Error ? error.message : String(error)
+			});
 			// If it's not an expression, try as a statement
 			try {
 				const func = new Function(...paramNames, expression);
@@ -222,7 +234,11 @@ export class ExpressionEvaluator {
 				logger.debug('Statement evaluation result:', result);
 				return result;
 			} catch (statementError) {
-				logger.error('Statement evaluation error:', statementError instanceof Error ? statementError.message : statementError);
+				logger.error('Statement evaluation error', {
+					expression: expression.substring(0, 1000),
+					instanceId: context?.instance?.instanceId,
+					message: statementError instanceof Error ? statementError.message : String(statementError)
+				});
 				throw new Error(`Expression evaluation failed: ${expression}`);
 			}
 		}

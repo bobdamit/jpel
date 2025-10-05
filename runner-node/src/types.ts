@@ -23,6 +23,7 @@ export interface ProcessTemplateFlyweight {
 export interface ProcessInstance {
 	instanceId: string;
 	processId: string;
+	title?: string;
 	status: ProcessStatus;
 	startedAt: Date;
 	completedAt?: Date;
@@ -39,7 +40,7 @@ export enum ProcessStatus {
 }
 
 export interface Activity {
-	id: string;
+	id?: string; // Optional - will be derived from map key if not provided
 	name?: string;
 	description?: string;
 	type: ActivityType;

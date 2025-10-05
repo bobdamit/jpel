@@ -13,7 +13,6 @@
 	],
 	"activities": {
 		"approvalSequence": {
-			"id": "approvalSequence",
 			"name": "Document Approval Sequence",
 			"type": "sequence",
 			"activities": [
@@ -23,7 +22,6 @@
 			]
 		},
 		"submitDocument": {
-			"id": "submitDocument",
 			"name": "Submit Document for Approval",
 			"type": "human",
 			"prompt": "Please provide document details for approval:",
@@ -51,7 +49,6 @@
 			]
 		},
 		"reviewDocument": {
-			"id": "reviewDocument",
 			"name": "Review Document",
 			"type": "human",
 			"prompt": "Please review the document and make your decision:",
@@ -70,7 +67,6 @@
 			]
 		},
 		"processDecision": {
-			"id": "processDecision",
 			"name": "Process Approval Decision",
 			"type": "switch",
 			"expression": "a:reviewDocument.f:approverDecision",
@@ -91,7 +87,6 @@
 			]
 		},
 		"documentRejected": {
-			"id": "documentRejected",
 			"name": "Document Rejected",
 			"type": "compute",
 			"code": [
@@ -100,7 +95,6 @@
 			]
 		},
 		"documentNeedsRevision": {
-			"id": "documentNeedsRevision",
 			"name": "Document Needs Revision",
 			"type": "compute",
 			"code": [

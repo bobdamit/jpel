@@ -9,7 +9,6 @@
 	],
 	"activities": {
 		"getUserName": {
-			"id": "getUserName",
 			"name": "Get User Name",
 			"type": "human",
 			"prompt": "Welcome! Please tell us your name:",
@@ -24,7 +23,6 @@
 			]
 		},
 		"generateGreeting": {
-			"id": "generateGreeting",
 			"name": "Generate Greeting",
 			"type": "compute",
 			"code": [
@@ -37,7 +35,6 @@
 			]
 		},
 		"end": {
-			"id": "end",
 			"name": "Process Complete",
 			"type": "terminate",
 			"reason": "Process completed successfully"

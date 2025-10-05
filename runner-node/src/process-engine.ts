@@ -36,6 +36,7 @@ import { RepositoryFactory } from './repositories/repository-factory';
 import { ProcessDefinitionRepository } from './repositories/process-definition-repository';
 import { ProcessInstanceRepository } from './repositories/process-instance-repository';
 import { logger } from './logger';
+import ProcessNormalizer from './process-normalizer';
 
 // Using centralized logger
 
@@ -77,6 +78,18 @@ export class ProcessEngine {
 			logger.warn('ProcessEngine: Process definition missing start activity reference', processDefinition);
 		}
 
+		// Validate and normalize the incoming process definition
+		const validation = ProcessNormalizer.validate(processDefinition);
+		if (!validation.valid) {
+			// Treat validation errors as fatal - processes must be valid to be loaded.
+			logger.error('ProcessEngine: Process definition validation failed', { errors: validation.errors });
+			throw new Error(`Process definition validation failed: ${validation.errors.join('; ')}`);
+		}
+		if (validation.warnings && validation.warnings.length) {
+			logger.warn('ProcessEngine: Process definition validation warnings', { warnings: validation.warnings });
+		}
+		ProcessNormalizer.normalize(processDefinition);
+
 		await this.processDefinitionRepo.save(processDefinition);
 		logger.info(`ProcessEngine: Process definition '${processDefinition.id}' loaded successfully`);
 	}
@@ -111,6 +124,9 @@ export class ProcessEngine {
 			start: processDefinition.start,
 			activitiesKeys: Object.keys(processDefinition.activities || {})
 		});
+
+		// Normalize any process data coming from repositories (on-demand loads)
+		ProcessNormalizer.normalize(processDefinition);
 
 		if (!processDefinition.start) {
 			logger.error(`ProcessEngine: Process definition '${processId}' has no start activity defined`, processDefinition);
@@ -332,6 +348,15 @@ export class ProcessEngine {
 	private async executeActivity(instanceId: string, activity: Activity): Promise<ProcessExecutionResult> {
 		logger.info(`ProcessEngine: Executing activity '${activity.id}' of type '${activity.type}' for instance '${instanceId}'`);
 
+		if (!activity.id) {
+			logger.error(`ProcessEngine: Activity missing ID during execution`, activity);
+			return {
+				instanceId,
+				status: ProcessStatus.Failed,
+				message: 'Activity missing ID'
+			};
+		}
+
 		const instance = await this.processInstanceRepo.findById(instanceId);
 		if (!instance) {
 			logger.error(`ProcessEngine: Instance '${instanceId}' not found during activity execution`);
@@ -439,6 +464,15 @@ export class ProcessEngine {
 			};
 		}
 
+		if (!activity.id) {
+			logger.error('ProcessEngine: Human activity missing ID');
+			return {
+				instanceId,
+				status: ProcessStatus.Failed,
+				message: 'Activity missing ID'
+			};
+		}
+
 		const activityInstance = instance.activities[activity.id];
 
 		// The FieldValue objects in the activity instance already have their values
@@ -474,6 +508,15 @@ export class ProcessEngine {
 				instanceId,
 				status: ProcessStatus.Failed,
 				message: 'Process instance not found'
+			};
+		}
+
+		if (!activity.id) {
+			logger.error('ProcessEngine: Compute activity missing ID');
+			return {
+				instanceId,
+				status: ProcessStatus.Failed,
+				message: 'Activity missing ID'
 			};
 		}
 
@@ -517,6 +560,15 @@ export class ProcessEngine {
 			};
 		}
 
+		if (!activity.id) {
+			logger.error('ProcessEngine: API activity missing ID');
+			return {
+				instanceId,
+				status: ProcessStatus.Failed,
+				message: 'Activity missing ID'
+			};
+		}
+
 		const activityInstance = instance.activities[activity.id] as APIActivityInstance;
 
 		try {
@@ -551,6 +603,15 @@ export class ProcessEngine {
 			};
 		}
 
+		if (!activity.id) {
+			logger.error('ProcessEngine: Sequence activity missing ID');
+			return {
+				instanceId,
+				status: ProcessStatus.Failed,
+				message: 'Activity missing ID'
+			};
+		}
+
 		// For sequence activities, we execute the first child activity
 		if (activity.activities.length > 0) {
 			const firstActivity = this.extractActivityId(activity.activities[0]);
@@ -581,6 +642,15 @@ export class ProcessEngine {
 				instanceId,
 				status: ProcessStatus.Failed,
 				message: 'Process instance not found'
+			};
+		}
+
+		if (!activity.id) {
+			logger.error('ProcessEngine: Parallel activity missing ID');
+			return {
+				instanceId,
+				status: ProcessStatus.Failed,
+				message: 'Activity missing ID'
 			};
 		}
 
@@ -645,6 +715,15 @@ export class ProcessEngine {
 			};
 		}
 
+		if (!activity.id) {
+			logger.error('ProcessEngine: Branch activity missing ID');
+			return {
+				instanceId,
+				status: ProcessStatus.Failed,
+				message: 'Activity missing ID'
+			};
+		}
+
 		const activityInstance = instance.activities[activity.id] as BranchActivityInstance;
 
 		try {
@@ -689,6 +768,15 @@ export class ProcessEngine {
 				instanceId,
 				status: ProcessStatus.Failed,
 				message: 'Process instance not found'
+			};
+		}
+
+		if (!activity.id) {
+			logger.error('ProcessEngine: Switch activity missing ID');
+			return {
+				instanceId,
+				status: ProcessStatus.Failed,
+				message: 'Activity missing ID'
 			};
 		}
 
@@ -748,6 +836,15 @@ export class ProcessEngine {
 				instanceId,
 				status: ProcessStatus.Failed,
 				message: 'Process instance not found'
+			};
+		}
+
+		if (!activity.id) {
+			logger.error('ProcessEngine: Terminate activity missing ID');
+			return {
+				instanceId,
+				status: ProcessStatus.Failed,
+				message: 'Activity missing ID'
 			};
 		}
 
@@ -902,15 +999,21 @@ export class ProcessEngine {
 	private initializeActivities(activities: { [key: string]: Activity }): { [key: string]: ActivityInstance } {
 		const result: { [key: string]: ActivityInstance } = {};
 
-		Object.values(activities).forEach(activity => {
-			const activityInstance: ActivityInstance = {
+		Object.entries(activities).forEach(([activityKey, activity]) => {
+			// Ensure activity has an ID (derived from map key if not set)
+			const normalizedActivity = {
 				...activity,
+				id: activity.id || activityKey
+			};
+
+			const activityInstance: ActivityInstance = {
+				...normalizedActivity,
 				status: ActivityStatus.Pending
 			};
 
 			// For human activities, convert Field[] to FieldValue[] with default values
-			if (activity.type === ActivityType.Human) {
-				const humanActivity = activity as HumanActivity;
+			if (normalizedActivity.type === ActivityType.Human) {
+				const humanActivity = normalizedActivity as HumanActivity;
 				if (humanActivity.inputs) {
 					(activityInstance as any).inputs = humanActivity.inputs.map(field => ({
 						...field,
@@ -919,7 +1022,7 @@ export class ProcessEngine {
 				}
 			}
 
-			result[activity.id] = activityInstance;
+			result[activityKey] = activityInstance;
 		});
 
 		return result;

@@ -13,7 +13,6 @@
 	],
 	"activities": {
 		"onboardingSequence": {
-			"id": "onboardingSequence",
 			"name": "Employee Onboarding Sequence",
 			"type": "sequence",
 			"activities": [
@@ -24,7 +23,6 @@
 			]
 		},
 		"collectEmployeeInfo": {
-			"id": "collectEmployeeInfo",
 			"name": "Collect Employee Information",
 			"type": "human",
 			"prompt": "Please provide new employee details:",
@@ -60,7 +58,6 @@
 			]
 		},
 		"parallelSetup": {
-			"id": "parallelSetup",
 			"name": "Parallel Setup Tasks",
 			"type": "parallel",
 			"activities": [
@@ -69,35 +66,32 @@
 			]
 		},
 		"assignEquipment": {
-			"id": "assignEquipment",
 			"name": "Assign Equipment",
 			"type": "human",
 			"prompt": "Please assign equipment to the new employee:",
 			"inputs": [
 				{
 					"name": "equipmentAssigned",
-					"type": "checkbox",
+					"type": "boolean",
 					"label": "Equipment has been assigned",
 					"required": true
 				}
 			]
 		},
 		"createAccounts": {
-			"id": "createAccounts",
 			"name": "Create User Accounts",
 			"type": "human",
 			"prompt": "Please create necessary user accounts:",
 			"inputs": [
 				{
 					"name": "accountsCreated",
-					"type": "checkbox",
+					"type": "boolean",
 					"label": "User accounts have been created",
 					"required": true
 				}
 			]
 		},
 		"verifySetup": {
-			"id": "verifySetup",
 			"name": "Verify Setup Complete",
 			"type": "compute",
 			"code": [
@@ -108,14 +102,13 @@
 			]
 		},
 		"welcomeEmployee": {
-			"id": "welcomeEmployee",
 			"name": "Welcome New Employee",
 			"type": "human",
 			"prompt": "Send welcome message to the new employee:",
 			"inputs": [
 				{
 					"name": "welcomeSent",
-					"type": "checkbox",
+					"type": "boolean",
 					"label": "Welcome message sent",
 					"required": true
 				}

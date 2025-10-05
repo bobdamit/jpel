@@ -1,0 +1,113 @@
+{
+	"id": "mic",
+	"name": "Build steps and quality checks for microphone assembly",
+	"description": "A process demonstrating build steps and quality checks for microphone assembly",
+	"version": "1.0.0",
+	"start": "a:basicFacts",
+	"variables": [
+		{
+			"name": "title",
+			"type": "text",
+			"description": "Title generated from common facts"
+		}
+	],
+	"activities": {
+		"basicFacts": {
+			"name": "Collect Basic Facts",
+			"description": "Gather essential information about the microphone assembly process",
+			"type": "sequence",
+			"activities": [
+				"a:commonFacts",
+				"a:validateCommonFacts",
+				"a:generateTitle"
+			]
+		},
+		"commonFacts": {
+			"name": "Common Facts Collection",
+			"description": "Collect common facts applicable to all microphone builds",
+			"type": "human",
+			"prompt": "Please provide the following common details for the microphone assembly:",
+			"inputs": [
+				{
+					"name": "customerName",
+					"type": "text",
+					"label": "Customer Name",
+					"required": true,
+					"placeholder": "Enter customer name",
+					"minLength": 3,
+					"description": "The name of the customer"
+				},
+				{
+					"name": "storeOrderNumber",
+					"type": "text",
+					"label": "Store Order Number",
+					"required": true,
+					"description": "The order number associated with the store"
+				},
+				{
+					"name": "buildNumber",
+					"type": "text",
+					"label": "Build Number",
+					"required": true,
+					"description": "The unique identifier for the build",
+					"pattern": "^\\d{4,6}$",
+					"patternDescription": "Build number must be 4-6 digits"
+				},
+				{
+					"name": "buildNumberEngraved",
+					"type": "boolean",
+					"label": "Build Number Engraved",
+					"required": true
+				},
+				{
+					"name": "bodySource",
+					"type": "select",
+					"label": "Body Source",
+					"required": true,
+					"options": [
+						"Donor",
+						"RS Custom"
+					],
+					"description": "Source of this microphone body"
+				},
+				{
+					"name": "microphoneCategory",
+					"type": "select",
+					"label": "Microphone Category",
+					"required": true,
+					"options": [
+						"LDC",
+						"SDC"
+					],
+					"description": "Category of the microphone"
+				}
+			]
+		},
+		"validateCommonFacts": {
+			"name": "Validate Common Facts",
+			"description": "Ensure all common facts are correctly provided",
+			"type": "compute",
+			"code": [
+				"// Retrieve common facts from the previous activity",
+				"const buildNumber = getValue('a:commonFacts.f:buildNumber');",
+				"const buildNumberEngraved = getValue('a:commonFacts.f:buildNumberEngraved');"
+			]
+		},
+		"generateTitle": {
+			"name": "Generate Title",
+			"description": "Generate a title for the build based on common facts",
+			"type": "compute",
+			"code": [
+				"// Retrieve common facts from the previous activity",
+				"const customerName = getValue('a:commonFacts.f:customerName');",
+				"const storeOrderNumber = getValue('a:commonFacts.f:storeOrderNumber');",
+				"const buildNumber = getValue('a:commonFacts.f:buildNumber');",
+				"const bodySource = getValue('a:commonFacts.f:bodySource');",
+				"const microphoneCategory = getValue('a:commonFacts.f:microphoneCategory');",
+				"const title = `${customerName} - ${storeOrderNumber} - ${buildNumber} - ${bodySource} - ${microphoneCategory}`;"
+			]
+		}	
+	
+	}
+	
+}
