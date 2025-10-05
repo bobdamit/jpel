@@ -177,10 +177,6 @@ JPEL is designed to run on multiple platforms:
 - **Features**: Interactive web UI, REST API, in-memory/MongoDB storage
 - **Quick Start**: `cd runner-node && npm install && npm run demo`
 
-### Java Runner (`runner-java/`)
-- **Best for**: Enterprise deployment, Spring Boot integration
-- **Features**: Production-ready, scalable, enterprise connectors
-- **Quick Start**: `cd runner-java && ./mvnw spring-boot:run`
 
 ## 📊 Real-World Examples
 
@@ -209,9 +205,7 @@ JPEL is designed to run on multiple platforms:
 ## 📚 Documentation
 
 - [Process Schema](design/schema.yaml) - Complete JSON schema reference
-- [Expression Language](docs/expressions.md) - Field references and compute syntax
 - [API Reference](runner-node/README.md) - REST API documentation
-- [Java Integration](runner-java/README.md) - Enterprise deployment guide
 
 ## 🤝 Contributing
 
