@@ -22,24 +22,57 @@ export class ExpressionEvaluator {
 		try {
 			const context = this.createEvaluationContext(instance, currentActivityId);
 
-			let result: any = {};
+			// Translate all lines to a single JavaScript code block so declarations
+			// (const/let/var) persist across lines. Previously each line was
+			// evaluated in its own function which meant local variables were not
+			// preserved and assignments like `v:x = a && b;` failed when relying
+			// on previously-declared temps.
+			const jsCodeBlock = codeLines.map(line => this.translateJPELToJS(line, instance)).join('\n');
 
-			for (const line of codeLines) {
-				const jsCode = this.translateJPELToJS(line, instance);
-				const lineResult = this.safeEval(jsCode, context);
-
-				// If the line assigns to 'this', capture it
-				if (line.includes('this.')) {
-					// Extract assignments to 'this' and update result
-					const thisMatch = line.match(/this\.(\w+)\s*=\s*(.+);?$/);
-					if (thisMatch) {
-						const [, property] = thisMatch;
-						result[property] = context.currentActivity[property];
-					}
-				}
+			// Debug: show the actual JS code block we're about to execute.
+			// Emit debug to stderr (not mocked by tests) so we can inspect during CI/test runs
+			try {
+				process.stderr.write('--- JS CODE BLOCK ---\n');
+				process.stderr.write(jsCodeBlock + '\n');
+				process.stderr.write('--- CONTEXT.process BEFORE ---\n' + JSON.stringify(context.process) + '\n');
+			} catch (err) {
+				// swallow if write not available
 			}
 
-			return Object.keys(result).length > 0 ? result : context.currentActivity;
+			// Determine properties assigned to `this.xxx` so we can return only
+			// those properties (preserves previous behaviour where callers
+			// received an object containing just the assigned fields).
+			const thisProps = new Set<string>();
+			for (const line of codeLines) {
+				const m = line.match(/this\.([a-zA-Z0-9_]+)\s*=/);
+				if (m) thisProps.add(m[1]);
+			}
+
+			// Execute the entire block. safeEval will try expression first then
+			// fall back to statement execution, so this covers most compute scripts.
+			const execResult = this.safeEval(jsCodeBlock, context);
+
+			try {
+				process.stderr.write('--- CONTEXT.process AFTER ---\n' + JSON.stringify(context.process) + '\n');
+			} catch (err) {
+				// swallow
+			}
+
+			if (thisProps.size > 0) {
+				const out: any = {};
+				for (const p of Array.from(thisProps)) {
+					out[p] = context.currentActivity[p];
+				}
+				return out;
+			}
+
+			// If the script returned some specific non-undefined result, surface it,
+			// otherwise return the mutated currentActivity for compatibility.
+			if (execResult !== undefined && execResult !== context.currentActivity) {
+				return execResult;
+			}
+
+			return context.currentActivity;
 		} catch (error) {
 			throw new Error(`Code execution failed: ${error instanceof Error ? error.message : String(error)}`);
 		}
@@ -153,9 +186,16 @@ export class ExpressionEvaluator {
 		console.log('=======================');
 
 		try {
-			// Create and execute the function
-			const func = new Function(...paramNames, `return ${expression}`);
-			const result = func(...paramValues);
+			// If expression contains multiple lines or semicolons, treat it as a
+			// block of statements (so declarations and side-effects persist).
+			let result: any;
+			if (expression.includes('\n') || expression.includes(';')) {
+				const func = new Function(...paramNames, expression);
+				result = func(...paramValues);
+			} else {
+				const func = new Function(...paramNames, `return ${expression}`);
+				result = func(...paramValues);
+			}
 			console.log('Expression evaluation result:', result);
 			return result;
 		} catch (error) {

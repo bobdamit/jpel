@@ -17,19 +17,19 @@ const port = process.env.PORT || 3000;
 
 // Initialize repositories and process engine
 async function initializeApplication() {
-  try {
-    // Initialize repositories (in-memory for now)
-    await RepositoryFactory.initializeInMemory();
-    console.log('✅ Repositories initialized');
-    
-    // Test repository health
-    const health = await RepositoryFactory.healthCheck();
-    console.log('📊 Repository health:', health);
-    
-  } catch (error) {
-    console.error('❌ Failed to initialize application:', error);
-    process.exit(1);
-  }
+	try {
+		// Initialize repositories (in-memory for now)
+		await RepositoryFactory.initializeInMemory();
+		console.log('✅ Repositories initialized');
+
+		// Test repository health
+		const health = await RepositoryFactory.healthCheck();
+		console.log('📊 Repository health:', health);
+
+	} catch (error) {
+		console.error('❌ Failed to initialize application:', error);
+		process.exit(1);
+	}
 }
 
 let processEngine: ProcessEngine;
@@ -350,19 +350,19 @@ app.use((error: any, req: Request, res: Response, next: NextFunction) => {
 	res.status(500).json(createResponse(false, null, "Internal server error"));
 });
 
-// 404 handler
-app.use("*", (req: Request, res: Response) => {
+// 404 handler - must be last
+app.use((req: Request, res: Response) => {
 	res.status(404).json(createResponse(false, null, "Endpoint not found"));
 });
 
 // Start server
 async function startServer() {
 	await initializeApplication();
-	
+
 	// Initialize process engine with repositories
 	processEngine = new ProcessEngine();
 	console.log('✅ Process engine initialized');
-	
+
 	app.listen(port, () => {
 		console.log(`🚀 JPEL Runner API server started on port ${port}`);
 		console.log(`📖 Health check: http://localhost:${port}/health`);

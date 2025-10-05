@@ -46,13 +46,18 @@ export interface Activity {
 	timeout?: number; // seconds
 }
 
+/**
+ * Base runtime instance that extends the activity definition with execution state
+ */
 export interface ActivityInstance extends Activity {
 	status: ActivityStatus;
 	passFail?: PassFail;
 	startedAt?: Date;
 	completedAt?: Date;
-	data?: { [key: string]: any }; // User input data from forms, API responses, etc.
 	error?: string;
+	data?: { [key: string]: any }; // Generic runtime data (specific types override with typed versions)
+	// Note: Specific activity types should extend this and add their typed runtime data
+	// e.g., HumanActivityInstance adds inputs: FieldValue[] and typed data
 }
 
 export enum ActivityType {
@@ -80,13 +85,22 @@ export enum PassFail {
 	Fail = "fail"
 }
 
-// Specific activity types
+// Specific activity types (DEFINITIONS)
 export interface HumanActivity extends Activity {
 	type: ActivityType.Human;
 	prompt?: string;
-	inputs?: Field[];
+	inputs?: Field[]; // Definition-time: field schemas
 	fileUploads?: FileUpload[];
 	attachments?: Attachment[];
+}
+
+/**
+ * Runtime instance of a human activity with collected field values
+ */
+export interface HumanActivityInstance extends ActivityInstance, HumanActivity {
+	type: ActivityType.Human;
+	inputs?: FieldValue[]; // Runtime: fields with actual collected values
+	data?: { [key: string]: any }; // Submitted form data in key-value format
 }
 
 export interface Field {
@@ -145,6 +159,14 @@ export interface APIActivity extends Activity {
 	body?: any;
 }
 
+/**
+ * Runtime instance of an API activity with response data
+ */
+export interface APIActivityInstance extends ActivityInstance, APIActivity {
+	type: ActivityType.API;
+	data?: { [key: string]: any }; // API response data
+}
+
 export enum HttpMethod {
 	GET = "GET",
 	POST = "POST",
@@ -157,9 +179,28 @@ export interface ComputeActivity extends Activity {
 	code: string[];
 }
 
+/**
+ * Runtime instance of a compute activity with execution results
+ */
+export interface ComputeActivityInstance extends ActivityInstance, ComputeActivity {
+	type: ActivityType.Compute;
+	data?: { [key: string]: any }; // Computed values from code execution
+}
+
 export interface SequenceActivity extends Activity {
 	type: ActivityType.Sequence;
 	activities: string[];
+}
+
+/**
+ * Runtime instance of a sequence activity with execution state
+ */
+export interface SequenceActivityInstance extends ActivityInstance, SequenceActivity {
+	type: ActivityType.Sequence;
+	data?: {
+		sequenceIndex: number;
+		activities: string[];
+	};
 }
 
 export interface ParallelActivity extends Activity {
@@ -179,6 +220,18 @@ export interface SwitchActivity extends Activity {
 	expression: string;
 	cases: { [key: string]: string };
 	default?: string;
+}
+
+/**
+ * Runtime instance of a switch activity with execution result
+ */
+export interface SwitchActivityInstance extends ActivityInstance, SwitchActivity {
+	type: ActivityType.Switch;
+	data?: {
+		expressionValue: any;
+		matchedCase?: string;
+		nextActivity?: string;
+	};
 }
 
 export interface TerminateActivity extends Activity {
@@ -202,19 +255,29 @@ export interface ApiResponse<T = any> {
 	timestamp: string;
 }
 
+/**
+ * Data structure for presenting a human task to the UI
+ * This is a VIEW model, not a domain model
+ */
 export interface HumanTaskData {
 	activityId: string;
 	prompt?: string;
-	fields: FieldValue[]; // Runtime fields with values for UI
+	fields: FieldValue[]; // Runtime fields with values for UI rendering
 	fileUploads?: FileUpload[];
 	attachments?: Attachment[];
 	context?: { [key: string]: any }; // Additional context data, e.g., previous run data
 }
 
+/**
+ * Result of a process execution step (NOT the entire process state)
+ * This represents what happened after executing one step/activity
+ */
 export interface ProcessExecutionResult {
 	instanceId: string;
-	status: ProcessStatus;
-	currentActivity?: string;
+	status: ProcessStatus; // Current status of the instance
+	currentActivity?: string; // Which activity is now current (if any)
+	message?: string; // Status message about what happened
+	// Note: humanTask is a convenience for API responses when the result is "waiting for human input"
+	// It's NOT part of the core domain model - just a view helper
 	humanTask?: HumanTaskData;
-	message?: string;
 }

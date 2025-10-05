@@ -18,7 +18,7 @@
     "noImplicitThis": true,
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
-  "module": "ES2020",
+  "module": "CommonJS",
   "moduleResolution": "node",
     "baseUrl": "./",
     "paths": {

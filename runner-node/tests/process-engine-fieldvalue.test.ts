@@ -189,14 +189,14 @@ describe('ProcessEngine FieldValue Architecture', () => {
                 originalData
             );
             
-            // Re-run the instance
+            // Re-run the instance (should reuse the same instance, not create a new one)
             const rerunResult = await processEngine.reRunInstance(originalInstanceId);
             expect(rerunResult.status).not.toBe(ProcessStatus.Failed);
             
-            const newInstanceId = rerunResult.instanceId;
-            expect(newInstanceId).not.toBe(originalInstanceId);
+            // The instance ID should be the SAME (re-run reuses the instance)
+            expect(rerunResult.instanceId).toBe(originalInstanceId);
             
-            // Check that the new instance has the preserved values
+            // Check that the instance has the preserved values from the previous run
             expect(rerunResult.humanTask).toBeDefined();
             const fields = rerunResult.humanTask!.fields;
             
@@ -258,21 +258,25 @@ describe('ProcessEngine FieldValue Architecture', () => {
             });
         });
 
-        test('should maintain FieldValue structure after context data application', async () => {
-            // Create instance with context data (simulating re-run scenario)
-            const contextData = {
-                userForm: {
-                    userName: 'Context User',
-                    userAge: 35
-                }
-            };
+        test('should maintain FieldValue structure after re-run', async () => {
+            // Create and complete an instance first
+            const createResult = await processEngine.createInstance('test-fieldvalue-process');
+            const instanceId = createResult.instanceId;
             
-            const result = await processEngine.createInstance('test-fieldvalue-process', contextData);
+            // Submit the form with data
+            await processEngine.submitHumanTask(instanceId, 'userForm', {
+                userName: 'Context User',
+                userAge: 35,
+                isActive: true
+            });
             
-            expect(result.humanTask).toBeDefined();
-            const fields = result.humanTask!.fields;
+            // Re-run the instance (should reset to beginning but keep data)
+            const reRunResult = await processEngine.reRunInstance(instanceId);
             
-            // Check that context data was applied to FieldValue objects
+            expect(reRunResult.humanTask).toBeDefined();
+            const fields = reRunResult.humanTask!.fields;
+            
+            // Check that previous data is still in FieldValue objects after re-run
             const userNameField = fields.find(f => f.name === 'userName');
             const userAgeField = fields.find(f => f.name === 'userAge');
             const isActiveField = fields.find(f => f.name === 'isActive');

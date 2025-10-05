@@ -3,7 +3,6 @@
   "version": "1.0.0",
   "description": "JPEL Process Execution Engine - Node.js TypeScript runner",
   "main": "dist/src/index.js",
-  "type": "module",
   "scripts": {
     "build": "tsc",
     "start": "node dist/src/index.js",

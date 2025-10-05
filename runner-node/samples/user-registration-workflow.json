@@ -47,16 +47,6 @@
 					"pattern": "^https?:\\/\\/[a-zA-Z0-9]+(?:\\.[a-zA-Z0-9]+)*\\.[a-zA-Z]{2,}(?:\\/.*)?$",
 					"patternDescription": "Must be a valid URL starting with http:// or https://"
 				}
-			],
-			"next": "a:processRegistration"
-		},
-		"processRegistration": {
-			"id": "processRegistration",
-			"name": "Process Registration",
-			"type": "compute",
-			"code": [
-				"// Process the registration - just log the completion",
-				"console.log('Registration completed successfully for user: ' + getValue('a:userRegistration.f:username'));"
 			]
 		}
 	}

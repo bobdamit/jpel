@@ -90,7 +90,7 @@ export class ProcessEngine {
 	}
 
 	// Create a new process instance
-	async createInstance(processId: string, contextData?: { [activityId: string]: any }): Promise<ProcessExecutionResult> {
+	async createInstance(processId: string): Promise<ProcessExecutionResult> {
 		logger.info(`ProcessEngine: Creating instance for process '${processId}'`);
 
 		const processDefinition = await this.processDefinitionRepo.findById(processId);
@@ -156,7 +156,7 @@ export class ProcessEngine {
 		await this.processInstanceRepo.save(instance);
 		logger.info(`ProcessEngine: Instance '${instanceId}' saved to repository`);
 
-		return await this.executeNextStep(instanceId, contextData);
+		return await this.executeNextStep(instanceId);
 	}
 
 	// Get process instance
@@ -165,7 +165,7 @@ export class ProcessEngine {
 	}
 
 	// Execute the next step in a process instance
-	async executeNextStep(instanceId: string, contextData?: { [activityId: string]: any }): Promise<ProcessExecutionResult> {
+	async executeNextStep(instanceId: string): Promise<ProcessExecutionResult> {
 		logger.info(`ProcessEngine: Executing next step for instance '${instanceId}'`);
 
 		const instance = await this.processInstanceRepo.findById(instanceId);
@@ -220,7 +220,7 @@ export class ProcessEngine {
 
 		logger.info(`ProcessEngine: Executing activity '${instance.currentActivity}' of type '${activity.type}'`);
 		try {
-			return await this.executeActivity(instanceId, activity, contextData);
+			return await this.executeActivity(instanceId, activity);
 		} catch (error) {
 			logger.error(`ProcessEngine: Error executing activity '${instance.currentActivity}' for instance '${instanceId}'`, error);
 			return {
@@ -327,7 +327,7 @@ export class ProcessEngine {
 		return await this.continueExecution(instanceId);
 	}
 
-	private async executeActivity(instanceId: string, activity: Activity, contextData?: { [activityId: string]: any }): Promise<ProcessExecutionResult> {
+	private async executeActivity(instanceId: string, activity: Activity): Promise<ProcessExecutionResult> {
 		logger.info(`ProcessEngine: Executing activity '${activity.id}' of type '${activity.type}' for instance '${instanceId}'`);
 
 		const instance = await this.processInstanceRepo.findById(instanceId);
@@ -359,10 +359,10 @@ export class ProcessEngine {
 			let result: ProcessExecutionResult;
 
 			switch (activity.type) {
-			case ActivityType.Human:
-				logger.info(`ProcessEngine: Executing human activity '${activity.id}'`);
-				result = await this.executeHumanActivity(instanceId, activity as HumanActivity, contextData);
-				break;				case ActivityType.Compute:
+				case ActivityType.Human:
+					logger.info(`ProcessEngine: Executing human activity '${activity.id}'`);
+					result = await this.executeHumanActivity(instanceId, activity as HumanActivity);
+					break; case ActivityType.Compute:
 					logger.info(`ProcessEngine: Executing compute activity '${activity.id}'`);
 					result = await this.executeComputeActivity(instanceId, activity as ComputeActivity);
 					break;
@@ -375,9 +375,7 @@ export class ProcessEngine {
 				case ActivityType.Sequence:
 					logger.info(`ProcessEngine: Executing sequence activity '${activity.id}'`);
 					result = await this.executeSequenceActivity(instanceId, activity as SequenceActivity);
-					break;
-
-				case ActivityType.Parallel:
+					break; case ActivityType.Parallel:
 					logger.info(`ProcessEngine: Executing parallel activity '${activity.id}'`);
 					result = await this.executeParallelActivity(instanceId, activity as ParallelActivity);
 					break;
@@ -428,7 +426,7 @@ export class ProcessEngine {
 		}
 	}
 
-	private async executeHumanActivity(instanceId: string, activity: HumanActivity, contextData?: { [activityId: string]: any }): Promise<ProcessExecutionResult> {
+	private async executeHumanActivity(instanceId: string, activity: HumanActivity): Promise<ProcessExecutionResult> {
 		// Human activities wait for external input
 		const instance = await this.processInstanceRepo.findById(instanceId);
 		if (!instance) {
@@ -440,29 +438,22 @@ export class ProcessEngine {
 		}
 
 		const activityInstance = instance.activities[activity.id];
-		
-		// If we have context data from a re-run, update the FieldValue objects
-		if (contextData?.[activity.id]) {
-			const previousData = contextData[activity.id];
-			if ((activityInstance as any).inputs && Array.isArray((activityInstance as any).inputs)) {
-				(activityInstance as any).inputs.forEach((fieldValue: FieldValue) => {
-					if (previousData.hasOwnProperty(fieldValue.name)) {
-						fieldValue.value = previousData[fieldValue.name];
-					}
-				});
-			}
-		}
-		
-		// Use the FieldValue objects directly from the activity instance
+
+		// The FieldValue objects in the activity instance already have their values
+		// (either default values from initialization, or previous run values for re-runs)
 		const fieldsWithValues: FieldValue[] = (activityInstance as any).inputs || [];
-		
+
+		logger.debug(`ProcessEngine: Executing human activity '${activity.id}'`, {
+			fieldsCount: fieldsWithValues.length,
+			hasValues: fieldsWithValues.some((f: FieldValue) => f.value !== undefined && f.value !== null && f.value !== '')
+		});
+
 		const humanTaskData: HumanTaskData = {
 			activityId: activity.id,
 			prompt: activity.prompt,
 			fields: fieldsWithValues,
 			fileUploads: activity.fileUploads,
-			attachments: activity.attachments,
-			context: contextData?.[activity.id] ? { previousRunData: contextData[activity.id] } : undefined
+			attachments: activity.attachments
 		};
 
 		return {
@@ -959,21 +950,51 @@ export class ProcessEngine {
 
 	async reRunInstance(instanceId: string): Promise<ProcessExecutionResult> {
 		// Get the existing instance
-		const existingInstance = await this.processInstanceRepo.findById(instanceId);
-		if (!existingInstance) {
+		const instance = await this.processInstanceRepo.findById(instanceId);
+		if (!instance) {
 			throw new Error(`Instance ${instanceId} not found`);
 		}
 
-		// Extract context data from completed activities with human task data
-		const contextData: { [activityId: string]: any } = {};
-		for (const [activityId, activity] of Object.entries(existingInstance.activities)) {
-			if (activity.data && Object.keys(activity.data).length > 0) {
-				contextData[activityId] = activity.data;
-			}
+		logger.info(`ProcessEngine: Re-running instance '${instanceId}'`, {
+			processId: instance.processId,
+			previousStatus: instance.status
+		});
+
+		// Get the process definition to find the start activity
+		const processDefinition = await this.processDefinitionRepo.findById(instance.processId);
+		if (!processDefinition) {
+			throw new Error(`Process definition '${instance.processId}' not found`);
 		}
 
-		// Create a new instance with context data from the previous run
-		return await this.createInstance(existingInstance.processId, contextData);
+		const startActivityId = this.extractActivityId(processDefinition.start);
+
+		// Reset the instance state to re-run from the beginning
+		// Keep all activity data (including field values) - just reset statuses
+		instance.status = ProcessStatus.Running;
+		instance.completedAt = undefined;
+		instance.currentActivity = startActivityId;
+
+		// Reset all activity statuses to pending (but keep their data!)
+		for (const activityId in instance.activities) {
+			const activity = instance.activities[activityId];
+			activity.status = ActivityStatus.Pending;
+			activity.startedAt = undefined;
+			activity.completedAt = undefined;
+			activity.error = undefined;
+			// NOTE: We deliberately keep activity.data and activity.inputs with their values
+			// so they can be displayed when re-running
+		}
+
+		logger.info(`ProcessEngine: Reset instance '${instanceId}' for re-run`, {
+			currentActivity: instance.currentActivity,
+			activitiesCount: Object.keys(instance.activities).length
+		});
+
+		// Save the reset instance
+		await this.processInstanceRepo.save(instance);
+
+		// Execute from the start
+		return await this.executeNextStep(instanceId);
 	}
 
 	async getProcessStatistics(): Promise<{ [key: string]: number }> {

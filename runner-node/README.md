@@ -1,4 +1,12 @@
-# 🚀 JPEL Runner - JSON Process Execution Language
+# 🚀## ✨ Features
+
+- **👤 Human Tasks**: Interactive forms and approvals
+- **🔄 Process Control**: Sequences, parallel execution, conditional branching
+- **🔁 Re-Run Capability**: Execute completed instances again with preserved data
+- **🧮 Compute Activities**: Expression evaluation and data transformation
+- **🌐 API Integration**: External service calls and webhooks
+- **📊 Persistence**: Repository pattern with in-memory and MongoDB support
+- **🎨 Interactive Demo**: Built-in web interface for testing processesnner - JSON Process Execution Language
 
 A powerful, extensible process execution engine that runs JSON-based business processes inspired by BPEL4People. Perfect for building workflow applications, approval systems, and automated business processes.
 
@@ -200,7 +208,49 @@ Content-Type: application/json
 
 # Get current human task
 GET /api/instances/{instanceId}/current-task
+
+# Re-run a completed instance
+POST /api/instances/{instanceId}/rerun
 ```
+
+### 🔄 Re-Running Process Instances
+
+Re-running allows you to execute a completed process instance again from the beginning, **preserving all previously entered data**:
+
+**How Re-Run Works:**
+1. Takes an existing completed instance (keeps the same `instanceId`)
+2. Resets the execution state to start from the beginning
+3. **Preserves all activity data** including:
+   - Human task field values (forms are pre-populated)
+   - Computed values from previous execution
+   - API responses and other activity data
+4. Allows users to review, modify, or confirm previous inputs
+5. Updates activity data as the process re-executes
+
+**Use Cases:**
+- Review and modify a completed approval workflow
+- Re-submit a form with corrections
+- Re-execute a process with updated external data
+- Audit and verify previous process executions
+
+**Example Flow:**
+```bash
+# 1. Complete a process normally
+POST /api/processes/approval-workflow/instances
+# ... submit forms, complete process
+
+# 2. Re-run the completed instance
+POST /api/instances/{instanceId}/rerun
+
+# 3. Forms show previous values, user can modify and re-submit
+# 4. Process executes with updated data
+```
+
+**Important Notes:**
+- Re-run does **NOT** create a new instance - it reuses the existing one
+- All previous activity data is retained and visible
+- Great for iterative workflows and correction scenarios
+- The instance retains its original creation timestamp
 
 ### Response Format
 
