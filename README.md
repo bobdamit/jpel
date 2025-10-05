@@ -62,7 +62,6 @@ Here's a simple employee onboarding process:
   ],
   "activities": {
     "collect-info": {
-      "id": "collect-info",
       "name": "Collect Employee Information",
       "type": "human",
       "prompt": "Please enter the new employee's details:",
@@ -83,14 +82,12 @@ Here's a simple employee onboarding process:
       "then": "a:setup-workstation"
     },
     "setup-workstation": {
-      "id": "setup-workstation",
       "name": "Setup Workstation",
       "type": "sequence",
       "activities": ["a:create-email", "a:provision-laptop", "a:setup-access"],
       "then": "a:send-welcome"
     },
     "create-email": {
-      "id": "create-email",
       "name": "Create Email Account",
       "type": "api",
       "method": "POST",
@@ -101,7 +98,6 @@ Here's a simple employee onboarding process:
       }
     },
     "provision-laptop": {
-      "id": "provision-laptop",
       "name": "Provision Laptop",
       "type": "human",
       "prompt": "Configure laptop for ${a:collect-info.f:employeeName}:",
@@ -116,13 +112,11 @@ Here's a simple employee onboarding process:
       ]
     },
     "setup-access": {
-      "id": "setup-access",
       "name": "Setup System Access",
       "type": "parallel",
       "activities": ["a:grant-network", "a:create-user", "a:setup-vpn"]
     },
     "send-welcome": {
-      "id": "send-welcome",
       "name": "Send Welcome Email",
       "type": "compute",
       "code": [
@@ -136,7 +130,6 @@ Here's a simple employee onboarding process:
       "then": "a:complete"
     },
     "complete": {
-      "id": "complete",
       "name": "Onboarding Complete",
       "type": "terminate",
       "status": "completed"
