@@ -86,9 +86,10 @@ JPEL (JSON Process Expression Language) is a lightweight JSON-based business pro
 | `human` | Interactive user task | Data collection, approvals |
 | `compute` | JavaScript execution | Calculations, data transformation |
 | `api` | REST API call | External system integration |
-| `sequence` | Sequential execution | Multi-step workflows |
-| `parallel` | Concurrent execution | Independent parallel tasks |
-| `branch` | Conditional routing | Approval/rejection flows |
+| `sequence` | Sequential execution | Multiple Activities in Series |
+| `parallel` | Concurrent execution | Multiple Activities in Paraallel |
+| `branch` | Conditional routing | IF/Else Conditional Flow |
+| `switch` | Conditional routing | Mutiple Case Conditional Flow |
 | `terminate` | Process completion | Success/failure endpoints |
 
 ### Activity References
