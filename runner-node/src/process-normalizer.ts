@@ -35,6 +35,20 @@ export class ProcessNormalizer {
                         }
                     }
                 }
+
+                // Validate field references in compute activity code
+                if (activity.type === 'compute' && (activity as any).code) {
+                    const codeLines = (activity as any).code as string[];
+                    for (const line of codeLines) {
+                        const fieldRefs = this.extractFieldReferences(line);
+                        for (const ref of fieldRefs) {
+                            const validationError = this.validateFieldReference(ref, processDefinition);
+                            if (validationError) {
+                                errors.push(`Activity '${key}' code: ${validationError}`);
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -101,6 +115,60 @@ export class ProcessNormalizer {
         }
 
         return { valid: errors.length === 0, errors, warnings };
+    }
+
+    /**
+     * Extract field references from a line of code
+     * Looks for patterns like a:activityId.f:fieldName
+     */
+    private extractFieldReferences(codeLine: string): string[] {
+        const fieldRefPattern = /a:([a-zA-Z0-9_-]+)\.f:([a-zA-Z0-9_-]+)/g;
+        const references: string[] = [];
+        let match;
+        
+        while ((match = fieldRefPattern.exec(codeLine)) !== null) {
+            references.push(`a:${match[1]}.f:${match[2]}`);
+        }
+        
+        return references;
+    }
+
+    /**
+     * Validate a field reference against the process definition
+     * Returns error message if invalid, null if valid
+     */
+    private validateFieldReference(fieldRef: string, processDefinition: ProcessDefinition): string | null {
+        const match = fieldRef.match(/^a:([a-zA-Z0-9_-]+)\.f:([a-zA-Z0-9_-]+)$/);
+        if (!match) {
+            return `Invalid field reference format: ${fieldRef}`;
+        }
+
+        const [, activityId, fieldName] = match;
+        
+        // Check if activity exists
+        const activity = processDefinition.activities?.[activityId];
+        if (!activity) {
+            return `Field reference '${fieldRef}' references unknown activity '${activityId}'`;
+        }
+
+        // Check if activity has inputs (only human activities have field inputs)
+        if (activity.type !== 'human') {
+            return `Field reference '${fieldRef}' references activity '${activityId}' which is not a human activity and has no input fields`;
+        }
+
+        // Check if field exists in the activity's inputs
+        const inputs = (activity as any).inputs as any[] | undefined;
+        if (!inputs || !Array.isArray(inputs)) {
+            return `Field reference '${fieldRef}' references activity '${activityId}' which has no input fields defined`;
+        }
+
+        const fieldExists = inputs.some(input => input && input.name === fieldName);
+        if (!fieldExists) {
+            const availableFields = inputs.map(input => input?.name || 'unnamed').join(', ');
+            return `Field reference '${fieldRef}' references unknown field '${fieldName}' in activity '${activityId}'. Available fields: ${availableFields}`;
+        }
+
+        return null; // Valid reference
     }
 
     normalize(processDefinition: ProcessDefinition): void {

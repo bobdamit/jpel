@@ -84,8 +84,8 @@
 			"code": [
 				"// Retrieve common facts from the previous activity",
 				"const buildNumber = a:commonFacts.f:buildNumber;",
-				"const buildNumberEngraved = a:commonFacts.f:buildNumberEngraved;",
-				"a:validateCommonFacts.passFail = buildNumberEngraved ? 'pass' : 'fail';"
+				"// Check if build number exists and is valid",
+				"a:validateCommonFacts.passFail = buildNumber ? 'pass' : 'fail';"
 			]
 		},
 		"generateTitle": {

@@ -5,7 +5,11 @@
 	"version": "1.0.0",
 	"start": "a:getUserName",
 	"variables": [
-
+		{
+			"name": "greeting",
+			"type": "text",
+			"description": "The generated greeting message"
+		}
 	],
 	"activities": {
 		"getUserName": {
@@ -31,7 +35,7 @@
 				"// Generate a greeting",
 				"const greeting = `Hello, ${userName}! Welcome to JPEL!`;",
 				"// Store the greeting",
-				"return { greeting: greeting };"
+				"v:greeting = greeting;"
 			]
 		},
 		"end": {

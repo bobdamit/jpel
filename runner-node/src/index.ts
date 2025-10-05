@@ -240,7 +240,10 @@ app.post(
 			return;
 		}
 
-		res.json(createResponse(true, result));
+		// Include the current instance state for UI rendering
+		const instance = await processEngine.getInstance(result.instanceId);
+
+		res.json(createResponse(true, { ...result, instance }));
 	})
 );
 
@@ -269,7 +272,10 @@ app.post(
 			instanceId
 		);
 
-		res.json(createResponse(true, result));
+		// Include the current instance state for UI rendering
+		const instance = await processEngine.getInstance(instanceId);
+
+		res.json(createResponse(true, { ...result, instance }));
 	})
 );
 
@@ -298,7 +304,10 @@ app.post(
 			processedFiles
 		);
 
-		res.json(createResponse(true, result));
+		// Include the current instance state for UI rendering
+		const instance = await processEngine.getInstance(instanceId);
+
+		res.json(createResponse(true, { ...result, instance }));
 	})
 );
 
@@ -317,7 +326,7 @@ app.get(
 		}
 
 		if (!instance.currentActivity) {
-			res.json(createResponse(true, { message: "No current activity" }));
+			res.json(createResponse(true, { message: "No current activity", instance }));
 			return;
 		}
 
@@ -340,7 +349,7 @@ app.get(
 				context: activityData && Object.keys(activityData).length > 0 ? { previousRunData: activityData } : undefined
 			};
 
-			res.json(createResponse(true, { humanTask: humanTaskData }));
+			res.json(createResponse(true, { humanTask: humanTaskData, instance }));
 			return;
 		}
 
@@ -349,6 +358,7 @@ app.get(
 				currentActivity: currentActivity.id,
 				status: currentActivity.status,
 				type: currentActivity.type,
+				instance
 			})
 		);
 	}

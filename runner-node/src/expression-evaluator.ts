@@ -191,12 +191,13 @@ export class ExpressionEvaluator {
 			// Only translate if not inside quotes (even parts are outside quotes)
 			if (!part.startsWith('"') && !part.endsWith('"')) {
 				// Replace a:activityId.f:fieldName with activities["activityId"].f["fieldName"]
-				part = part.replace(/a:([^\.\s]+)\.f:([^\.\s]+)/g, (m, activityId, fieldName) => {
+				// Allow word characters and hyphens for both activity IDs and field names
+				part = part.replace(/a:([a-zA-Z0-9_-]+)\.f:([a-zA-Z0-9_-]+)/g, (m, activityId, fieldName) => {
 					return `activities[${JSON.stringify(activityId)}].f[${JSON.stringify(fieldName)}]`;
 				});
 
 				// Replace a:activityId.property with activities["activityId"].property
-				part = part.replace(/a:([^\.\s]+)\.(\w+)/g, (m, activityId, prop) => {
+				part = part.replace(/a:([a-zA-Z0-9_-]+)\.(\w+)/g, (m, activityId, prop) => {
 					return `activities[${JSON.stringify(activityId)}].${prop}`;
 				});
 
