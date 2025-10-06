@@ -1,11 +1,15 @@
 # JPEL - JSON Process Expression Language
 
-A lightweight, JSON-native business process language for building task lists, data collection workflows, and quality control processes. JPEL makes it easy to define and execute structured business processes without complex workflow engines.
-
+A lightweight, JSON-native business process language for building task lists, data collection workflows, and quality control processes. JPEL makes it easy to define  structured business processes. The schema is fairly simple but powerful.  A Sample (node.js) Runner application is included here along with some sample processes.
 
 ## 🎯 What is JPEL?
 
-JPEL (JSON Process Expression Language) is a modern approach to business process automation that uses simple JSON to define workflows. Unlike traditional BPMN or BPEL systems, JPEL focuses on three core capabilities:
+JPEL (JSON Process Expression Language) is a modern approach to business process automation that uses simple JSON to define workflows. 
+
+### JPEL Definition/Instance Structure
+JPEL defines process definitions. These definitions define Activities of various types as well as conditions and branching. A Runner materializes a process template into a process *Instance*.  The instance represents a specific *Run* of the process and is where data is collected and processed. Each Activity in the Instance can collect Variables (from UI, API calls or *Compute* Activities).  The process instance itself can also hold Variables which are global to the entire process.
+
+Here are a few use-cases for JPEL:
 
 ### 📋 Task Lists
 Create structured checklists and task sequences for operational procedures:
@@ -13,11 +17,13 @@ Create structured checklists and task sequences for operational procedures:
 - Quality control inspection processes
 - Maintenance and compliance workflows
 - Project milestone tracking
+- Unlimited branching to do specific steps based on conditions
 
 ### � Data Collection
 Build forms and data capture workflows with validation:
 - Customer intake forms
 - Survey and feedback collection
+- Laboratory Process Data Collection and validation
 - Audit and inspection data
 - Regulatory compliance reporting
 
@@ -44,107 +50,62 @@ Here's a simple employee onboarding process:
 
 ```json
 {
-  "id": "employee-onboarding",
-  "name": "Employee Onboarding",
-  "description": "New hire setup and orientation process",
-  "start": "a:collect-info",
-  "variables": [
-    {
-      "name": "employeeName",
-      "type": "string",
-      "description": "New employee's full name"
-    },
-    {
-      "name": "startDate",
-      "type": "date",
-      "description": "Employment start date"
-    }
-  ],
-  "activities": {
-    "collect-info": {
-      "name": "Collect Employee Information",
-      "type": "human",
-      "prompt": "Please enter the new employee's details:",
-      "inputs": [
-        {
-          "name": "employeeName",
-          "type": "string",
-          "label": "Full Name",
-          "required": true
-        },
-        {
-          "name": "startDate",
-          "type": "date",
-          "label": "Start Date",
-          "required": true
-        }
-      ],
-      "then": "a:setup-workstation"
-    },
-    "setup-workstation": {
-      "name": "Setup Workstation",
-      "type": "sequence",
-      "activities": ["a:create-email", "a:provision-laptop", "a:setup-access"],
-      "then": "a:send-welcome"
-    },
-    "create-email": {
-      "name": "Create Email Account",
-      "type": "api",
-      "method": "POST",
-      "url": "https://api.company.com/email/create",
-      "body": {
-        "name": "a:collect-info.f:employeeName",
-        "type": "employee"
-      }
-    },
-    "provision-laptop": {
-      "name": "Provision Laptop",
-      "type": "human",
-      "prompt": "Configure laptop for ${a:collect-info.f:employeeName}:",
-      "inputs": [
-        {
-          "name": "laptopModel",
-          "type": "select",
-          "label": "Laptop Model",
-          "options": ["MacBook Pro", "Dell XPS", "ThinkPad"],
-          "required": true
-        }
-      ]
-    },
-    "setup-access": {
-      "name": "Setup System Access",
-      "type": "parallel",
-      "activities": ["a:grant-network", "a:create-user", "a:setup-vpn"]
-    },
-    "send-welcome": {
-      "name": "Send Welcome Email",
-      "type": "compute",
-      "code": [
-        "const name = instance.activities['collect-info'].data.employeeName;",
-        "const startDate = instance.activities['collect-info'].data.startDate;",
-        "return {",
-        "  subject: `Welcome to the team, ${name}!`,",
-        "  body: `Your onboarding is complete. Start date: ${startDate}`",
-        "};"
-      ],
-      "then": "a:complete"
-    },
-    "complete": {
-      "name": "Onboarding Complete",
-      "type": "terminate",
-      "status": "completed"
-    }
-  }
+	"id": "hello-world",
+	"name": "Hello World Process",
+	"description": "A simple greeting process demonstrating human tasks and compute activities",
+	"version": "1.0.0",
+	"start": "a:mainSequence",
+	"variables": [
+		{
+			"name": "greeting",
+			"type": "text",
+			"description": "The generated greeting message"
+		}
+	],
+	"activities": {
+		"mainSequence": {
+			"name": "Main Sequence",
+			"type": "sequence",
+			"activities": [
+				"a:getUserName",
+				"a:generateGreeting"
+			]
+		},
+		"getUserName": {
+			"name": "Get User Name",
+			"type": "human",
+			"prompt": "Welcome! Please tell us your name:",
+			"inputs": [
+				{
+					"name": "userName",
+					"type": "text",
+					"label": "Your Name",
+					"required": true,
+					"placeholder": "Enter your full name"
+				}
+			]
+		},
+		"generateGreeting": {
+			"name": "Generate Greeting",
+			"type": "compute",
+			"code": [
+				"// Get the user name from the previous activity",
+				"const userName = a:getUserName.v:userName;",
+				"// Generate a greeting",
+				"const greeting = `Hello, ${userName}! Welcome to JPEL!`;",
+				"// Store the greeting",
+				"v:greeting = greeting;"
+			]
+		}
+	}
 }
 ```
 
 This example shows:
 - **Human tasks** for data collection
 - **Sequence activities** for ordered steps
-- **Parallel execution** for concurrent tasks
-- **API calls** for system integration
 - **Compute activities** for data processing
-- **Field references** using `a:activityId.f:fieldName` syntax
+- **Variable references** using `a:activityId.v:variableName` syntax
 
 ## 🏗️ Activity Types
 
@@ -159,48 +120,16 @@ This example shows:
 | `switch` | Multi-case routing | Status-based routing, category handling |
 | `terminate` | Process completion | Success/failure endpoints |
 
-## 🔄 Process Execution
-
-JPEL processes execute through activity references using the `a:activityId` syntax:
-
-- **Start**: `"start": "a:collect-info"` begins with the collect-info activity
-- **Flow**: `"then": "a:next-step"` continues to the next activity
-- **Data Access**: `"a:activityId.f:fieldName"` references collected data
-- **Conditions**: JavaScript expressions for branching logic
-
-## 🏃‍♂️ Available Runners
-
-JPEL is designed to run on multiple platforms:
-
-### Node.js Runner (`runner-node/`)
-- **Best for**: Development, demos, and JavaScript ecosystems
-- **Features**: Interactive web UI, REST API, in-memory/MongoDB storage
-- **Quick Start**: `cd runner-node && npm install && npm run demo`
-
-
-## 📊 Real-World Examples
-
-### Task Lists
-- **Safety Inspections**: Step-by-step equipment checks with photo capture
-- **Quality Audits**: Structured evaluation forms with scoring
-- **Maintenance Procedures**: Ordered checklists with conditional steps
-
-### Data Collection
-- **Customer Onboarding**: Multi-step forms with validation
-- **Survey Systems**: Dynamic questionnaires with conditional logic
-- **Incident Reporting**: Structured data capture with categorization
-
-### Quality Control
-- **Document Approval**: Multi-level review processes with rejections
-- **Change Management**: Impact assessment and approval workflows
-- **Compliance Checking**: Automated validation against business rules
 
 ## 🛠️ Getting Started
-
-1. **Choose a Runner**: Start with the Node.js runner for development
-2. **Load a Sample**: Use the built-in sample processes
-3. **Customize**: Modify JSON to match your business needs
-4. **Integrate**: Connect to your existing systems via API activities
+1. **Build and Run the Node.js Runner**
+```
+npm install
+npm run build && npm run test
+npm start
+```
+2. Visit localhost:3000 in a browser to open the Runner Demo UI
+3. Choose one of the sample processes and start a new Instance
 
 ## 📚 Documentation
 
@@ -209,7 +138,7 @@ JPEL is designed to run on multiple platforms:
 
 ## 🤝 Contributing
 
-JPEL welcomes contributions! Whether you're fixing bugs, adding features, or improving documentation, your help makes business process automation better for everyone.
+JPEL welcomes contributions! Whether you're fixing bugs, adding features, or improving documentation, your help makes business process automation better for everyone. Any non-backward compatible breaking changes, or changes that are not covered by unit tests will probably not be merged in.
 
 ## 📄 License
 
