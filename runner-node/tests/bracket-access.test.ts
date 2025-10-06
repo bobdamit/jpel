@@ -57,7 +57,7 @@ describe('Bracket-access JPEL translations', () => {
           id: 'copy-name',
           name: 'Copy Name',
           type: 'compute',
-          code: [ 'v:customer = a:enter-name.f:customer-name' ]
+          code: [ 'v:customer = a:enter-name.v:customer-name' ]
         }
       },
       variables: [ { name: 'customer', type: 'string' } ]

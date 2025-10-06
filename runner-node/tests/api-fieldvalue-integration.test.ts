@@ -9,37 +9,20 @@ import {
     HumanActivity 
 } from '../src/types';
 
-/**
- * Extracts data from typed activity instances for test API responses
- */
+// Import the updated getActivityData function
 function getActivityData(activity: any): any {
-	if (!activity) return {};
-	
-	// Return data based on activity type
-	if (activity.formData) {
-		// HumanActivityInstance
-		return activity.formData;
-	} else if (activity.responseData) {
-		// APIActivityInstance  
-		return activity.responseData;
-	} else if (activity.computedValues) {
-		// ComputeActivityInstance
-		return activity.computedValues;
-	} else if (activity.sequenceIndex !== undefined) {
-		// SequenceActivityInstance
-		return { sequenceIndex: activity.sequenceIndex, activities: activity.sequenceActivities };
-	} else if (activity.parallelState) {
-		// ParallelActivityInstance
-		return { parallelState: activity.parallelState, activeActivities: activity.activeActivities, completedActivities: activity.completedActivities };
-	} else if (activity.conditionResult !== undefined) {
-		// BranchActivityInstance
-		return { conditionResult: activity.conditionResult, nextActivity: activity.nextActivity };
-	} else if (activity.expressionValue !== undefined) {
-		// SwitchActivityInstance
-		return { expressionValue: activity.expressionValue, matchedCase: activity.matchedCase, nextActivity: activity.nextActivity };
-	}
-	
-	return {};
+    if (!activity) return {};
+    
+    // Return variables data - this is the new unified approach
+    if (activity.variables && Array.isArray(activity.variables)) {
+        const data: any = {};
+        activity.variables.forEach((variable: any) => {
+            data[variable.name] = variable.value;
+        });
+        return data;
+    }
+    
+    return {};
 }
 
 // Create a minimal Express app for testing API endpoints
@@ -85,14 +68,21 @@ const createTestApp = (processEngine: ProcessEngine) => {
             const currentActivity = instance.activities[instance.currentActivity];
 
             if (currentActivity.status === "running" && currentActivity.type === "human") {
-                // Return FieldValue[] directly from activity instance
-                const fieldsWithValues = (currentActivity as any).inputs || [];
+                // Convert variables to FieldValue[] for UI (same as main API)
+                const variables = (currentActivity as any).variables || [];
+                
+                // Convert Variable[] to FieldValue[] format expected by UI
+                const fieldsWithValues = variables.map((variable: any) => ({
+                    ...variable,
+                    value: variable.value !== undefined ? variable.value : 
+                           variable.defaultValue !== undefined ? variable.defaultValue : undefined
+                }));
 
                 const activityData = getActivityData(currentActivity);
                 const humanTaskData = {
                     activityId: currentActivity.id,
                     prompt: (currentActivity as any).prompt,
-                    fields: fieldsWithValues,
+                    fields: fieldsWithValues, // These are now FieldValue[] objects
                     fileUploads: (currentActivity as any).fileUploads,
                     attachments: (currentActivity as any).attachments,
                     context: activityData && Object.keys(activityData).length > 0 ? { previousRunData: activityData } : undefined

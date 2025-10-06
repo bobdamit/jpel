@@ -33,7 +33,7 @@ describe('ProcessEngine compute copying activity field to variable', () => {
           id: 'copyName',
           name: 'Copy Name',
           type: 'compute',
-          code: [ 'v:customer = a:enterName.f:customerName' ]
+          code: [ 'v:customer = a:enterName.v:customerName' ]
         }
       },
       variables: [ { name: 'customer', type: 'string' } ]

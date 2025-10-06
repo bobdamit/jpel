@@ -69,7 +69,7 @@
 		"processDecision": {
 			"name": "Process Approval Decision",
 			"type": "switch",
-			"expression": "a:reviewDocument.f:approverDecision",
+			"expression": "a:reviewDocument.v:approverDecision",
 			"cases": {
 				"approved": "a:documentApproved",
 				"rejected": "a:documentRejected",

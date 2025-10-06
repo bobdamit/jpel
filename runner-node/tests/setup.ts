@@ -64,7 +64,7 @@ export function createMockActivityInstance(overrides = {}) {
     passFail: 'pass',
     startedAt: new Date().toISOString(),
     completedAt: new Date().toISOString(),
-    formData: {}, // For human activities
+    variables: [], // For all activities
     ...overrides,
   };
 }

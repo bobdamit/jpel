@@ -1,5 +1,14 @@
 # JPEL Schema v2 - Simplified JSON-based Process Execution Language
 # Inspired by BPEL4People but designed for simplicity and readability
+#
+# JPEL Variable Access Syntax:
+# - Activity variables: a:activityId.v:variableName
+# - Process variables: v:variableName or var:variableName  
+# - Variable assignment: v:variableName = expression
+# - Examples:
+#   * const name = a:getUserInfo.v:customerName;
+#   * v:isValid = a:validateData.v:approved && a:checkRules.v:passed;
+#   * var:totalScore = a:quiz.v:score + a:bonus.v:points;
 
 process:
   type: object
@@ -168,16 +177,24 @@ components:
 
 # Runtime conversion notes
 # When a process instance is created from a Process Template, HumanActivity.inputs
-# (which are arrays of `Field` objects) MUST be converted into `FieldValue` objects
-# where each FieldValue extends the Field schema with an additional `value` field.
+# (which are arrays of `Field` objects) are converted into `Variable` objects
+# stored in the ActivityInstance.variables array.
 #
-# Conversion rules:
-# - Field.defaultValue -> FieldValue.value when creating a new instance (if present)
-# - If no defaultValue is present, FieldValue.value may be undefined
-# - When a human task is submitted, engine updates both activityInstance.data and
-#   activityInstance.inputs[*].value to ensure expressions and UI binding both work.
-# - API endpoints must return FieldValue[] for current human tasks so clients can
-#   bind to `field.value` for pre-population during re-run or resume.
+# Variable-based Architecture:
+# - All activity types store runtime data in ActivityInstance.variables (Variable[] array)
+# - Field definitions are converted to Variables with initial values set to defaultValue
+# - Variables support both runtime values and metadata (type, validation, etc.)
+# - No redundant data structures - only variables array exists at runtime
+#
+# JPEL Syntax:
+# - Variable access: a:activityId.v:variableName (e.g., a:askBuildType.v:buildType)
+# - Process variables: v:variableName (e.g., v:onboardingComplete)
+# - Variable assignment: v:variableName = value
+#
+# API Behavior:
+# - Endpoints return FieldValue[] (which extends Variable) for UI compatibility
+# - FieldValue[] is generated on-demand from ActivityInstance.variables
+# - No legacy getValue() function - only direct syntax supported
 
 
     FileUpload:
@@ -271,12 +288,17 @@ components:
               const: compute
             code:
               type: array
-              description: JavaScript code lines
+              description: JavaScript code lines using JPEL variable syntax
               items:
                 type: string
               example:
-                - "const buildType = a:askBuildType.f:buildType;"
-                - "this.result = buildType === 'TC' ? 'pass' : 'fail';"
+                - "// Access activity variables using a:activity.v:variable syntax"
+                - "const buildType = a:askBuildType.v:buildType;"
+                - "const quality = a:checkQuality.v:qualityScore;"
+                - "// Assign to process variables using v:variable syntax"
+                - "v:buildResult = buildType === 'TC' ? 'pass' : 'fail';"
+                - "// Complex expressions with multiple variables"
+                - "v:isComplete = a:equipmentCheck.v:equipmentOK && a:testResults.v:allTestsPassed;"
 
     # Sequential execution activity
     SequenceActivity:
@@ -322,7 +344,7 @@ components:
             condition:
               type: string
               description: JavaScript condition expression
-              example: "a:askBuildType.f:buildType === 'TC'"
+              example: "a:askBuildType.v:buildType === 'TC'"
             then:
               type: string
               description: Activity to execute if condition is true
@@ -346,7 +368,7 @@ components:
             expression:
               type: string
               description: JavaScript expression to evaluate
-              example: "a:reviewDocument.f:approverDecision"
+              example: "a:reviewDocument.v:approverDecision"
             cases:
               type: object
               description: Map of case values to activity references
@@ -413,34 +435,31 @@ processInstance:
       description: Process variable values
       additionalProperties: true
 
-# Conversion rules and runtime notes
-# ==================================================
-# When a Process Template (definition) is instantiated into a Process Run Instance,
-# the following conversion rules are applied to ensure runtime state is captured
-# and the UI can bind to runtime values.
+# JPEL Variable-based Runtime Architecture
+# =========================================
+# JPEL uses a consistent Variable-based architecture across all activity types.
 #
-# - Field -> FieldValue conversion:
-#   * For each HumanActivity.inputs (an array of `Field` objects) in the process template,
-#     the engine creates a corresponding `inputs` array on the ActivityInstance where each
-#     item is a `FieldValue` (i.e., a Field with an added `value` property).
-#   * The initial `value` is set to the Field's `defaultValue` if present, otherwise left
-#     undefined.
+# Variable Storage:
+# - All activities store runtime data in ActivityInstance.variables (Variable[] array)
+# - Variables contain both value and metadata (type, validation rules, etc.)
+# - No redundant data structures like formData, computedValues, or inputs arrays
 #
-# - Storing runtime data:
-#   * When a human task is submitted, the submitted key/value pairs are stored in two places:
-#     1) activityInstance.data (a plain map used by expressions and legacy code), and
-#     2) activityInstance.inputs (an array of `FieldValue`) — each matching field's `.value` is
-#        updated so UI clients can read a consistent runtime model.
+# Variable Access Syntax:
+# - Activity variables: a:activityId.v:variableName
+# - Process variables: v:variableName or var:variableName
+# - Assignment: v:variableName = expression
+# - Direct access only - no getValue() function
 #
-# - Re-run behavior:
-#   * When re-running an instance, previous activityInstance.data values are copied into the
-#     new instance's `inputs` (FieldValue[].value) so that human tasks are pre-populated with
-#     prior values.
+# Runtime Behavior:
+# - Human activity inputs (Field[]) are converted to variables (Variable[]) at instance creation
+# - Redundant inputs array is removed from runtime instances
+# - UI receives FieldValue[] (extends Variable) converted on-demand from variables
+# - All expressions use direct variable access syntax
 #
-# - API behavior:
-#   * Endpoints that return human tasks (e.g., `/api/instances/:id/current-task`, `createInstance`)
-#     must return `FieldValue[]` (not `Field[]`) in the `humanTask.fields` payload so UI code can
-#     safely access `field.value`.
+# Legacy Syntax Removed:
+# - a:activity.f:field syntax is no longer supported
+# - getValue() function has been eliminated
+# - Only modern v: syntax is accepted
 
     activities:
       type: object
@@ -448,7 +467,7 @@ processInstance:
       additionalProperties:
         $ref: "#/components/schemas/ActivityInstance"
 
-activityInstance:
+ActivityInstance:
   type: object
   required:
     - id
@@ -474,10 +493,56 @@ activityInstance:
     completedAt:
       type: string
       format: date-time
-    data:
-      type: object
-      description: Activity execution data
-      additionalProperties: true
+    variables:
+      type: array
+      description: Activity variable storage (unified across all activity types)
+      items:
+        $ref: "#/components/schemas/Variable"
     error:
       type: string
       description: Error message if failed
+
+# Variable schema (used in both process-level and activity-level storage)
+Variable:
+  type: object
+  required:
+    - name
+    - type
+  properties:
+    name:
+      type: string
+      description: Variable name
+    type:
+      type: string
+      enum: [text, number, boolean, select, date, file]
+      description: Variable type
+    value:
+      description: Runtime variable value
+    defaultValue:
+      description: Default value
+    description:
+      type: string
+      description: Variable description
+    required:
+      type: boolean
+      description: Whether variable is required
+    options:
+      type: array
+      description: Options for select fields
+      items:
+        type: string
+    min:
+      type: number
+      description: Minimum value (for numbers)
+    max:
+      type: number
+      description: Maximum value (for numbers)
+    units:
+      type: string
+      description: Units of measurement
+    pattern:
+      type: string
+      description: Regular expression pattern for validation
+    patternDescription:
+      type: string
+      description: Human-readable description of pattern requirements

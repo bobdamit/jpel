@@ -56,6 +56,7 @@ export interface ActivityInstance extends Activity {
 	startedAt?: Date;
 	completedAt?: Date;
 	error?: string;
+	variables?: Variable[]; // Consistent variable storage across all activity types
 }
 
 export enum ActivityType {
@@ -97,11 +98,15 @@ export interface HumanActivity extends Activity {
  */
 export interface HumanActivityInstance extends ActivityInstance, HumanActivity {
 	type: ActivityType.Human;
-	inputs?: FieldValue[]; // Runtime: fields with actual collected values
-	formData?: { [key: string]: any }; // Submitted form data in key-value format
+	// Note: variables are now stored in base ActivityInstance.variables
+	// inputs from HumanActivity definition are converted to variables at runtime
 	_files?: any[]; // Uploaded files
 }
 
+/**
+ * Field definition for activity inputs (definition-time schema)
+ * Used in process templates to define expected inputs
+ */
 export interface Field {
 	name: string;
 	type: FieldType;
@@ -114,14 +119,6 @@ export interface Field {
 	description?: string;
 	pattern?: string; // Regex pattern for validation
 	patternDescription?: string; // Description of the pattern for UI display
-}
-
-/**
- * Runtime field value that extends the field definition with actual data
- * Used in process instances to store collected/computed field values
- */
-export interface FieldValue extends Field {
-	value: any; // The actual runtime value
 }
 
 export enum FieldType {
@@ -156,6 +153,7 @@ export interface APIActivity extends Activity {
 	headers?: { [key: string]: string };
 	queryParams?: { [key: string]: string };
 	body?: any;
+	code?: string[]; // Optional code to process the response
 }
 
 /**
@@ -183,7 +181,6 @@ export interface ComputeActivity extends Activity {
  */
 export interface ComputeActivityInstance extends ActivityInstance, ComputeActivity {
 	type: ActivityType.Compute;
-	computedValues?: { [key: string]: any }; // Computed values from code execution
 }
 
 export interface SequenceActivity extends Activity {
@@ -257,8 +254,24 @@ export interface TerminateActivity extends Activity {
 export interface Variable {
 	name: string;
 	type: FieldType;
+	value?: any; // Runtime value
 	defaultValue?: any;
 	description?: string;
+	required?: boolean;
+	options?: string[]; // For select/enum fields
+	min?: number;
+	max?: number;
+	units?: string;
+	pattern?: string; // Regex pattern for validation
+	patternDescription?: string; // Description of the pattern for UI display
+}
+
+/**
+ * Runtime field value that extends Variable for form field compatibility
+ * Used in UI contexts where field-specific properties are needed
+ */
+export interface FieldValue extends Variable {
+	// FieldValue is now just an alias for Variable with field-specific semantics
 }
 
 // API Response types
@@ -276,7 +289,7 @@ export interface ApiResponse<T = any> {
 export interface HumanTaskData {
 	activityId: string;
 	prompt?: string;
-	fields: FieldValue[]; // Runtime fields with values for UI rendering
+	fields: FieldValue[]; // UI needs FieldValue with all presentation properties
 	fileUploads?: FileUpload[];
 	attachments?: Attachment[];
 	context?: { [key: string]: any }; // Additional context data, e.g., previous run data

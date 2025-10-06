@@ -83,7 +83,7 @@
 			"type": "compute",
 			"code": [
 				"// Retrieve common facts from the previous activity",
-				"const buildNumber = a:commonFacts.f:buildNumber;",
+				"const buildNumber = a:commonFacts.v:buildNumber;",
 				"// Check if build number exists and is valid",
 				"a:validateCommonFacts.passFail = buildNumber ? 'pass' : 'fail';"
 			]
@@ -94,11 +94,11 @@
 			"type": "compute",
 			"code": [
 				"// Retrieve common facts from the previous activity",
-				"const customerName = a:commonFacts.f:customerName;",
-				"const storeOrderNumber = a:commonFacts.f:storeOrderNumber;",
-				"const buildNumber = a:commonFacts.f:buildNumber;",
-				"const bodySource = a:commonFacts.f:bodySource;",
-				"const microphoneCategory = a:commonFacts.f:microphoneCategory;",
+				"const customerName = a:commonFacts.v:customerName;",
+				"const storeOrderNumber = a:commonFacts.v:storeOrderNumber;",
+				"const buildNumber = a:commonFacts.v:buildNumber;",
+				"const bodySource = a:commonFacts.v:bodySource;",
+				"const microphoneCategory = a:commonFacts.v:microphoneCategory;",
 				"const title = `${customerName} - ${storeOrderNumber} - ${buildNumber} - ${bodySource} - ${microphoneCategory}`;",
 				"v:title = title;"
 			]

@@ -24,10 +24,11 @@ import {
 	SwitchActivity,
 	SwitchActivityInstance,
 	TerminateActivity,
-	Field,
-	FieldValue,
 	ProcessExecutionResult,
-	HumanTaskData
+	HumanTaskData,
+	FieldValue,
+	FieldType,
+	Variable
 } from './types';
 import { ExpressionEvaluator } from './expression-evaluator';
 import { APIExecutor } from './api-executor';
@@ -286,8 +287,10 @@ export class ProcessEngine {
 			};
 		}
 
-		// Store the submitted data
-		activityInstance.formData = activityInstance.formData || {};
+		// Store the submitted data in the activity's variables array
+		if (!activityInstance.variables) {
+			activityInstance.variables = [];
+		}
 
 		// Get the process definition to access field definitions for validation
 		const processDefinition = await this.processDefinitionRepo.findById(instance.processId);
@@ -313,23 +316,30 @@ export class ProcessEngine {
 			}
 		}
 
-		Object.assign(activityInstance.formData, data);
+		// Update variables array with submitted data
+		Object.keys(data).forEach(key => {
+			let variable = activityInstance.variables!.find(v => v.name === key);
+			if (variable) {
+				variable.value = data[key];
+			} else {
+				// Create new variable if it doesn't exist
+				variable = {
+					name: key,
+					type: typeof data[key] === 'boolean' ? FieldType.Boolean : 
+						  typeof data[key] === 'number' ? FieldType.Number : FieldType.Text,
+					value: data[key]
+				};
+				activityInstance.variables!.push(variable);
+			}
+		});
+
 		if (files) {
 			activityInstance._files = files;
 		}
 
-		// Update FieldValue objects in the activity instance inputs array
-		if (activityInstance.inputs && Array.isArray(activityInstance.inputs)) {
-			activityInstance.inputs.forEach((fieldValue: FieldValue) => {
-				if (data.hasOwnProperty(fieldValue.name)) {
-					fieldValue.value = data[fieldValue.name];
-				}
-			});
-		}
-
-		logger.debug(`ProcessEngine: Stored human task data`, {
+		logger.debug(`ProcessEngine: Stored human task data as variables`, {
 			activityId,
-			dataStored: activityInstance.formData
+			variablesCount: activityInstance.variables?.length || 0
 		});
 
 		// Complete the human task
@@ -339,7 +349,7 @@ export class ProcessEngine {
 		// Save the updated instance
 		await this.processInstanceRepo.save(instance);
 
-		logger.info(`ProcessEngine: Human task '${activityId}' completed, continuing execution for instance '${instanceId}'`);
+		logger.info(`ProcessEngine: Human Activity '${activityId}' completed, continuing execution for instance '${instanceId}'`);
 
 		// Continue execution
 		return await this.continueExecution(instanceId);
@@ -473,21 +483,63 @@ export class ProcessEngine {
 			};
 		}
 
-		const activityInstance = instance.activities[activity.id];
+		const activityInstance = instance.activities[activity.id!] as HumanActivityInstance;
+		activityInstance.status = ActivityStatus.Running;
+		activityInstance.startedAt = new Date();
 
-		// The FieldValue objects in the activity instance already have their values
-		// (either default values from initialization, or previous run values for re-runs)
-		const fieldsWithValues: FieldValue[] = (activityInstance as any).inputs || [];
+		// Ensure variables array exists
+		if (!activityInstance.variables) {
+			activityInstance.variables = [];
+		}
+
+		// If variables array is empty, initialize from activity definition
+		if (activity.inputs && Array.isArray(activity.inputs) && activityInstance.variables.length === 0) {
+			activityInstance.variables = activity.inputs.map(field => ({
+				name: field.name,
+				type: field.type,
+				value: field.defaultValue, // Use defaultValue for initial value
+				defaultValue: field.defaultValue,
+				description: field.description,
+				required: field.required,
+				options: field.options,
+				min: field.min,
+				max: field.max,
+				units: field.units,
+				pattern: field.pattern,
+				patternDescription: field.patternDescription
+			}));
+			
+			// Remove inputs from runtime instance to prevent redundant state
+			delete (activityInstance as any).inputs;
+		}
+
+		await this.processInstanceRepo.save(instance);
 
 		logger.debug(`ProcessEngine: Executing human activity '${activity.id}'`, {
-			fieldsCount: fieldsWithValues.length,
-			hasValues: fieldsWithValues.some((f: FieldValue) => f.value !== undefined && f.value !== null && f.value !== '')
+			variablesCount: activityInstance.variables.length,
+			hasValues: activityInstance.variables.some(v => v.value !== undefined && v.value !== null && v.value !== '')
 		});
+
+		// Convert variables to FieldValue[] for UI binding
+		const fieldsForUI: FieldValue[] = activityInstance.variables.map(variable => ({
+			name: variable.name,
+			type: variable.type,
+			value: variable.value,
+			defaultValue: variable.defaultValue,
+			description: variable.description,
+			required: variable.required,
+			options: variable.options,
+			min: variable.min,
+			max: variable.max,
+			units: variable.units,
+			pattern: variable.pattern,
+			patternDescription: variable.patternDescription
+		}));
 
 		const humanTaskData: HumanTaskData = {
 			activityId: activity.id,
 			prompt: activity.prompt,
-			fields: fieldsWithValues,
+			fields: fieldsForUI,
 			fileUploads: activity.fileUploads,
 			attachments: activity.attachments
 		};
@@ -526,9 +578,28 @@ export class ProcessEngine {
 			// Execute JavaScript code
 			const result = this.expressionEvaluator.executeCode(activity.code, instance, activity.id);
 
-			// Store any results
+			// Store results in the activity's variables array
 			if (result) {
-				activityInstance.computedValues = result;
+				if (!activityInstance.variables) {
+					activityInstance.variables = [];
+				}
+
+				// Convert result object to variables
+				Object.keys(result).forEach(key => {
+					let variable = activityInstance.variables!.find(v => v.name === key);
+					if (variable) {
+						variable.value = result[key];
+					} else {
+						// Create new variable
+						variable = {
+							name: key,
+							type: typeof result[key] === 'boolean' ? FieldType.Boolean : 
+								  typeof result[key] === 'number' ? FieldType.Number : FieldType.Text,
+							value: result[key]
+						};
+						activityInstance.variables!.push(variable);
+					}
+				});
 			}
 
 			// Complete the activity
@@ -897,7 +968,7 @@ export class ProcessEngine {
 					const parallelInstance = instance.activities[activityId];
 
 				// Check if this parallel activity contains our current activity
-				if ((parallelInstance as any).parallelState === 'running' &&
+				if ((parallelInstance as ParallelActivityInstance).parallelState === 'running' &&
 					parallelActivity.activities.some(a => this.extractActivityId(a) === instance.currentActivity)) {
 
 					logger.debug(`ProcessEngine: Current activity '${instance.currentActivity}' is part of parallel '${activityId}'`);
@@ -921,7 +992,7 @@ export class ProcessEngine {
 					const sequenceInstance = instance.activities[activityId];
 
 				// Check if this sequence contains our current activity and has sequence data
-				if ((sequenceInstance as any).sequenceIndex !== undefined &&
+				if ((sequenceInstance as SequenceActivityInstance).sequenceIndex !== undefined &&
 					sequenceActivity.activities.some(a => this.extractActivityId(a) === instance.currentActivity)) {					logger.debug(`ProcessEngine: Found parent sequence '${activityId}' for current activity '${instance.currentActivity}'`);
 					const sequenceActivityInstance = sequenceInstance as SequenceActivityInstance;
 					const nextIndex = sequenceActivityInstance.sequenceIndex! + 1;
@@ -988,7 +1059,7 @@ export class ProcessEngine {
 		return result;
 	}
 
-	private initializeVariables(variables: any[]): { [key: string]: any } {
+	private initializeVariables(variables: Variable[]): { [key: string]: any } {
 		const result: { [key: string]: any } = {};
 		variables.forEach(variable => {
 			result[variable.name] = variable.defaultValue;
@@ -1011,18 +1082,30 @@ export class ProcessEngine {
 				status: ActivityStatus.Pending
 			};
 
-			// For human activities, convert Field[] to FieldValue[] with default values
-			if (normalizedActivity.type === ActivityType.Human) {
-				const humanActivity = normalizedActivity as HumanActivity;
-				if (humanActivity.inputs) {
-					(activityInstance as any).inputs = humanActivity.inputs.map(field => ({
-						...field,
-						value: field.defaultValue
-					}));
-				}
+		// For human activities, initialize variables from inputs definition
+		if (normalizedActivity.type === ActivityType.Human) {
+			const humanActivity = normalizedActivity as HumanActivity;
+			if (humanActivity.inputs) {
+				activityInstance.variables = humanActivity.inputs.map(field => ({
+					name: field.name,
+					type: field.type,
+					value: field.defaultValue,
+					defaultValue: field.defaultValue,
+					description: field.description,
+					required: field.required,
+					options: field.options,
+					min: field.min,
+					max: field.max,
+					units: field.units,
+					pattern: field.pattern,
+					patternDescription: field.patternDescription
+				}));
+				
+				// Remove inputs from runtime instance to prevent redundant state
+				// Only variables should exist at runtime
+				delete (activityInstance as any).inputs;
 			}
-
-			result[activityKey] = activityInstance;
+		}			result[activityKey] = activityInstance;
 		});
 
 		return result;

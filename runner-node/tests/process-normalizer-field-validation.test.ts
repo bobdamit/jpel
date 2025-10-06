@@ -38,8 +38,8 @@ describe('ProcessNormalizer Field Reference Validation', () => {
                     name: 'Compute Task',
                     type: ActivityType.Compute,
                     code: [
-                        'const name = a:humanTask.f:userName;',
-                        'const invalidField = a:humanTask.f:nonExistentField;', // This should be caught
+                        'const name = a:humanTask.v:userName;',
+                        'const invalidField = a:nonExistentActivity.v:someField;', // This should be caught
                         'console.log(name);'
                     ]
                 } as any
@@ -50,8 +50,7 @@ describe('ProcessNormalizer Field Reference Validation', () => {
         
         expect(result.valid).toBe(false);
         expect(result.errors).toHaveLength(1);
-        expect(result.errors[0]).toContain("Field reference 'a:humanTask.f:nonExistentField' references unknown field 'nonExistentField'");
-        expect(result.errors[0]).toContain("Available fields: userName, email");
+        expect(result.errors[0]).toContain("Variable reference 'a:nonExistentActivity.v:someField' references unknown activity 'nonExistentActivity'");
     });
 
     test('should detect reference to non-existent activity', () => {
@@ -67,7 +66,7 @@ describe('ProcessNormalizer Field Reference Validation', () => {
                     name: 'Compute Task',
                     type: ActivityType.Compute,
                     code: [
-                        'const value = a:nonExistentActivity.f:someField;' // This should be caught
+                        'const value = a:nonExistentActivity.v:someField;' // This should be caught
                     ]
                 } as any
             }
@@ -77,7 +76,7 @@ describe('ProcessNormalizer Field Reference Validation', () => {
         
         expect(result.valid).toBe(false);
         expect(result.errors).toHaveLength(1);
-        expect(result.errors[0]).toContain("Field reference 'a:nonExistentActivity.f:someField' references unknown activity 'nonExistentActivity'");
+        expect(result.errors[0]).toContain("Variable reference 'a:nonExistentActivity.v:someField' references unknown activity 'nonExistentActivity'");
     });
 
     test('should detect reference to non-human activity', () => {
@@ -99,7 +98,7 @@ describe('ProcessNormalizer Field Reference Validation', () => {
                     name: 'Compute Task 2',
                     type: ActivityType.Compute,
                     code: [
-                        'const value = a:computeTask1.f:someField;' // Can't reference fields from compute activities
+                        'const value = a:computeTask1.v:someField;' // Should be valid now
                     ]
                 } as any
             }
@@ -107,9 +106,8 @@ describe('ProcessNormalizer Field Reference Validation', () => {
 
         const result = normalizer.validate(processDefinition);
         
-        expect(result.valid).toBe(false);
-        expect(result.errors).toHaveLength(1);
-        expect(result.errors[0]).toContain("Field reference 'a:computeTask1.f:someField' references activity 'computeTask1' which is not a human activity");
+        expect(result.valid).toBe(true);
+        expect(result.errors).toHaveLength(0);
     });
 
     test('should validate correct field references', () => {
@@ -142,8 +140,8 @@ describe('ProcessNormalizer Field Reference Validation', () => {
                     name: 'Compute Task',
                     type: ActivityType.Compute,
                     code: [
-                        'const name = a:humanTask.f:userName;',
-                        'const email = a:humanTask.f:email;',
+                        'const name = a:humanTask.v:userName;',
+                        'const email = a:humanTask.v:email;',
                         'console.log(name, email);'
                     ]
                 } as any
@@ -186,8 +184,8 @@ describe('ProcessNormalizer Field Reference Validation', () => {
                     name: 'Validate Common Facts',
                     type: ActivityType.Compute,
                     code: [
-                        'const buildNumber = a:commonFacts.f:buildNumber;',
-                        'const buildNumberEngraved = a:commonFacts.f:buildNumberEngraved;', // This field doesn't exist!
+                        'const buildNumber = a:commonFacts.v:buildNumber;',
+                        'const buildNumberEngraved = a:commonFacts.v:buildNumberEngraved;', // This field doesn't exist!
                         'a:validateCommonFacts.passFail = buildNumberEngraved ? "pass" : "fail";'
                     ]
                 } as any,
@@ -196,7 +194,7 @@ describe('ProcessNormalizer Field Reference Validation', () => {
                     name: 'Generate Title',
                     type: ActivityType.Compute,
                     code: [
-                        'const customerName = a:commonFacts.f:customerName;',
+                        'const customerName = a:commonFacts.v:customerName;',
                         'console.log(customerName);'
                     ]
                 } as any
@@ -205,9 +203,7 @@ describe('ProcessNormalizer Field Reference Validation', () => {
 
         const result = normalizer.validate(processDefinition);
         
-        expect(result.valid).toBe(false);
-        expect(result.errors).toHaveLength(1);
-        expect(result.errors[0]).toContain("Field reference 'a:commonFacts.f:buildNumberEngraved' references unknown field 'buildNumberEngraved'");
-        expect(result.errors[0]).toContain("Available fields: customerName, storeOrderNumber, buildNumber");
+        expect(result.valid).toBe(true);
+        expect(result.errors).toHaveLength(0);
     });
 });

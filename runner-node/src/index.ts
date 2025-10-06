@@ -336,14 +336,21 @@ app.get(
 			currentActivity.status === "running" &&
 			currentActivity.type === "human"
 		) {
-			// This is a waiting human task - return the FieldValue[] directly from activity instance
-			const fieldsWithValues = (currentActivity as any).inputs || [];
+			// This is a waiting human task - convert variables to FieldValue[] for UI
+			const variables = (currentActivity as any).variables || [];
+			
+			// Convert Variable[] to FieldValue[] format expected by UI
+			const fieldsWithValues = variables.map((variable: any) => ({
+				...variable,
+				value: variable.value !== undefined ? variable.value : 
+					   variable.defaultValue !== undefined ? variable.defaultValue : undefined
+			}));
 
 			const activityData = getActivityData(currentActivity);
 			const humanTaskData = {
 				activityId: currentActivity.id,
 				prompt: (currentActivity as any).prompt,
-				fields: fieldsWithValues, // These are already FieldValue[] objects
+				fields: fieldsWithValues, // These are now FieldValue[] objects
 				fileUploads: (currentActivity as any).fileUploads,
 				attachments: (currentActivity as any).attachments,
 				context: activityData && Object.keys(activityData).length > 0 ? { previousRunData: activityData } : undefined

@@ -15,16 +15,19 @@ describe('ExpressionEvaluator', () => {
       },
       activities: {
         getUserName: createMockActivityInstance({
-          formData: { userName: 'Jane Smith' },
+          variables: [{ name: 'userName', value: 'Jane Smith', type: 'text' }],
         }),
         checkAge: createMockActivityInstance({
-          formData: { age: 25 },
+          variables: [{ name: 'age', value: 25, type: 'number' }],
         }),
         confirmActive: createMockActivityInstance({
-          formData: { isActive: false },
+          variables: [{ name: 'isActive', value: false, type: 'boolean' }],
         }),
         testActivity: createMockActivityInstance({
-          formData: { name: 'Test User', email: 'test@example.com' },
+          variables: [
+            { name: 'name', value: 'Test User', type: 'text' },
+            { name: 'email', value: 'test@example.com', type: 'text' }
+          ],
         }),
       },
     });
@@ -46,18 +49,18 @@ describe('ExpressionEvaluator', () => {
       expect(result).toBe(true);
     });
 
-    it('should evaluate activity field references', () => {
-      const result = evaluator.evaluateCondition('a:getUserName.f:userName === "Jane Smith"', mockInstance);
+    it('should evaluate activity variable references', () => {
+      const result = evaluator.evaluateCondition('a:getUserName.v:userName === "Jane Smith"', mockInstance);
       expect(result).toBe(true);
     });
 
     it('should evaluate complex expressions', () => {
-      const result = evaluator.evaluateCondition('v:age >= 18 && a:confirmActive.f:isActive', mockInstance);
+      const result = evaluator.evaluateCondition('v:age >= 18 && a:confirmActive.v:isActive', mockInstance);
       expect(result).toBe(false); // age >= 18 is true, but isActive is false
     });
 
-    it('should handle getValue function calls', () => {
-      const result = evaluator.evaluateCondition('getValue("v:userName") === "John Doe"', mockInstance);
+    it('should handle direct variable access', () => {
+      const result = evaluator.evaluateCondition('v:userName === "John Doe"', mockInstance);
       expect(result).toBe(true);
     });
 
@@ -79,9 +82,9 @@ describe('ExpressionEvaluator', () => {
       expect(mockInstance.variables.newVariable).toBe('test value');
     });
 
-    it('should execute code with getValue calls', () => {
+    it('should execute code with direct variable access', () => {
       const result = evaluator.executeCode([
-        'v:processedName = getValue("a:getUserName.f:userName").toUpperCase()'
+        'v:processedName = a:getUserName.v:userName.toUpperCase()'
       ], mockInstance, 'testActivity');
       expect(mockInstance.variables.processedName).toBe('JANE SMITH');
     });
@@ -100,7 +103,7 @@ describe('ExpressionEvaluator', () => {
 
     it('should execute complex logic', () => {
       const result = evaluator.executeCode([
-        'v:isAdult = getValue("a:checkAge.f:age") >= 18',
+        'v:isAdult = a:checkAge.v:age >= 18',
         'v:category = v:isAdult ? "adult" : "minor"'
       ], mockInstance, 'testActivity');
 
@@ -124,9 +127,9 @@ describe('ExpressionEvaluator', () => {
   });
 
   describe('JPEL syntax translation', () => {
-    it('should translate activity field references', () => {
+    it('should translate activity variable references', () => {
       // Test the private translateJPELToJS method indirectly through evaluateCondition
-      const result = evaluator.evaluateCondition('a:getUserName.f:userName === "Jane Smith"', mockInstance);
+      const result = evaluator.evaluateCondition('a:getUserName.v:userName === "Jane Smith"', mockInstance);
       expect(result).toBe(true);
     });
 
@@ -146,26 +149,26 @@ describe('ExpressionEvaluator', () => {
     });
   });
 
-  describe('getValue function', () => {
-    it('should retrieve activity field values', () => {
+  describe('Direct variable access', () => {
+    it('should retrieve activity variable values', () => {
       const result = evaluator.executeCode([
-        'v:retrievedValue = getValue("a:getUserName.f:userName")'
+        'v:retrievedValue = a:getUserName.v:userName'
       ], mockInstance, 'testActivity');
 
       expect(mockInstance.variables.retrievedValue).toBe('Jane Smith');
     });
 
-    it('should retrieve variable values', () => {
+    it('should retrieve process variable values', () => {
       const result = evaluator.executeCode([
-        'v:retrievedValue = getValue("v:userName")'
+        'v:retrievedValue = v:userName'
       ], mockInstance, 'testActivity');
 
       expect(mockInstance.variables.retrievedValue).toBe('John Doe');
     });
 
-    it('should return undefined for non-existent references', () => {
+    it('should handle undefined variables gracefully', () => {
       const result = evaluator.executeCode([
-        'v:retrievedValue = getValue("a:nonExistent.f:field")'
+        'v:retrievedValue = a:getUserName.v:nonExistentField'
       ], mockInstance, 'testActivity');
 
       expect(mockInstance.variables.retrievedValue).toBeUndefined();

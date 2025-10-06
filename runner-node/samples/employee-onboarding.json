@@ -17,7 +17,8 @@
 			"type": "sequence",
 			"activities": [
 				"a:collectEmployeeInfo",
-				"a:parallelSetup",
+				"a:assignEquipment",
+				"a:createAccounts",
 				"a:verifySetup",
 				"a:welcomeEmployee"
 			]
@@ -57,14 +58,6 @@
 				}
 			]
 		},
-		"parallelSetup": {
-			"name": "Parallel Setup Tasks",
-			"type": "parallel",
-			"activities": [
-				"a:assignEquipment",
-				"a:createAccounts"
-			]
-		},
 		"assignEquipment": {
 			"name": "Assign Equipment",
 			"type": "human",
@@ -96,8 +89,8 @@
 			"type": "compute",
 			"code": [
 				"// Check if both setup tasks are complete",
-				"const equipmentDone = getValue('a:assignEquipment.f:equipmentAssigned');",
-				"const accountsDone = getValue('a:createAccounts.f:accountsCreated');",
+				"const equipmentDone = a:assignEquipment.v:equipmentAssigned;",
+				"const accountsDone = a:createAccounts.v:accountsCreated;",
 				"v:onboardingComplete = equipmentDone && accountsDone;"
 			]
 		},

@@ -3,7 +3,7 @@
 	"name": "Hello World Process",
 	"description": "A simple greeting process demonstrating human tasks and compute activities",
 	"version": "1.0.0",
-	"start": "a:getUserName",
+	"start": "a:mainSequence",
 	"variables": [
 		{
 			"name": "greeting",
@@ -12,6 +12,14 @@
 		}
 	],
 	"activities": {
+		"mainSequence": {
+			"name": "Main Sequence",
+			"type": "sequence",
+			"activities": [
+				"a:getUserName",
+				"a:generateGreeting"
+			]
+		},
 		"getUserName": {
 			"name": "Get User Name",
 			"type": "human",
@@ -31,7 +39,7 @@
 			"type": "compute",
 			"code": [
 				"// Get the user name from the previous activity",
-				"const userName = getValue('a:getUserName.f:userName');",
+				"const userName = a:getUserName.v:userName;",
 				"// Generate a greeting",
 				"const greeting = `Hello, ${userName}! Welcome to JPEL!`;",
 				"// Store the greeting",

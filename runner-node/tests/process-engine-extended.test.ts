@@ -127,10 +127,12 @@ describe('ProcessEngine Extended Coverage', () => {
                 return;
             }
             
-            // If successful, check the computed values
-            expect((computeActivity as any).computedValues).toBeDefined();
-            expect((computeActivity as any).computedValues!.calculation).toBe(4);
-            expect((computeActivity as any).computedValues!.message).toBe('Hello World');
+            // If successful, check the computed values in variables array
+            expect((computeActivity as any).variables).toBeDefined();
+            const calculationVar = (computeActivity as any).variables.find((v: any) => v.name === 'calculation');
+            const messageVar = (computeActivity as any).variables.find((v: any) => v.name === 'message');
+            expect(calculationVar?.value).toBe(4);
+            expect(messageVar?.value).toBe('Hello World');
         });
 
         test('should handle compute activity errors', async () => {

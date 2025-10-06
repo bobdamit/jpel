@@ -110,17 +110,17 @@ describe('ProcessEngine FieldValue Architecture', () => {
             const userFormActivity = instance!.activities['userForm'];
             expect(userFormActivity).toBeDefined();
             
-            // Check that the activity instance has FieldValue[] inputs
-            const inputs = (userFormActivity as any).inputs;
-            expect(inputs).toBeDefined();
-            expect(Array.isArray(inputs)).toBe(true);
-            expect(inputs).toHaveLength(3);
+            // Check that the activity instance has Variable[] variables
+            const variables = (userFormActivity as any).variables;
+            expect(variables).toBeDefined();
+            expect(Array.isArray(variables)).toBe(true);
+            expect(variables).toHaveLength(3);
             
-            // Verify each input is a FieldValue
-            inputs.forEach((input: any) => {
-                expect(input).toHaveProperty('value');
-                expect(input).toHaveProperty('name');
-                expect(input).toHaveProperty('type');
+            // Verify each variable is a Variable with value property
+            variables.forEach((variable: any) => {
+                expect(variable).toHaveProperty('value');
+                expect(variable).toHaveProperty('name');
+                expect(variable).toHaveProperty('type');
             });
         });
     });
@@ -150,23 +150,17 @@ describe('ProcessEngine FieldValue Architecture', () => {
             const instance = await processEngine.getInstance(instanceId);
             const userFormActivity = instance!.activities['userForm'];
             
-            // Check that FieldValue objects were updated
-            const inputs = (userFormActivity as any).inputs;
-            expect(inputs).toHaveLength(3);
+            // Check that Variable objects were updated in the variables array
+            const variables = (userFormActivity as any).variables;
+            expect(variables).toHaveLength(3);
             
-            const userNameField = inputs.find((f: FieldValue) => f.name === 'userName');
-            const userAgeField = inputs.find((f: FieldValue) => f.name === 'userAge');
-            const isActiveField = inputs.find((f: FieldValue) => f.name === 'isActive');
+            const userNameField = variables.find((f: FieldValue) => f.name === 'userName');
+            const userAgeField = variables.find((f: FieldValue) => f.name === 'userAge');
+            const isActiveField = variables.find((f: FieldValue) => f.name === 'isActive');
             
             expect(userNameField.value).toBe('John Doe');
             expect(userAgeField.value).toBe(30);
             expect(isActiveField.value).toBe(false);
-            
-            // Also check that form data is stored in activity.formData
-            expect((userFormActivity as any).formData).toBeDefined();
-            expect((userFormActivity as any).formData!.userName).toBe('John Doe');
-            expect((userFormActivity as any).formData!.userAge).toBe(30);
-            expect((userFormActivity as any).formData!.isActive).toBe(false);
         });
     });
 

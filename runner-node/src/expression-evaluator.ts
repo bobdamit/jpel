@@ -81,30 +81,15 @@ export class ExpressionEvaluator {
 	private getActivityData(activity: any): any {
 		if (!activity) return {};
 		
-		// Return data based on activity type
-		if (activity.formData) {
-			// HumanActivityInstance
-			return activity.formData;
-		} else if (activity.responseData) {
-			// APIActivityInstance  
-			return activity.responseData;
-		} else if (activity.computedValues) {
-			// ComputeActivityInstance
-			return activity.computedValues;
-		} else if (activity.sequenceIndex !== undefined) {
-			// SequenceActivityInstance
-			return { sequenceIndex: activity.sequenceIndex, activities: activity.sequenceActivities };
-		} else if (activity.parallelState) {
-			// ParallelActivityInstance
-			return { parallelState: activity.parallelState, activeActivities: activity.activeActivities, completedActivities: activity.completedActivities };
-		} else if (activity.conditionResult !== undefined) {
-			// BranchActivityInstance
-			return { conditionResult: activity.conditionResult, nextActivity: activity.nextActivity };
-		} else if (activity.expressionValue !== undefined) {
-			// SwitchActivityInstance
-			return { expressionValue: activity.expressionValue, matchedCase: activity.matchedCase, nextActivity: activity.nextActivity };
+		// Use the consistent variables array approach
+		if (activity.variables && Array.isArray(activity.variables)) {
+			// Convert variables array to key-value object for compatibility
+			const data: any = {};
+			activity.variables.forEach((variable: any) => {
+				data[variable.name] = variable.value;
+			});
+			return data;
 		}
-		
 		return {};
 	}
 
@@ -126,42 +111,19 @@ export class ExpressionEvaluator {
 					// Use process.stdout instead of console for Node.js
 					process.stdout.write(`[Process ${instance.instanceId}] ${args.join(' ')}\n`);
 				}
-			},
-
-			// getValue function for JPEL field/variable access
-			getValue: (reference: string) => {
-				if (reference.startsWith('a:')) {
-					// Activity field reference: a:activityId.f:fieldName
-					const activityMatch = reference.match(/^a:(\w+)\.f:(\w+)$/);
-					if (activityMatch) {
-						const [, activityId, fieldName] = activityMatch;
-						const activityData = this.getActivityData(instance.activities[activityId]);
-						return activityData?.[fieldName];
-					}
-				} else if (reference.startsWith('v:')) {
-					// Variable reference: v:variableName
-					const variableName = reference.substring(2);
-					return instance.variables[variableName];
-				} else if (reference.startsWith('var:')) {
-					// Variable reference: var:variableName
-					const variableName = reference.substring(4);
-					return instance.variables[variableName];
-				}
-				return undefined;
 			}
 		};
 
-		// Add activity data accessors for backward compatibility
+		// Add activity data accessors
 		context.activities = {};
 		Object.keys(instance.activities).forEach(activityId => {
 			const activity = instance.activities[activityId];
 			const activityData = this.getActivityData(activity);
 
-			// Ensure the runtime activity instance exposes an f property that maps
-			// to the most relevant data (formData/responseData/computedValues)
-			// so scripts can access fields via `.f` and also write back.
-			if (!(activity as any).f) {
-				(activity as any).f = activityData || {};
+			// Ensure the runtime activity instance exposes a v property that maps
+			// to variables for the a:activity.v:variable syntax
+			if (!(activity as any).v) {
+				(activity as any).v = activityData || {};
 			}
 
 			// Expose the actual activity instance so assignments (e.g. passFail)
@@ -190,11 +152,16 @@ export class ExpressionEvaluator {
 		const translatedParts = parts.map(part => {
 			// Only translate if not inside quotes (even parts are outside quotes)
 			if (!part.startsWith('"') && !part.endsWith('"')) {
-				// Replace a:activityId.f:fieldName with activities["activityId"].f["fieldName"]
-				// Allow word characters and hyphens for both activity IDs and field names
-				part = part.replace(/a:([a-zA-Z0-9_-]+)\.f:([a-zA-Z0-9_-]+)/g, (m, activityId, fieldName) => {
-					return `activities[${JSON.stringify(activityId)}].f[${JSON.stringify(fieldName)}]`;
+				// Replace a:activityId.v:variableName with activities["activityId"].v["variableName"]
+				// Allow word characters and hyphens for both activity IDs and variable names
+				part = part.replace(/a:([a-zA-Z0-9_-]+)\.v:([a-zA-Z0-9_-]+)/g, (m, activityId, variableName) => {
+					return `activities[${JSON.stringify(activityId)}].v[${JSON.stringify(variableName)}]`;
 				});
+
+				// Reject legacy f: syntax - throw error instead of translating
+				if (/a:[a-zA-Z0-9_-]+\.f:[a-zA-Z0-9_-]+/.test(part)) {
+					throw new Error(`Legacy field syntax 'a:activity.f:field' is no longer supported. Use 'a:activity.v:variable' instead.`);
+				}
 
 				// Replace a:activityId.property with activities["activityId"].property
 				part = part.replace(/a:([a-zA-Z0-9_-]+)\.(\w+)/g, (m, activityId, prop) => {
@@ -202,25 +169,25 @@ export class ExpressionEvaluator {
 				});
 
 				// Replace v:variableName = value with process.variableName = value (use bracket if needed)
-				part = part.replace(/v:([^\.\s]+)\s*=/g, (m, varName) => {
+				part = part.replace(/v:([^\s\.=]+)\s*=/g, (m, varName) => {
 					if (/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(varName)) return `process.${varName} =`;
 					return `process[${JSON.stringify(varName)}] =`;
 				});
 
 				// Replace var:variableName = value with process.variableName = value
-				part = part.replace(/var:([^\.\s]+)\s*=/g, (m, varName) => {
+				part = part.replace(/var:([^\s\.=]+)\s*=/g, (m, varName) => {
 					if (/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(varName)) return `process.${varName} =`;
 					return `process[${JSON.stringify(varName)}] =`;
 				});
 
 				// Replace v:variableName (reading) with process.variableName (or bracket)
-				part = part.replace(/v:([^\.\s]+)/g, (m, varName) => {
+				part = part.replace(/v:([^\s\.]+)/g, (m, varName) => {
 					if (/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(varName)) return `process.${varName}`;
 					return `process[${JSON.stringify(varName)}]`;
 				});
 
 				// Replace var:variableName (reading) with process.variableName
-				part = part.replace(/var:([^\.\s]+)/g, (m, varName) => {
+				part = part.replace(/var:([^\s\.]+)/g, (m, varName) => {
 					if (/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(varName)) return `process.${varName}`;
 					return `process[${JSON.stringify(varName)}]`;
 				});
@@ -239,8 +206,7 @@ export class ExpressionEvaluator {
 		const paramNames = Object.keys(context);
 		const paramValues = Object.values(context);
 
-	// Minimal debug via centralized logger
-	logger.debug('Expression to evaluate (truncated):', expression && expression.length > 200 ? expression.substring(0,200) + '...' : expression);
+		logger.debug('Expression to evaluate (truncated):', expression && expression.length > 200 ? expression.substring(0,200) + '...' : expression);
 
 		try {
 			// If expression contains multiple lines or semicolons, treat it as a
