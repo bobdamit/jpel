@@ -1,4 +1,4 @@
-import { ProcessInstance, ProcessStatus } from '../types';
+import { ProcessInstance, ProcessInstanceFlyweight, ProcessStatus } from '../types';
 import { ProcessInstanceRepository } from './process-instance-repository';
 import { logger } from '../logger';
 
@@ -167,12 +167,19 @@ export class InMemoryProcessInstanceRepository implements ProcessInstanceReposit
 		return this.findByStatus(ProcessStatus.Failed);
 	}
 
-	async findByProcessId(processId: string): Promise<ProcessInstance[]> {
-		const result: ProcessInstance[] = [];
+	async findByProcessId(processId: string): Promise<ProcessInstanceFlyweight[]> {
+		const result: ProcessInstanceFlyweight[] = [];
 
 		for (const instance of this.instances.values()) {
 			if (instance.processId === processId) {
-				result.push({ ...instance });
+				result.push({
+					instanceId: instance.instanceId,
+					processId: instance.processId,
+					title: instance.title,
+					status: instance.status,
+					startedAt: instance.startedAt,
+					completedAt: instance.completedAt
+				});
 			}
 		}
 

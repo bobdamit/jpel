@@ -367,7 +367,6 @@ function renderInstanceList(instances, processId) {
                     <div>Status: ${instance.status}</div>
                     <div>Started: ${startedAt}</div>
                     <div>Completed: ${completedAt}</div>
-                    <div>Current Activity: ${instance.currentActivity || 'None'}</div>
                 </div>
                 <button class="btn btn-secondary" data-action="view-instance" data-instance="${instance.instanceId}">View Details</button>
                 <button class="btn btn-primary" data-action="rerun-instance" data-instance="${instance.instanceId}">Re-run Process</button>

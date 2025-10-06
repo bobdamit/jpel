@@ -353,11 +353,11 @@
     <div class="container">
         <div class="header">
             <h1>🚀 JPEL Runner Demo</h1>
-            <p>JSON-based Process Execution Language - Interactive Demonstration</p>
+            <p>JSON-based Process Expression Language - Interactive Demonstration</p>
         </div>
         
         <div class="demo-section">
-            <h2>Sample Processes</h2>
+            <h2>Sample Process Definitions</h2>
             
             <div class="process-grid" id="process-grid">
                 <!-- Process cards will be dynamically generated here -->
@@ -365,15 +365,6 @@
             </div>
         </div>
         
-        <div class="demo-section">
-            <h2>Process Management</h2>
-            <div style="margin-bottom: 1rem;">
-                <button class="btn" data-action="list-processes">List Loaded Processes</button>
-                <button class="btn" data-action="list-instances">List Running Instances</button>
-                <button class="btn btn-secondary" data-action="clear-results">Clear Results</button>
-            </div>
-            <div id="management-results"></div>
-        </div>
 
         <div class="main-interface">
             <!-- Left Column: Process Execution and Human Tasks -->
@@ -440,6 +431,15 @@
             <div id="instance-list" class="instance-list"></div>
         </div>
         
+        <div class="demo-section">
+            <h2>Process Management</h2>
+            <div style="margin-bottom: 1rem;">
+                <button class="btn" data-action="list-processes">List Loaded Processes</button>
+                <button class="btn" data-action="list-instances">List Running Instances</button>
+                <button class="btn btn-secondary" data-action="clear-results">Clear Results</button>
+            </div>
+            <div id="management-results"></div>
+        </div>				
         <div class="api-docs">
             <h3>🔗 API Endpoints</h3>
             <p>This demo uses the following JPEL Runner API endpoints:</p>

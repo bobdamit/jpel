@@ -1,4 +1,4 @@
-import { ProcessInstance, ProcessStatus } from '../types';
+import { ProcessInstance, ProcessInstanceFlyweight, ProcessStatus } from '../types';
 
 /**
  * Repository interface for process runtime instances
@@ -19,7 +19,7 @@ export interface ProcessInstanceRepository {
 	findFailedInstances(): Promise<ProcessInstance[]>;
 
 	// Query by process definition
-	findByProcessId(processId: string): Promise<ProcessInstance[]>;
+	findByProcessId(processId: string): Promise<ProcessInstanceFlyweight[]>;
 	findByProcessIdAndStatus(processId: string, status: ProcessStatus): Promise<ProcessInstance[]>;
 
 	// Time-based queries

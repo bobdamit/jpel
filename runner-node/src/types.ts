@@ -20,6 +20,15 @@ export interface ProcessTemplateFlyweight {
 	version?: string;
 }
 
+export interface ProcessInstanceFlyweight {
+	instanceId: string;
+	processId: string;
+	title?: string;
+	status: ProcessStatus;
+	startedAt: Date;
+	completedAt?: Date;
+}
+
 export interface ProcessInstance {
 	instanceId: string;
 	processId: string;

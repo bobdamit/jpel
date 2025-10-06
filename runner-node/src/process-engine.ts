@@ -28,7 +28,8 @@ import {
 	HumanTaskData,
 	FieldValue,
 	FieldType,
-	Variable
+	Variable,
+	ProcessInstanceFlyweight
 } from './types';
 import { ExpressionEvaluator } from './expression-evaluator';
 import { APIExecutor } from './api-executor';
@@ -1116,7 +1117,7 @@ export class ProcessEngine {
 		return await this.processInstanceRepo.findRunningInstances();
 	}
 
-	async getInstancesByProcessId(processId: string): Promise<ProcessInstance[]> {
+	async getInstancesByProcessId(processId: string): Promise<ProcessInstanceFlyweight[]> {
 		return await this.processInstanceRepo.findByProcessId(processId);
 	}
 
