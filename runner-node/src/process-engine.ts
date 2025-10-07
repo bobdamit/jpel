@@ -874,7 +874,7 @@ export class ProcessEngine {
 				nextActivity = activity.default;
 				logger.debug(`ProcessEngine: Switch using default case -> '${nextActivity}'`);
 			} else {
-				throw new Error(`No matching case found for value '${switchValue}' and no default case provided`);
+				throw new Error(`No matching case found for value '${switchValue}' in Activity ${activity.name} `);
 			}
 
 			// Set next activity and complete this one
@@ -891,6 +891,8 @@ export class ProcessEngine {
 		} catch (error) {
 			activityInstance.status = ActivityStatus.Failed;
 			activityInstance.error = error instanceof Error ? error.message : String(error);
+
+			logger.error(`Switch Eval Failed: ${activityInstance.error} `);
 
 			await this.processInstanceRepo.save(instance);
 			return {

@@ -1,7 +1,7 @@
 {
 	"id": "mic-build",
-	"name": "Build steps and quality checks for microphone assembly",
-	"description": "A process demonstrating build steps and quality checks for microphone assembly",
+	"name": "Microphone Build",
+	"description": "Data Colleciton, QC and Task Lists for Microphone Builds",
 	"version": "1.0.0",
 	"start": "a:main",
 	"variables": [
@@ -12,7 +12,6 @@
 		}
 	],
 	"activities": {
-
 
 		"main": {
 			"name": "Main",
@@ -27,8 +26,8 @@
 
 
 		"basicFactsSequence": {
-			"name": "Collect Basic Facts",
-			"description": "Gather essential information about the order and config",
+			"name": "Basic Facts Sequency",
+			"description": "Gather Data about the microphone build and compute a title",
 			"type": "sequence",
 			"activities": [
 				"a:commonFacts",
@@ -92,6 +91,34 @@
 		},
 
 
+		"ldcCircuitryTypeDecision" : {
+			"name": "Conditional for LDC Circuitry Type",
+			"type": "switch",
+			"expression": "a:ldcFacts.v:circuitryType",
+			"cases": {
+				"TL": "a:tlSequence",
+				"TC": "a:tcSequence"
+			}
+		},
+
+		"tlSequence" : {
+			"name": "TL Circuitry Sequence",
+			"description": "TL Circuitry Sequence Branch",
+			"type": "sequence",
+			"activities": [
+				"a:tlCircuitryFacts"
+			]
+		},
+
+		"tcSequence" : {
+			"name": "TC Circuitry Sequence",
+			"description": "TC Circuitry Sequence Branch",
+			"type": "sequence",
+			"activities": [
+				"a:tcCircuitryFacts"
+			]
+		},
+
 		"micTypeDecision": {
 			"name": "Conditional for LDC/SDC",
 			"type": "switch",
@@ -101,13 +128,15 @@
 				"SDC": "a:sdcMic"
 			}
 		},
+
 		"ldcMic": {
 			"name": "LDC Mic Sequence",
 			"description": "LDC Mic Sequence Branch",
 			"type": "sequence",
 			"activities": [
 				"a:ldcDonorFacts",
-				"a:ldcFacts"
+				"a:ldcFacts",
+				"a:ldcCircuitryTypeDecision"
 			]
 		},
 		"sdcMic": {
@@ -141,19 +170,149 @@
 			]
 		},
 
-		"ldcFacts": {
-			"name": "LDC Facts Sequence",
-			"description": "LDC Facts Sequence Branch",
-			"type": "sequence",
-			"activities": [
+		"ldcCustomMicFacts" : {
+			"name": "LDC Custom Mic Facts",
+			"description": "Collect Data Regarding LDC Custom Mic Type",
+			"type": "human",
+			"inputs": [
+				{
+					"name": "body",
+					"type": "select",
+					"label": "Body Style",
+					"required": true,
+					"options": [
+						"102",
+						"TF33",
+						"Other (800-ish)"
+					]
+				}
 			]
 		},
 
-		"ldcCapsuleFacts": {
-			"name": "LDC Capsule Facts",
-			"description": "Collect Data Regarding LDC Capsule Type",
+		"tlCircuitryFacts" : {
+			"name" : "TL Circuit Data",
+			"description" : "Transformerless Circuit Data Collection",
+			"type" : "human",
+			"inputs" : [
+				{
+					"name" : "vcc",
+					"label" : "Vcc Voltage",
+					"type" : "number",
+					"required" : true,
+					"min" : 5,
+					"max" : 12
+				},
+				{
+					"name" : "pol",
+					"label" : "Capsule pol+ Voltage",
+					"type" : "number",
+					"required" : true,
+					"min" : 55,
+					"max"	: 65
+				},
+				{
+					"name" : "vs",
+					"label" : "Vs FET Source Voltage",
+					"type" : "number",
+					"required" : true,
+					"min" : 1,
+					"max"	: 10
+				}
+			]
+		},
+
+		"tcCircuitryFacts" : {
+			"name":"TC Data Collection",
+			"description":"Transformer Coupled Circuit Data Collection",
+			"type": "human",
+			"inputs": [{
+					"name" : "r3-pot",
+					"label" : "R3 Pot Value (K Ohm)",
+					"type" : "number",
+					"required" : true,
+					"min" : 2,
+					"max" : 10
+				},
+				{
+					"name" : "r3-actual",
+					"label" : "R3 Actual Value (K Ohm)",
+					"type" : "number",
+					"required" : true,
+					"min" : 2,
+					"max"	: 10
+				}
+			]
+		},
+
+		"testing" : {
+			"name":"Testing",
+			"description" : "Testing Sequence",
+			"type": "sequence",
+			"activities": [
+
+			]
+		},
+
+		"electricalInspection" : {
+			"type" : "human",
+			"name" : "Electrical Inspection",
+			"inputs" : [
+				{
+					"name" : "pcb",
+					"label" : "PCB Soldering Neat and Clean",
+					"type" : "boolean",
+					"required" : true
+				},
+				{
+					"name" : "capsule",
+					"label" : "Capsule Soldering Neat and Clean",
+					"type" : "boolean",
+					"required" : true
+				},
+				{
+					"name" : "xlr",
+					"label" : "XLR Wiring and Pins Inspection",
+					"type" : "boolean",
+					"required" : true
+				}
+			]
+		},
+
+		"visualInspection" : {
+
+		},
+
+		"mechanicalInspection" : {
+
+		},
+
+		"tcValidation" : {
+			"name":"TC Data Validation",
+			"description" : "Transformer Coupled Data Validation",
+			"type": "compute",
+			"code": [
+				"const r3Pot = a:tcCircuitryFacts.v:r3-pot;",
+				"const r3Actual = a:tcCircuitryFacts.v:r3-actual;",
+				"const deviation = Math.abs(r3Actual - r3Pot)/r3Pot;",
+				"a:validateCommonFacts.passFail = deviation < 0.05 ? 'pass' : 'fail';"
+			]
+		},
+
+		"ldcFacts": {
+			"name": "LDC Facts Sequence",
+			"description": "LDC Facts Sequence Branch",
 			"type": "human",
 			"inputs": [
+				{
+					"name": "circuitryType",
+					"type": "select",
+					"label": "Circuitry Type",
+					"required": true,
+					"options": [
+						"TL",
+						"TC"
+					]
+				},
 				{
 					"name": "capsule",
 					"type": "select",
@@ -166,6 +325,8 @@
 				}
 			]
 		},
+
+
 		"transformerFacts": {
 			"name": "Transformer Facts",
 			"description": "Collect Data Regarding Transformer Type",
