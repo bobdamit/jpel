@@ -5,6 +5,12 @@ const level = process.env.LOG_LEVEL || 'info';
 
 const pinoLogger = pino({
   level,
+	transport: {
+		target: 'pino-pretty',
+		options: {
+			colorize: true
+		}
+	},
   base: { pid: false },
   timestamp: pino.stdTimeFunctions.isoTime
 });

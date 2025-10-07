@@ -1,9 +1,9 @@
 {
-	"id": "mic",
+	"id": "mic-build",
 	"name": "Build steps and quality checks for microphone assembly",
 	"description": "A process demonstrating build steps and quality checks for microphone assembly",
 	"version": "1.0.0",
-	"start": "a:basicFacts",
+	"start": "a:main",
 	"variables": [
 		{
 			"name": "title",
@@ -12,13 +12,26 @@
 		}
 	],
 	"activities": {
-		"basicFacts": {
+
+
+		"main": {
+			"name": "Main",
+			"description": "Main Sequence",
+			"type": "sequence",
+			"activities": [
+				"a:basicFactsSequence",
+				"a:validateCommonFacts",
+				"a:micTypeDecision"
+			]
+		},
+
+
+		"basicFactsSequence": {
 			"name": "Collect Basic Facts",
-			"description": "Gather essential information about the microphone assembly process",
+			"description": "Gather essential information about the order and config",
 			"type": "sequence",
 			"activities": [
 				"a:commonFacts",
-				"a:validateCommonFacts",
 				"a:generateTitle"
 			]
 		},
@@ -77,6 +90,102 @@
 				}
 			]
 		},
+
+
+		"micTypeDecision": {
+			"name": "Conditional for LDC/SDC",
+			"type": "switch",
+			"expression": "a:commonFacts.v:microphoneCategory",
+			"cases": {
+				"LDC": "a:ldcMic",
+				"SDC": "a:sdcMic"
+			}
+		},
+		"ldcMic": {
+			"name": "LDC Mic Sequence",
+			"description": "LDC Mic Sequence Branch",
+			"type": "sequence",
+			"activities": [
+				"a:ldcDonorFacts",
+				"a:ldcFacts"
+			]
+		},
+		"sdcMic": {
+			"name": "SDC Mic Sequence",
+			"description": "SDC Mic Sequence Branch",
+			"type": "sequence",
+			"activities": []
+		},
+
+		"ldcDonorFacts" : {
+			"name": "LDC Donor Facts",
+			"description": "Collect Data Regarding LDC Donor Type",
+			"type": "human",
+			"inputs": [
+				{
+					"name": "donor",
+					"type": "select",
+					"label": "Donor",
+					"required": true,
+					"options": [
+						"990",
+						"990S",
+						"770",
+						"Nova",
+						"ST55",
+						"910",
+						"920",
+						"Other (800-ish)"
+					]
+				}
+			]
+		},
+
+		"ldcFacts": {
+			"name": "LDC Facts Sequence",
+			"description": "LDC Facts Sequence Branch",
+			"type": "sequence",
+			"activities": [
+			]
+		},
+
+		"ldcCapsuleFacts": {
+			"name": "LDC Capsule Facts",
+			"description": "Collect Data Regarding LDC Capsule Type",
+			"type": "human",
+			"inputs": [
+				{
+					"name": "capsule",
+					"type": "select",
+					"label": "Capsule",
+					"required": true,
+					"options": [
+						"K47-Style (getwin)",
+						"CK12-Style (getwin)"
+					]
+				}
+			]
+		},
+		"transformerFacts": {
+			"name": "Transformer Facts",
+			"description": "Collect Data Regarding Transformer Type",
+			"type": "human",
+			"inputs": [
+				{
+					"name": "transformer",
+					"type": "select",
+					"label": "Transformer",
+					"required": true,
+					"options": [
+						"Cinemag 5722w",
+						"AMI T12",
+						"3U Audio GZT-84",
+						"Neutrik (lo-fi)",
+						"Other"
+					]
+				}
+			]
+		},
 		"validateCommonFacts": {
 			"name": "Validate Common Facts",
 			"description": "Ensure all common facts are correctly provided",
@@ -88,6 +197,7 @@
 				"a:validateCommonFacts.passFail = buildNumber ? 'pass' : 'fail';"
 			]
 		},
+
 		"generateTitle": {
 			"name": "Generate Title",
 			"description": "Generate a title for the build based on common facts",
@@ -95,15 +205,11 @@
 			"code": [
 				"// Retrieve common facts from the previous activity",
 				"const customerName = a:commonFacts.v:customerName;",
-				"const storeOrderNumber = a:commonFacts.v:storeOrderNumber;",
 				"const buildNumber = a:commonFacts.v:buildNumber;",
-				"const bodySource = a:commonFacts.v:bodySource;",
 				"const microphoneCategory = a:commonFacts.v:microphoneCategory;",
-				"const title = `${customerName} - ${storeOrderNumber} - ${buildNumber} - ${bodySource} - ${microphoneCategory}`;",
+				"const title = `${customerName}-${buildNumber}-${microphoneCategory}`;",
 				"v:title = title;"
 			]
-		}	
-	
+		}
 	}
-	
 }
