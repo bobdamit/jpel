@@ -968,18 +968,19 @@ export class ProcessEngine {
 					const parallelActivity = activityDef as ParallelActivity;
 					const parallelInstance = instance.activities[activityId];
 
-				// Check if this parallel activity contains our current activity
-				if ((parallelInstance as ParallelActivityInstance).parallelState === 'running' &&
-					parallelActivity.activities.some(a => this.extractActivityId(a) === instance.currentActivity)) {
+					// Check if this parallel activity contains our current activity
+					if ((parallelInstance as ParallelActivityInstance).parallelState === 'running' &&
+						parallelActivity.activities.some(a => this.extractActivityId(a) === instance.currentActivity)) {
 
-					logger.debug(`ProcessEngine: Current activity '${instance.currentActivity}' is part of parallel '${activityId}'`);
-					const parallelActivityInstance = parallelInstance as ParallelActivityInstance;
+						logger.debug(`ProcessEngine: Current activity '${instance.currentActivity}' is part of parallel '${activityId}'`);
+						const parallelActivityInstance = parallelInstance as ParallelActivityInstance;
 
-					// Mark current activity as completed in parallel tracking
-					if (!parallelActivityInstance.completedActivities!.includes(instance.currentActivity)) {
-						parallelActivityInstance.completedActivities!.push(instance.currentActivity);
-						logger.info(`ProcessEngine: Marked '${instance.currentActivity}' as completed in parallel '${activityId}'`);
-					}						// Continue parallel execution
+						// Mark current activity as completed in parallel tracking
+						if (!parallelActivityInstance.completedActivities!.includes(instance.currentActivity)) {
+							parallelActivityInstance.completedActivities!.push(instance.currentActivity);
+							logger.info(`ProcessEngine: Marked '${instance.currentActivity}' as completed in parallel '${activityId}'`);
+						}
+						// Continue parallel execution
 						await this.processInstanceRepo.save(instance);
 						return await this.executeParallelActivity(instanceId, parallelActivity);
 					}
@@ -992,17 +993,19 @@ export class ProcessEngine {
 					const sequenceActivity = activityDef as SequenceActivity;
 					const sequenceInstance = instance.activities[activityId];
 
-				// Check if this sequence contains our current activity and has sequence data
-				if ((sequenceInstance as SequenceActivityInstance).sequenceIndex !== undefined &&
-					sequenceActivity.activities.some(a => this.extractActivityId(a) === instance.currentActivity)) {					logger.debug(`ProcessEngine: Found parent sequence '${activityId}' for current activity '${instance.currentActivity}'`);
-					const sequenceActivityInstance = sequenceInstance as SequenceActivityInstance;
-					const nextIndex = sequenceActivityInstance.sequenceIndex! + 1;
+					// Check if this sequence contains our current activity and has sequence data
+					if ((sequenceInstance as SequenceActivityInstance).sequenceIndex !== undefined &&
+						sequenceActivity.activities.some(a => this.extractActivityId(a) === instance.currentActivity)) {
+						logger.debug(`ProcessEngine: Found parent sequence '${activityId}' for current activity '${instance.currentActivity}'`);
+						const sequenceActivityInstance = sequenceInstance as SequenceActivityInstance;
+						const nextIndex = sequenceActivityInstance.sequenceIndex! + 1;
 
-					if (nextIndex < sequenceActivityInstance.sequenceActivities!.length) {
-						// Continue with next activity in sequence
-						sequenceActivityInstance.sequenceIndex = nextIndex;
-						const nextActivity = this.extractActivityId(sequenceActivityInstance.sequenceActivities![nextIndex]);
-						instance.currentActivity = nextActivity;							logger.info(`ProcessEngine: Continuing sequence '${activityId}' - moving to activity '${nextActivity}' (index ${nextIndex})`);
+						if (nextIndex < sequenceActivityInstance.sequenceActivities!.length) {
+							// Continue with next activity in sequence
+							sequenceActivityInstance.sequenceIndex = nextIndex;
+							const nextActivity = this.extractActivityId(sequenceActivityInstance.sequenceActivities![nextIndex]);
+							instance.currentActivity = nextActivity;
+							logger.info(`ProcessEngine: Continuing sequence '${activityId}' - moving to activity '${nextActivity}' (index ${nextIndex})`);
 							await this.processInstanceRepo.save(instance);
 							return await this.executeNextStep(instanceId);
 						} else {
@@ -1011,7 +1014,48 @@ export class ProcessEngine {
 							sequenceInstance.status = ActivityStatus.Completed;
 							sequenceInstance.completedAt = new Date();
 							await this.processInstanceRepo.save(instance);
+							// Record the completed sequence ID so we can check for parent sequences
+							(instance as any).__lastCompletedSequenceId = activityId;
 							break; // Exit the loop and continue with normal completion
+						}
+					}
+				}
+			}
+
+			// Check if a nested sequence just completed and advance any parent sequences that reference it
+			const completedSeqId = (instance as any).__lastCompletedSequenceId as string | undefined;
+			if (completedSeqId) {
+				logger.debug(`ProcessEngine: Looking for parent sequence referencing completed sequence '${completedSeqId}'`);
+				for (const [parentId, parentDef] of Object.entries(processDefinition.activities)) {
+					if (parentDef.type === ActivityType.Sequence) {
+						const parentActivity = parentDef as SequenceActivity;
+						const parentInstance = instance.activities[parentId] as SequenceActivityInstance | undefined;
+						
+						// Check if this parent sequence references the completed nested sequence
+						if (parentInstance && parentInstance.sequenceActivities && 
+							parentActivity.activities.some(a => this.extractActivityId(a) === completedSeqId)) {
+							
+							const completedIndex = parentInstance.sequenceActivities.findIndex(a => this.extractActivityId(a) === completedSeqId);
+							const nextIndex = completedIndex + 1;
+							
+							if (nextIndex < parentInstance.sequenceActivities.length) {
+								// Continue to next activity in parent sequence
+								parentInstance.sequenceIndex = nextIndex;
+								const nextActivity = this.extractActivityId(parentInstance.sequenceActivities[nextIndex]);
+								instance.currentActivity = nextActivity;
+								logger.info(`ProcessEngine: Parent sequence '${parentId}' continuing to activity '${nextActivity}' (index ${nextIndex})`);
+								await this.processInstanceRepo.save(instance);
+								// Clear the completed sequence marker
+								delete (instance as any).__lastCompletedSequenceId;
+								return await this.executeNextStep(instanceId);
+							} else {
+								// Parent sequence also completed
+								logger.info(`ProcessEngine: Parent sequence '${parentId}' completed for instance '${instanceId}'`);
+								parentInstance.status = ActivityStatus.Completed;
+								parentInstance.completedAt = new Date();
+								await this.processInstanceRepo.save(instance);
+								// Continue searching for outer parent sequences
+							}
 						}
 					}
 				}
