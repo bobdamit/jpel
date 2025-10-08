@@ -53,6 +53,7 @@ function detectAndRenderFinishedActivities(instance) {
     Object.entries(instance.activities).forEach(([actId, act]) => {
         const prev = instanceActivityState[instId][actId];
         const curr = act.status;
+		  const type = act.type;
         // If previous state wasn't completed and now it is, append
         const terminal = ['completed', 'failed', 'cancelled', 'timeout'];
         if (prev !== curr && terminal.includes(curr)) {
@@ -80,7 +81,11 @@ function detectAndRenderFinishedActivities(instance) {
             const pfHtml = pf ? `<span class="pass-fail ${pf}">${String(pf).charAt(0).toUpperCase() + String(pf).slice(1)}</span>` : '';
 
             item.innerHTML = `
-                <div class="finished-header"><strong>${displayName}</strong> — <span class="status ${curr}">${curr}</span> ${pfHtml} ${time ? `<span class="time">@ ${time}</span>` : ''}</div>
+                <div class="finished-header">
+					 <strong>${displayName}</strong> — 
+					 <span class="type">${type}</span> 
+					 ${pfHtml} ${time ? `<span class="time">@ ${time}</span>` : ''}
+					 </div>
                 ${varsHtml}
             `;
 

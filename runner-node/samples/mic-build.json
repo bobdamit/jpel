@@ -71,8 +71,8 @@
 					"label": "Body Source",
 					"required": true,
 					"options": [
-						{ "value": "Donor", "label": "Donor" },
-						{ "value": "RS Custom", "label": "RS Custom" }
+						{ "value": "DONOR", "label": "Donor" },
+						{ "value": "CUSTOM", "label": "RS Custom" }
 					],
 					"description": "Source of this microphone body"
 				},
@@ -135,17 +135,27 @@
 			"description": "LDC Mic Sequence Branch",
 			"type": "sequence",
 			"activities": [
-				"a:ldcDonorFacts",
+				"a:ldcBodyCondition",
 				"a:ldcFacts",
 				"a:ldcCircuitryTypeDecision"
 			]
 		},
-		
+
 		"sdcMic": {
 			"name": "SDC Mic Sequence",
 			"description": "SDC Mic Sequence Branch",
 			"type": "sequence",
 			"activities": []
+		},
+
+		"ldcBodyCondition": {
+			"name": "Conditional for LDC Body Source",
+			"type": "switch",
+			"expression": "a:commonFacts.v:bodySource",
+			"cases": {
+				"DONOR": "a:ldcDonorFacts",
+				"CUSTOM": "a:ldcCustomBodyFacts"
+			}
 		},
 
 		"ldcDonorFacts" : {
@@ -166,6 +176,25 @@
 						{"value": "ST55", "label": "ST55"},
 						{"value": "910", "label": "910"},
 						{"value": "920", "label": "920"},
+						{"value": "OTHER", "label": "Other (800-ish)"}
+					]
+				}
+			]
+		},
+
+		"ldcCustomBodyFacts" : {
+			"name": "LDC Custom Body Facts",
+			"description": "Collect Data Regarding LDC Custom Body Type",
+			"type": "human",
+			"inputs": [
+				{
+					"name": "body",
+					"type": "select",
+					"label": "Body Style",
+					"required": true,
+					"options": [
+						{"value": "102", "label": "102"},
+						{"value": "TF33", "label": "TF33"},
 						{"value": "OTHER", "label": "Other (800-ish)"}
 					]
 				}
