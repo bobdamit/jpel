@@ -107,8 +107,12 @@ export class FieldValidator {
 	}
 
 	private static validateSelectField(field: Field, value: any, errors: string[]): void {
-		if (field.options && !field.options.includes(String(value))) {
-			errors.push(`${field.name} must be one of: ${field.options.join(', ')}`);
+		if (field.options) {
+			// field.options is ValueOption[], extract allowed values
+			const allowed = field.options.map(opt => String(opt.value));
+			if (!allowed.includes(String(value))) {
+				errors.push(`${field.name} must be one of: ${allowed.join(', ')}`);
+			}
 		}
 	}
 

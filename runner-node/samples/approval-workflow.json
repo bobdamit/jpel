@@ -41,9 +41,9 @@
 					"label": "Document Type",
 					"required": true,
 					"options": [
-						"policy",
-						"procedure",
-						"manual"
+						{ "value": "policy", "label": "policy" },
+						{ "value": "procedure", "label": "procedure" },
+						{ "value": "manual", "label": "manual" }
 					]
 				}
 			]
@@ -59,9 +59,9 @@
 					"label": "Approval Decision",
 					"required": true,
 					"options": [
-						"approved",
-						"rejected",
-						"needs-revision"
+						{ "value": "approved", "label": "approved" },
+						{ "value": "rejected", "label": "rejected" },
+						{ "value": "needs-revision", "label": "needs-revision" }
 					]
 				}
 			]

@@ -118,9 +118,11 @@ export interface HumanActivityInstance extends ActivityInstance, HumanActivity {
  */
 export interface Field {
 	name: string;
+	label?: string;
+	hint?: string;
 	type: FieldType;
 	required?: boolean;
-	options?: ValueOption[]; // For select/enum fields
+	options?: ValueOption[]; // For select/enum fields, allows label/value pairs
 	min?: number;
 	max?: number;
 	units?: string;
@@ -267,12 +269,14 @@ export interface TerminateActivity extends Activity {
 
 export interface Variable {
 	name: string;
+	label?: string;
+	hint?: string;
 	type: FieldType;
 	value?: any; // Runtime value
 	defaultValue?: any;
 	description?: string;
 	required?: boolean;
-	options?: string[]; // For select/enum fields
+	options?: ValueOption[]; // For select/enum fields, label/value pairs
 	min?: number;
 	max?: number;
 	units?: string;

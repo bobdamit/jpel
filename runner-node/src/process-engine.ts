@@ -497,6 +497,8 @@ export class ProcessEngine {
 		if (activity.inputs && Array.isArray(activity.inputs) && activityInstance.variables.length === 0) {
 			activityInstance.variables = activity.inputs.map(field => ({
 				name: field.name,
+				label: field.label,
+				hint: field.hint,
 				type: field.type,
 				value: field.defaultValue, // Use defaultValue for initial value
 				defaultValue: field.defaultValue,
@@ -874,7 +876,7 @@ export class ProcessEngine {
 				nextActivity = activity.default;
 				logger.debug(`ProcessEngine: Switch using default case -> '${nextActivity}'`);
 			} else {
-				throw new Error(`No matching case found for value '${switchValue}' in Activity ${activity.name} `);
+				throw new Error(`No matching case found for value '${switchValue}' in Activity ${activity.id} `);
 			}
 
 			// Set next activity and complete this one
@@ -1135,6 +1137,8 @@ export class ProcessEngine {
 			if (humanActivity.inputs) {
 				activityInstance.variables = humanActivity.inputs.map(field => ({
 					name: field.name,
+					label: field.label,
+					hint: field.hint,
 					type: field.type,
 					value: field.defaultValue,
 					defaultValue: field.defaultValue,

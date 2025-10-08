@@ -71,8 +71,8 @@
 					"label": "Body Source",
 					"required": true,
 					"options": [
-						"Donor",
-						"RS Custom"
+						{ "value": "Donor", "label": "Donor" },
+						{ "value": "RS Custom", "label": "RS Custom" }
 					],
 					"description": "Source of this microphone body"
 				},
@@ -82,8 +82,8 @@
 					"label": "Microphone Category",
 					"required": true,
 					"options": [
-						"LDC",
-						"SDC"
+						{ "value": "LDC" },
+						{ "value": "SDC"}
 					],
 					"description": "Category of the microphone"
 				}
@@ -115,7 +115,8 @@
 			"description": "TC Circuitry Sequence Branch",
 			"type": "sequence",
 			"activities": [
-				"a:tcCircuitryFacts"
+				"a:tcCircuitryFacts",
+				"a:tcValidation"
 			]
 		},
 
@@ -139,6 +140,7 @@
 				"a:ldcCircuitryTypeDecision"
 			]
 		},
+		
 		"sdcMic": {
 			"name": "SDC Mic Sequence",
 			"description": "SDC Mic Sequence Branch",
@@ -154,17 +156,17 @@
 				{
 					"name": "donor",
 					"type": "select",
-					"label": "Donor",
+					"label": "Donor Body Style",
 					"required": true,
 					"options": [
-						"990",
-						"990S",
-						"770",
-						"Nova",
-						"ST55",
-						"910",
-						"920",
-						"Other (800-ish)"
+						{"value": "990", "label": "990"},
+						{"value": "990S", "label": "990S"},
+						{"value": "770", "label": "770"},
+						{"value": "NOVA", "label": "Nova"},
+						{"value": "ST55", "label": "ST55"},
+						{"value": "910", "label": "910"},
+						{"value": "920", "label": "920"},
+						{"value": "OTHER", "label": "Other (800-ish)"}
 					]
 				}
 			]
@@ -181,9 +183,9 @@
 					"label": "Body Style",
 					"required": true,
 					"options": [
-						"102",
-						"TF33",
-						"Other (800-ish)"
+						{"value": "102", "label": "102"},
+						{"value": "TF33", "label": "TF33"},
+						{"value": "OTHER", "label": "Other (800-ish)"}
 					]
 				}
 			]
@@ -228,6 +230,7 @@
 			"inputs": [{
 					"name" : "r3-pot",
 					"label" : "R3 Pot Value (K Ohm)",
+					"hint": "Value of R3 Pot for Minimum THD",
 					"type" : "number",
 					"required" : true,
 					"min" : 2,
@@ -236,6 +239,7 @@
 				{
 					"name" : "r3-actual",
 					"label" : "R3 Actual Value (K Ohm)",
+					"hint": "Closest Selected Fixed Resistor for R3",
 					"type" : "number",
 					"required" : true,
 					"min" : 2,
@@ -294,7 +298,7 @@
 				"const r3Pot = a:tcCircuitryFacts.v:r3-pot;",
 				"const r3Actual = a:tcCircuitryFacts.v:r3-actual;",
 				"const deviation = Math.abs(r3Actual - r3Pot)/r3Pot;",
-				"a:validateCommonFacts.passFail = deviation < 0.05 ? 'pass' : 'fail';"
+				"a:tcValidation.passFail = deviation < 0.05 ? 'pass' : 'fail';"
 			]
 		},
 
@@ -309,8 +313,14 @@
 					"label": "Circuitry Type",
 					"required": true,
 					"options": [
-						"TL",
-						"TC"
+						{
+							"value": "TL",
+							"label": "Transformerless"
+						},
+						{
+							"value": "TC",
+							"label": "Transformer Coupled"
+						}
 					]
 				},
 				{
@@ -319,8 +329,14 @@
 					"label": "Capsule",
 					"required": true,
 					"options": [
-						"K47-Style (getwin)",
-						"CK12-Style (getwin)"
+						{
+							"value": "K47",
+							"label": "K47-Style (getwin)"
+						},
+						{
+							"value": "CK12",
+							"label": "CK12-Style (getwin)"
+						}
 					]
 				}
 			]
@@ -338,11 +354,11 @@
 					"label": "Transformer",
 					"required": true,
 					"options": [
-						"Cinemag 5722w",
-						"AMI T12",
-						"3U Audio GZT-84",
-						"Neutrik (lo-fi)",
-						"Other"
+						{ "value":"Cinemag 5722w"},
+						{ "value":"AMI T12"},
+						{ "value":"3U Audio GZT-84"},
+						{ "value":"Neutrik (lo-fi)"},
+						{ "value":"Other"}
 					]
 				}
 			]

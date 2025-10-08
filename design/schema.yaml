@@ -73,6 +73,46 @@ components:
           description: Variable description
           example: "Type of microphone build"
 
+        # Optional presentation metadata
+        label:
+          type: string
+          description: Optional human-friendly label for UIs
+          example: "Build Type"
+        hint:
+          type: string
+          description: Optional hint/help text for UIs (e.g., tooltip)
+          example: "Select the microphone category"
+        # Runtime value and validation metadata
+        value:
+          description: Runtime value of the variable (type depends on `type`)
+        required:
+          type: boolean
+          description: Whether the variable is required
+          default: false
+        options:
+          type: array
+          description: Options for select fields as label/value pairs
+          items:
+            $ref: "#/components/schemas/ValueOption"
+        min:
+          type: number
+          description: Minimum value (for numbers)
+        max:
+          type: number
+          description: Maximum value (for numbers)
+        units:
+          type: string
+          description: Units of measurement
+          example: "VDC"
+        pattern:
+          type: string
+          description: Regular expression pattern for validation
+          example: "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
+        patternDescription:
+          type: string
+          description: Human-readable description of the pattern requirements
+          example: "Please enter a valid email address (e.g., user@example.com)"
+
     Activity:
       type: object
       required:
@@ -137,6 +177,14 @@ components:
           type: string
           description: Field identifier
           example: buildType
+        label:
+          type: string
+          description: Optional human-friendly label shown in the UI
+          example: "Build Type"
+        hint:
+          type: string
+          description: Optional hint or tooltip text for the field
+          example: "Choose the category that best matches the microphone"
         type:
           type: string
           enum: [text, number, boolean, select, date, file]
@@ -149,8 +197,12 @@ components:
           type: array
           description: Options for select fields
           items:
-            type: string
-          example: ["TC", "TL"]
+            $ref: "#/components/schemas/ValueOption"
+          example:
+            - value: "TC"
+              label: "Transformer Coupled"
+            - value: "TL"
+              label: "Transformerless"
         min:
           type: number
           description: Minimum value (for numbers)
@@ -174,6 +226,22 @@ components:
           type: string
           description: Human-readable description of the pattern requirements
           example: "Please enter a valid email address (e.g., user@example.com)"
+
+    ValueOption:
+      type: object
+      required:
+        - value
+      properties:
+        label:
+          type: string
+          description: Optional human-friendly label for the option
+          example: "Transformer Coupled"
+        value:
+          description: Option value (may be string, number or boolean)
+          oneOf:
+            - type: string
+            - type: number
+            - type: boolean
 
 # Runtime conversion notes
 # When a process instance is created from a Process Template, HumanActivity.inputs

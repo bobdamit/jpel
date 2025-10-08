@@ -103,7 +103,7 @@ describe('FieldValidator', () => {
         name: 'priority',
         type: FieldType.Select,
         required: true,
-        options: ['low', 'medium', 'high'],
+        options: [{value: 'low', label: 'Low'}, {value: 'medium', label: 'Medium'}, {value: 'high', label: 'High'}],
       };
 
       const validResult = FieldValidator.validateField(field, 'medium');

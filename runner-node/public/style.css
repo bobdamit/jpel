@@ -340,3 +340,17 @@
         .panel-body { padding: 0.5rem; max-height: 300px; overflow: auto; font-family: monospace; }
         .running-activity { border-bottom: 1px dashed #eee; padding: 0.5rem 0; }
         .var-row { padding: 0.25rem 0; }
+
+        /* Finished activities list */
+        .finished-list { list-style: none; padding: 0; margin: 0; }
+        .finished-item { padding: 0.5rem; border-bottom: 1px solid #eef0f2; }
+        .finished-header { font-weight: 600; margin-bottom: 0.25rem; display: flex; gap: 0.5rem; align-items: center; }
+        .finished-header .time { color: #6c757d; font-size: 0.85em; margin-left: 0.25rem; }
+        .finished-vars-list { display: grid; gap: 0.25rem; }
+        .var-pair { font-size: 0.95em; color: #333; }
+
+        /* Pass/Fail badge styling */
+        .pass-fail { padding: 0.15rem 0.5rem; border-radius: 12px; font-size: 0.8em; font-weight: 700; color: white; text-transform: none; }
+        .pass-fail.pass { background: #28a745; }
+        .pass-fail.fail { background: #dc3545; }
+        .pass-fail.unknown { background: #6c757d; }

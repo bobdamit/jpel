@@ -122,9 +122,8 @@ export class ExpressionEvaluator {
 
 			// Ensure the runtime activity instance exposes a v property that maps
 			// to variables for the a:activity.v:variable syntax
-			if (!(activity as any).v) {
-				(activity as any).v = activityData || {};
-			}
+			// Always update the v property to ensure it has the latest values
+			(activity as any).v = activityData || {};
 
 			// Expose the actual activity instance so assignments (e.g. passFail)
 			// mutate the runtime instance and will be persisted when the engine saves.

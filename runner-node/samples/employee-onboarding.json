@@ -43,11 +43,11 @@
 					"label": "Department",
 					"required": true,
 					"options": [
-						"Engineering",
-						"Sales",
-						"Marketing",
-						"HR",
-						"Finance"
+						{ "value": "Engineering", "label": "Engineering" },
+						{ "value": "Sales", "label": "Sales" },
+						{ "value": "Marketing", "label": "Marketing" },
+						{ "value": "HR", "label": "HR" },
+						{ "value": "Finance", "label": "Finance" }
 					]
 				},
 				{

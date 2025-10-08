@@ -7,6 +7,8 @@ let currentActivityId = null;
 
 // Available processes will be loaded dynamically
 let availableProcesses = {};
+// Track previously-seen activity statuses per instance to detect completions
+const instanceActivityState = {}; // { instanceId: { activityId: status, ... } }
 
 function showStatus(message, type = 'info') {
     const resultDiv = document.getElementById('management-results');
@@ -30,6 +32,65 @@ function renderInstanceVariables(instance) {
     const vars = instance && instance.variables ? instance.variables : {};
     const rows = Object.keys(vars).map(k => `<div class="var-row"><strong>${k}</strong>: ${JSON.stringify(vars[k])}</div>`).join('');
     container.innerHTML = `<h4>Process Variables</h4>${rows || '<div class="empty">(no variables)</div>'}`;
+}
+
+// Called whenever there's a new snapshot of an instance; detects activity completions
+function detectAndRenderFinishedActivities(instance) {
+    if (!instance || !instance.instanceId || !instance.activities) return;
+    const instId = instance.instanceId;
+    if (!instanceActivityState[instId]) instanceActivityState[instId] = {};
+
+    const finishedContainer = document.getElementById('finished-activities');
+    if (!finishedContainer) return;
+
+    // Ensure container has a list element
+    let list = finishedContainer.querySelector('ul');
+    if (!list) {
+        finishedContainer.innerHTML = '<ul class="finished-list"></ul>';
+        list = finishedContainer.querySelector('ul');
+    }
+
+    Object.entries(instance.activities).forEach(([actId, act]) => {
+        const prev = instanceActivityState[instId][actId];
+        const curr = act.status;
+        // If previous state wasn't completed and now it is, append
+        const terminal = ['completed', 'failed', 'cancelled', 'timeout'];
+        if (prev !== curr && terminal.includes(curr)) {
+            // Build a concise summary of variables set on this activity (name: value pairs)
+            const vars = Array.isArray(act.variables) ? act.variables : [];
+            let varsHtml = '<div class="empty">(no activity variables)</div>';
+            if (vars.length > 0) {
+                const pairs = vars.map(v => {
+                    const value = (v && v.value !== undefined) ? v.value : (v && v.defaultValue !== undefined ? v.defaultValue : null);
+                    // Format simple values inline, stringify objects modestly
+                    const formatted = (value === null || value === undefined) ? '<em>(empty)</em>' : (
+                        (typeof value === 'object') ? JSON.stringify(value) : String(value)
+                    );
+                    return `<div class="var-pair"><strong>${v.name}</strong>: ${formatted}</div>`;
+                }).join('');
+                varsHtml = `<div class="finished-vars-list">${pairs}</div>`;
+            }
+
+            const item = document.createElement('li');
+            item.className = 'finished-item';
+            const time = act.completedAt ? new Date(act.completedAt).toLocaleString() : '';
+            const displayName = act.name || actId;
+            // Pass/fail indicator (if set on the activity)
+            const pf = act.passFail || null;
+            const pfHtml = pf ? `<span class="pass-fail ${pf}">${String(pf).charAt(0).toUpperCase() + String(pf).slice(1)}</span>` : '';
+
+            item.innerHTML = `
+                <div class="finished-header"><strong>${displayName}</strong> — <span class="status ${curr}">${curr}</span> ${pfHtml} ${time ? `<span class="time">@ ${time}</span>` : ''}</div>
+                ${varsHtml}
+            `;
+
+            // Prepend so newest finished appear at top
+            list.insertBefore(item, list.firstChild);
+        }
+
+        // Update tracked state
+        instanceActivityState[instId][actId] = curr;
+    });
 }
 
 // Render simplified process variables for the right column
@@ -409,10 +470,12 @@ async function viewInstance(instanceId) {
             // Also render simplified versions for the right column
             renderProcessVariablesSimple(instance);
             renderCurrentActivitiesSimple(instance);
+                detectAndRenderFinishedActivities(instance);
         } else {
             showStatus(`Failed to load instance: ${result.error}`, 'error');
         }
     } catch (error) {
+        console.error('Error loading instance', error);
         showStatus(`Error loading instance: ${error.message}`, 'error');
     }
 }
@@ -437,9 +500,11 @@ async function rerunInstance(instanceId) {
             currentInstanceId = newInstanceId;
             await continueExecution();
         } else {
+            console.error('Failed to re-run instance', result);
             showStatus(`❌ Failed to re-run instance: ${result.error}`, 'error');
         }
     } catch (error) {
+        console.error('Error re-running instance', error);
         showStatus(`❌ Error re-running instance: ${error.message}`, 'error');
     }
 }
@@ -473,9 +538,11 @@ async function startInstanceById(processId) {
             // Auto-execute until we hit a human task
             await continueExecution();
         } else {
+            console.error('Failed to start instance', result);
             showExecutionStatus(`❌ Failed to start instance: ${result.error}`, 'error');
         }
     } catch (error) {
+        console.error('Error starting instance', error);
         showExecutionStatus(`❌ Error starting instance: ${error.message}`, 'error');
     }
 }
@@ -496,6 +563,7 @@ async function continueExecution() {
                 renderRunningActivities(taskResult.data.instance);
                 renderProcessVariablesSimple(taskResult.data.instance);
                 renderCurrentActivitiesSimple(taskResult.data.instance);
+                    detectAndRenderFinishedActivities(taskResult.data.instance);
             }
             return;
         }
@@ -509,13 +577,14 @@ async function continueExecution() {
         
         const stepResult = await stepResponse.json();
         
-        if (stepResult.success) {
+    if (stepResult.success) {
             // step result processed (quiet)
             if (stepResult.data && stepResult.data.instance) {
                 renderInstanceVariables(stepResult.data.instance);
                 renderRunningActivities(stepResult.data.instance);
                 renderProcessVariablesSimple(stepResult.data.instance);
                 renderCurrentActivitiesSimple(stepResult.data.instance);
+                    detectAndRenderFinishedActivities(stepResult.data.instance);
             }
             if (stepResult.data.status === 'completed') {
                 showExecutionStatus(`🎉 Process completed successfully!`, 'success');
@@ -533,9 +602,11 @@ async function continueExecution() {
                 setTimeout(() => continueExecution(), 500);
             }
         } else {
+            console.error('Step execution error', stepResult);
             showExecutionStatus(`❌ Execution error: ${stepResult.error}`, 'error');
         }
     } catch (error) {
+        console.error('Error during execution', error);
         showExecutionStatus(`❌ Error during execution: ${error.message}`, 'error');
     }
 }
@@ -556,17 +627,21 @@ function showHumanTask(humanTask) {
         const fieldValue = field.value !== undefined ? field.value : '';
         
         if (field.type === 'select') {
-            const options = field.options ? field.options.map(opt => 
-                `<option value="${opt}" ${fieldValue === opt ? 'selected' : ''}>${opt}</option>`
-            ).join('') : '';
-            
+            // field.options is ValueOption[]
+            const options = field.options ? field.options.map(opt => {
+                const val = opt.value;
+                const label = opt.label !== undefined ? opt.label : String(opt.value);
+                const selected = String(fieldValue) === String(val) ? 'selected' : '';
+                return `<option value="${val}" ${selected}>${label}</option>`;
+            }).join('') : '';
             return `
                 <div class="form-group">
-                    <label for="field-${field.name}">${field.label || field.name}:</label>
+                    <label for="field-${field.name}" title="${field.hint || ''}">${field.label || field.name}:</label>
                     <select id="field-${field.name}" name="${field.name}" ${field.required ? 'required' : ''}>
                         <option value="">Select...</option>
                         ${options}
                     </select>
+                    ${field.hint ? `<small class="field-hint">${field.hint}</small>` : ''}
                 </div>
             `;
         } else if (field.type === 'boolean') {
@@ -574,12 +649,13 @@ function showHumanTask(humanTask) {
             const selectedFalse = fieldValue === false || fieldValue === 'false';
             return `
                 <div class="form-group">
-                    <label for="field-${field.name}">${field.label || field.name}:</label>
+                    <label for="field-${field.name}" title="${field.hint || ''}">${field.label || field.name}:</label>
                     <select id="field-${field.name}" name="${field.name}" data-original-type="boolean" ${field.required ? 'required' : ''}>
                         <option value="">choose</option>
                         <option value="true" ${selectedTrue ? 'selected' : ''}>true</option>
                         <option value="false" ${selectedFalse ? 'selected' : ''}>false</option>
                     </select>
+                    ${field.hint ? `<small class="field-hint">${field.hint}</small>` : ''}
                 </div>
             `;
         } else {
@@ -588,10 +664,15 @@ function showHumanTask(humanTask) {
             const titleAttr = field.patternDescription ? `title="${field.patternDescription}"` : '';
             const description = field.patternDescription ? 
                 `<small class="pattern-description">${field.patternDescription}</small>` : '';
-            
+
+            // For numeric inputs allow floating point values by setting step="any"
+            const stepAttr = field.type === 'number' ? 'step="any"' : '';
+            const minAttr = (field.min !== undefined && field.min !== null) ? `min="${field.min}"` : '';
+            const maxAttr = (field.max !== undefined && field.max !== null) ? `max="${field.max}"` : '';
+
             return `
                 <div class="form-group">
-                    <label for="field-${field.name}">${field.label || field.name}:</label>
+                    <label for="field-${field.name}" title="${field.hint || ''}">${field.label || field.name}:</label>
                     <input 
                         type="${field.type || 'text'}" 
                         id="field-${field.name}" 
@@ -599,10 +680,14 @@ function showHumanTask(humanTask) {
                         placeholder="${field.placeholder || ''}"
                         value="${fieldValue}"
                         ${field.required ? 'required' : ''}
+                        ${stepAttr}
+                        ${minAttr}
+                        ${maxAttr}
                         ${patternAttr}
                         ${titleAttr}
                     >
                     ${description}
+                    ${field.hint ? `<small class="field-hint">${field.hint}</small>` : ''}
                 </div>
             `;
         }
@@ -634,8 +719,17 @@ async function submitHumanTask(event) {
         
         for (const [key, value] of formData.entries()) {
             const input = document.getElementById(`field-${key}`);
-            if (input && input.type === 'checkbox') {
-                taskData[key] = input.checked;
+            if (input) {
+                if (input.tagName === 'INPUT' && input.type === 'checkbox') {
+                    taskData[key] = input.checked;
+                } else if (input.tagName === 'SELECT' && input.dataset.originalType === 'boolean') {
+                    // Boolean select: 'true'->true, 'false'->false, ''->undefined
+                    if (value === 'true') taskData[key] = true;
+                    else if (value === 'false') taskData[key] = false;
+                    else taskData[key] = undefined;
+                } else {
+                    taskData[key] = value;
+                }
             } else {
                 taskData[key] = value;
             }
@@ -658,14 +752,17 @@ async function submitHumanTask(event) {
                 renderRunningActivities(result.data.instance);
                 renderProcessVariablesSimple(result.data.instance);
                 renderCurrentActivitiesSimple(result.data.instance);
+                    detectAndRenderFinishedActivities(result.data.instance);
             }
 
             // Continue execution
             setTimeout(() => continueExecution(), 1000);
         } else {
+            console.error('Human task submission failed', result);
             showTaskStatus(`❌ Failed to submit task: ${result.error}`, 'error');
         }
     } catch (error) {
+        console.error('Error submitting human task', error);
         showTaskStatus(`❌ Error submitting task: ${error.message}`, 'error');
     }
 }
