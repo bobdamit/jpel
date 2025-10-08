@@ -101,7 +101,7 @@ async function stripExamples(obj) {
 			// ignore
 		}
 
-		// Write the resolved JSON schema
+		// Write the resolved JSON schema (combined)
 		const outPath = path.join(repoRoot, 'design', 'schema-resolved.json');
 		fs.writeFileSync(outPath, JSON.stringify(deref, null, 2), 'utf8');
 		console.log('Wrote', outPath);
@@ -112,6 +112,64 @@ async function stripExamples(obj) {
 		const outJsonPath = path.join(repoRoot, 'design', 'schema.json');
 		fs.writeFileSync(outJsonPath, JSON.stringify(deref, null, 2), 'utf8');
 		console.log('Wrote', outJsonPath);
+
+		// Additionally produce a process-only resolved artifact if the original
+		// YAML has a top-level `process` node. This is useful when the repo
+		// splits runtime/instance schemas out and we want a focused validator
+		// for process templates only.
+		if (doc && doc.process) {
+			const processRoot = doc.process;
+
+			if (doc.components && doc.components.schemas) {
+				if (!processRoot.definitions) processRoot.definitions = {};
+				Object.assign(processRoot.definitions, doc.components.schemas);
+				const rewriteRefs = (obj) => {
+					if (!obj || typeof obj !== 'object') return;
+					if (Array.isArray(obj)) {
+						for (let i = 0; i < obj.length; i++) rewriteRefs(obj[i]);
+						return;
+					}
+					for (const k of Object.keys(obj)) {
+						const v = obj[k];
+						if (k === '$ref' && typeof v === 'string' && v.startsWith('#/components/schemas/')) {
+							obj[k] = v.replace('#/components/schemas/', '#/definitions/');
+						} else if (typeof v === 'object' && v !== null) {
+							rewriteRefs(v);
+						}
+					}
+				};
+				rewriteRefs(processRoot);
+			}
+
+			const derefProcess = await $RefParser.dereference(processRoot);
+			await stripExamples(derefProcess);
+
+			// Same compatibility tweaks as above
+			try {
+				const defs = derefProcess.definitions || {};
+				if (defs.Variable && defs.Variable.properties && defs.Variable.properties.type && Array.isArray(defs.Variable.properties.type.enum)) {
+					const enumArr = defs.Variable.properties.type.enum;
+					if (!enumArr.includes('string')) enumArr.push('string');
+					if (!enumArr.includes('text')) enumArr.push('text');
+				}
+				if (defs.Activity && defs.Activity.properties) {
+					defs.Activity.properties.type = { type: 'string' };
+				}
+				if (defs.Activity && Array.isArray(defs.Activity.required)) {
+					defs.Activity.required = defs.Activity.required.filter((r) => r !== 'id');
+				}
+			} catch (e) {
+				// ignore
+			}
+
+			const outProcessPath = path.join(repoRoot, 'design', 'schema-process-resolved.json');
+			fs.writeFileSync(outProcessPath, JSON.stringify(derefProcess, null, 2), 'utf8');
+			console.log('Wrote', outProcessPath);
+
+			const outProcessJson = path.join(repoRoot, 'design', 'schema-process.json');
+			fs.writeFileSync(outProcessJson, JSON.stringify(derefProcess, null, 2), 'utf8');
+			console.log('Wrote', outProcessJson);
+		}
 	} catch (err) {
 		console.error('Failed to bundle schema:', err && err.message ? err.message : err);
 		process.exit(1);

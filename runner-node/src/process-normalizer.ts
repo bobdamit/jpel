@@ -26,20 +26,35 @@ export class ProcessNormalizer {
 		if (this.validator || this.schemaLoadError) return this.validator;
 
 		try {
-			// Prefer a pre-bundled resolved JSON Schema artifact if available. This
-			// can be produced by running `npm run build:schema` which writes
-			// design/schema-resolved.json. Using a dereferenced JSON Schema avoids
-			// having to rewrite $ref values at runtime and keeps validation stable
-			// in CI.
+			// Prefer a pre-bundled resolved JSON Schema artifact if available. Projects
+			// may split the design into a focused process/template schema and a
+			// separate runtime/instance schema. To support that without breaking
+			// existing repos, prefer a process-only artifact when present:
+			// - design/schema-process-resolved.json
+			// - design/schema-process.yaml
+			// Otherwise fall back to the historical combined files:
+			// - design/schema-resolved.json
+			// - design/schema.yaml
+			const resolvedProcessJson = path.resolve(__dirname, '../../design/schema-process-resolved.json');
+			const processYamlPath = path.resolve(__dirname, '../../design/schema-process.yaml');
 			const resolvedJsonPath = path.resolve(__dirname, '../../design/schema-resolved.json');
+			const combinedYamlPath = path.resolve(__dirname, '../../design/schema.yaml');
 			let doc: any = null;
-			if (fs.existsSync(resolvedJsonPath)) {
+
+			if (fs.existsSync(resolvedProcessJson)) {
+				const file = fs.readFileSync(resolvedProcessJson, 'utf8');
+				doc = JSON.parse(file);
+			} else if (fs.existsSync(processYamlPath)) {
+				const file = fs.readFileSync(processYamlPath, 'utf8');
+				doc = yaml.load(file) as any;
+			} else if (fs.existsSync(resolvedJsonPath)) {
 				const file = fs.readFileSync(resolvedJsonPath, 'utf8');
 				doc = JSON.parse(file);
-			} else {
-				const schemaPath = path.resolve(__dirname, '../../design/schema.yaml');
-				const file = fs.readFileSync(schemaPath, 'utf8');
+			} else if (fs.existsSync(combinedYamlPath)) {
+				const file = fs.readFileSync(combinedYamlPath, 'utf8');
 				doc = yaml.load(file) as any;
+			} else {
+				throw new Error('No schema file found (looked for schema-process-resolved.json/schema-process.yaml/schema-resolved.json/schema.yaml)');
 			}
 
 			// Prefer the `process` schema node as the schema root (this matches

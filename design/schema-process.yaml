@@ -1,0 +1,92 @@
+# Extracted process/template schema for JPEL (derived from schema.yaml)
+# This file intentionally contains only the `process` root node and any
+# `components` it needs to validate templates. It is safe to regenerate from
+# the combined `design/schema.yaml` using `npm run build:schema`.
+
+process:
+  type: object
+  required:
+    - id
+    - name
+    - start
+    - activities
+  properties:
+    id:
+      type: string
+      description: Unique process identifier
+      example: mic-build
+    name:
+      type: string
+      description: Human-readable process name
+      example: Build a Microphone
+    description:
+      type: string
+      description: Process description
+      example: Quality control process for microphone assembly
+    version:
+      type: string
+      description: Process version
+      example: "1.0.0"
+    variables:
+      type: array
+      description: Process-level variables
+      items:
+        $ref: "#/components/schemas/Variable"
+    start:
+      type: string
+      description: Initial activity reference
+      example: "a:askBuildType"
+    activities:
+      type: object
+      description: Map of activity definitions
+      additionalProperties:
+        $ref: "#/components/schemas/Activity"
+  additionalProperties: false
+
+components:
+  schemas:
+    Variable:
+      type: object
+      required:
+        - name
+        - type
+      properties:
+        name:
+          type: string
+          description: Variable name
+          example: buildType
+        type:
+          type: string
+          enum: [text, number, boolean, select, date, file]
+          description: Variable type
+        defaultValue:
+          description: Default value
+          example: "TC"
+        description:
+          type: string
+          description: Variable description
+          example: "Type of microphone build"
+      additionalProperties: false
+
+    Activity:
+      type: object
+      required:
+        - id
+        - type
+      properties:
+        id:
+          type: string
+          description: Unique activity identifier
+          example: askBuildType
+        name:
+          type: string
+          description: Human-readable activity name
+          example: "Ask Build Type"
+        description:
+          type: string
+          description: Activity description
+        type:
+          type: string
+          enum: [human, compute, api, sequence, parallel, branch, switch, terminate]
+          description: Activity type
+      # Allow subtype-specific fields via allOf in the combined schema
