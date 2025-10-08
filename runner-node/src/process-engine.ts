@@ -998,29 +998,47 @@ export class ProcessEngine {
 					const sequenceInstance = instance.activities[activityId];
 
 					// Check if this sequence contains our current activity and has sequence data
-					if ((sequenceInstance as SequenceActivityInstance).sequenceIndex !== undefined &&
-						sequenceActivity.activities.some(a => this.extractActivityId(a) === instance.currentActivity)) {
-						logger.debug(`ProcessEngine: Found parent sequence '${activityId}' for current activity '${instance.currentActivity}'`);
-						const sequenceActivityInstance = sequenceInstance as SequenceActivityInstance;
-						const nextIndex = sequenceActivityInstance.sequenceIndex! + 1;
+					const seqInst = sequenceInstance as SequenceActivityInstance;
+					if (seqInst.sequenceIndex !== undefined) {
+						// Determine whether this sequence contains our current activity directly
+						// or indirectly via a child activity that redirected execution (e.g. switch -> branch)
+						const containsCurrent = sequenceActivity.activities.some(a => {
+							const aid = this.extractActivityId(a);
+							if (aid === instance.currentActivity) return true;
+							const childInst = instance.activities[aid] as ActivityInstance | undefined;
+							if (childInst && (childInst as any).nextActivity) {
+								try {
+									const redirected = this.extractActivityId((childInst as any).nextActivity);
+									if (redirected === instance.currentActivity) return true;
+								} catch (e) {
+									// ignore malformed nextActivity
+								}
+							}
+							return false;
+						});
 
-						if (nextIndex < sequenceActivityInstance.sequenceActivities!.length) {
-							// Continue with next activity in sequence
-							sequenceActivityInstance.sequenceIndex = nextIndex;
-							const nextActivity = this.extractActivityId(sequenceActivityInstance.sequenceActivities![nextIndex]);
-							instance.currentActivity = nextActivity;
-							logger.info(`ProcessEngine: Continuing sequence '${activityId}' - moving to activity '${nextActivity}' (index ${nextIndex})`);
-							await this.processInstanceRepo.save(instance);
-							return await this.executeNextStep(instanceId);
-						} else {
-							// Sequence completed
-							logger.info(`ProcessEngine: Sequence '${activityId}' completed for instance '${instanceId}'`);
-							sequenceInstance.status = ActivityStatus.Completed;
-							sequenceInstance.completedAt = new Date();
-							await this.processInstanceRepo.save(instance);
-							// Record the completed sequence ID so we can check for parent sequences
-							(instance as any).__lastCompletedSequenceId = activityId;
-							break; // Exit the loop and continue with normal completion
+						if (containsCurrent) {
+							logger.debug(`ProcessEngine: Found parent sequence '${activityId}' for current activity '${instance.currentActivity}'`);
+							const nextIndex = seqInst.sequenceIndex! + 1;
+
+							if (nextIndex < seqInst.sequenceActivities!.length) {
+								// Continue with next activity in sequence
+								seqInst.sequenceIndex = nextIndex;
+								const nextActivity = this.extractActivityId(seqInst.sequenceActivities![nextIndex]);
+								instance.currentActivity = nextActivity;
+								logger.info(`ProcessEngine: Continuing sequence '${activityId}' - moving to activity '${nextActivity}' (index ${nextIndex})`);
+								await this.processInstanceRepo.save(instance);
+								return await this.executeNextStep(instanceId);
+							} else {
+								// Sequence completed
+								logger.info(`ProcessEngine: Sequence '${activityId}' completed for instance '${instanceId}'`);
+								sequenceInstance.status = ActivityStatus.Completed;
+								sequenceInstance.completedAt = new Date();
+								await this.processInstanceRepo.save(instance);
+								// Record the completed sequence ID so we can check for parent sequences
+								(instance as any).__lastCompletedSequenceId = activityId;
+								break; // Exit the loop and continue with normal completion
+							}
 						}
 					}
 				}
@@ -1036,11 +1054,47 @@ export class ProcessEngine {
 						const parentInstance = instance.activities[parentId] as SequenceActivityInstance | undefined;
 						
 						// Check if this parent sequence references the completed nested sequence
-						if (parentInstance && parentInstance.sequenceActivities && 
-							parentActivity.activities.some(a => this.extractActivityId(a) === completedSeqId)) {
-							
-							const completedIndex = parentInstance.sequenceActivities.findIndex(a => this.extractActivityId(a) === completedSeqId);
-							const nextIndex = completedIndex + 1;
+								if (parentInstance && parentInstance.sequenceActivities) {
+									// Determine whether parent sequence references the completed sequence directly
+									// or indirectly via a child activity that redirected execution (e.g. switch -> nested sequence)
+									const referencesCompleted = parentActivity.activities.some(a => {
+										const aid = this.extractActivityId(a);
+										if (aid === completedSeqId) return true;
+										const childInst = instance.activities[aid] as ActivityInstance | undefined;
+										if (childInst && (childInst as any).nextActivity) {
+											try {
+												const redirected = this.extractActivityId((childInst as any).nextActivity);
+												if (redirected === completedSeqId) return true;
+											} catch (e) {
+												// ignore malformed nextActivity
+											}
+										}
+										return false;
+									});
+									if (!referencesCompleted) continue;
+									// Find the index within the parent's sequence activities that references the completed sequence.
+									let completedIndex = -1;
+									for (let i = 0; i < parentInstance.sequenceActivities.length; i++) {
+										const ref = parentInstance.sequenceActivities[i];
+										const refId = this.extractActivityId(ref);
+										if (refId === completedSeqId) {
+											completedIndex = i;
+											break;
+										}
+										const childInst = instance.activities[refId] as ActivityInstance | undefined;
+										if (childInst && (childInst as any).nextActivity) {
+											try {
+												const redirected = this.extractActivityId((childInst as any).nextActivity);
+												if (redirected === completedSeqId) {
+													completedIndex = i;
+													break;
+												}
+											} catch (e) {
+												// ignore malformed nextActivity
+											}
+										}
+									}
+									const nextIndex = completedIndex + 1;
 							
 							if (nextIndex < parentInstance.sequenceActivities.length) {
 								// Continue to next activity in parent sequence
