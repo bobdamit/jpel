@@ -570,13 +570,16 @@ function showHumanTask(humanTask) {
                 </div>
             `;
         } else if (field.type === 'boolean') {
-            const isChecked = fieldValue === true || fieldValue === 'true' || fieldValue === 'on';
+            const selectedTrue = fieldValue === true || fieldValue === 'true';
+            const selectedFalse = fieldValue === false || fieldValue === 'false';
             return `
                 <div class="form-group">
-                    <label>
-                        <input type="checkbox" id="field-${field.name}" name="${field.name}" value="true" ${isChecked ? 'checked' : ''}>
-                        ${field.label || field.name}
-                    </label>
+                    <label for="field-${field.name}">${field.label || field.name}:</label>
+                    <select id="field-${field.name}" name="${field.name}" data-original-type="boolean" ${field.required ? 'required' : ''}>
+                        <option value="">choose</option>
+                        <option value="true" ${selectedTrue ? 'selected' : ''}>true</option>
+                        <option value="false" ${selectedFalse ? 'selected' : ''}>false</option>
+                    </select>
                 </div>
             `;
         } else {

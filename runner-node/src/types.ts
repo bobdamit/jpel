@@ -120,7 +120,7 @@ export interface Field {
 	name: string;
 	type: FieldType;
 	required?: boolean;
-	options?: string[]; // For select/enum fields
+	options?: ValueOption[]; // For select/enum fields
 	min?: number;
 	max?: number;
 	units?: string;
@@ -128,6 +128,11 @@ export interface Field {
 	description?: string;
 	pattern?: string; // Regex pattern for validation
 	patternDescription?: string; // Description of the pattern for UI display
+}
+
+export interface ValueOption {
+	label?: string;
+	value: string | number | boolean;
 }
 
 export enum FieldType {
