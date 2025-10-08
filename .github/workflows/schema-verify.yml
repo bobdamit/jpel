@@ -1,0 +1,32 @@
+name: Schema verification
+
+on:
+  push:
+    paths:
+      - 'design/**'
+      - 'scripts/**'
+      - '.github/workflows/**'
+  pull_request:
+    paths:
+      - 'design/**'
+      - 'scripts/**'
+      - '.github/workflows/**'
+
+jobs:
+  verify-schema:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      - name: Install deps
+        run: npm ci
+        working-directory: runner-node
+      - name: Build resolved schema
+        run: npm run build:schema
+        working-directory: runner-node
+      - name: Verify schema matches committed artifact and compiles
+        run: node scripts/verify-schema.js
+        working-directory: runner-node

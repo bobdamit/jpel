@@ -48,6 +48,7 @@ process:
       description: Map of activity definitions
       additionalProperties:
         $ref: "#/components/schemas/Activity"
+  additionalProperties: false
 
 components:
   schemas:
@@ -112,6 +113,7 @@ components:
           type: string
           description: Human-readable description of the pattern requirements
           example: "Please enter a valid email address (e.g., user@example.com)"
+      additionalProperties: false
 
     Activity:
       type: object
@@ -138,6 +140,10 @@ components:
           type: integer
           description: Activity timeout in seconds
           example: 300
+      # Note: individual activity subtype schemas (HumanActivity, ComputeActivity,
+      # APIActivity, etc.) extend Activity via allOf and define their own properties.
+      # Do not set additionalProperties: false here or it will reject valid subtype
+      # fields like 'inputs', 'code', 'cases', etc.
 
     # Human interaction activity
     HumanActivity:
@@ -226,6 +232,7 @@ components:
           type: string
           description: Human-readable description of the pattern requirements
           example: "Please enter a valid email address (e.g., user@example.com)"
+      additionalProperties: false
 
     ValueOption:
       type: object

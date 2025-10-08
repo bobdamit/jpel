@@ -3,7 +3,7 @@
 	"name": "Microphone Build",
 	"description": "Data Colleciton, QC and Task Lists for Microphone Builds",
 	"version": "1.0.0",
-	"start": "a:main",
+	"startZ": "a:main",
 	"variables": [
 		{
 			"name": "title",

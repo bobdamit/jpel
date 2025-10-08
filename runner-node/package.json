@@ -12,7 +12,8 @@
     "test": "jest --config ./jest.config.cjs",
     "test:watch": "jest --config ./jest.config.cjs --watch",
     "test:coverage": "jest --config ./jest.config.cjs --coverage",
-    "demo": "node demo.js"
+    "demo": "node demo.js",
+    "build:schema": "node scripts/bundle-schema.js"
   },
   "keywords": [
     "jpel",
@@ -51,6 +52,10 @@
     "supertest": "^7.1.4",
     "ts-jest": "^29.4.4",
     "ts-node": "^10.9.2",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "ajv": "^8.12.0",
+    "js-yaml": "^4.1.0",
+    "@types/js-yaml": "^4.0.5",
+    "@apidevtools/json-schema-ref-parser": "^9.0.9"
   }
 }

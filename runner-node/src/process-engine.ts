@@ -77,13 +77,17 @@ export class ProcessEngine {
 		}
 
 		if (!processDefinition.start) {
-			logger.warn('ProcessEngine: Process definition missing start activity reference', processDefinition);
+			logger.warn('ProcessEngine: Process definition missing start activity reference', {
+				processId: processDefinition.id,
+				name: processDefinition.name,
+				start: processDefinition.start
+			});
 		}
 
 		// Validate and normalize the incoming process definition
 		const validation = ProcessNormalizer.validate(processDefinition);
 		if (!validation.valid) {
-			// Treat validation errors as fatal - processes must be valid to be loaded.
+			// ProcessNormalizer already logs individual AJV schema diagnostics at ERROR.
 			logger.error('ProcessEngine: Process definition validation failed', { errors: validation.errors });
 			throw new Error(`Process definition validation failed: ${validation.errors.join('; ')}`);
 		}
@@ -131,7 +135,11 @@ export class ProcessEngine {
 		ProcessNormalizer.normalize(processDefinition);
 
 		if (!processDefinition.start) {
-			logger.error(`ProcessEngine: Process definition '${processId}' has no start activity defined`, processDefinition);
+			logger.error(`ProcessEngine: Process definition '${processId}' has no start activity defined`, {
+				processId,
+				name: processDefinition.name,
+				start: processDefinition.start
+			});
 			return {
 				instanceId: '',
 				status: ProcessStatus.Failed,

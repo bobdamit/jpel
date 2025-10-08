@@ -26,7 +26,7 @@ export class InMemoryProcessDefinitionRepository implements ProcessDefinitionRep
 		try {
 			// Check if samples directory exists
 			if (!fs.existsSync(this.samplesDir)) {
-				logger.warn('Samples directory not found', { samplesDir: this.samplesDir });
+				logger.error('Samples directory not found', { samplesDir: this.samplesDir });
 				return [];
 			}
 
@@ -45,7 +45,7 @@ export class InMemoryProcessDefinitionRepository implements ProcessDefinitionRep
 
 					// Validate basic structure
 					if (!processDefinition.id || !processDefinition.name) {
-						logger.warn('Skipping invalid process definition (missing id or name)', { filePath });
+						logger.error('Skipping invalid process definition (missing id or name)', { filePath });
 						continue;
 					}
 
@@ -124,7 +124,7 @@ export class InMemoryProcessDefinitionRepository implements ProcessDefinitionRep
 
 			// Validate basic structure
 			if (!processDefinition.id || !processDefinition.name) {
-				logger.warn('Invalid process definition loaded from file', { filePath });
+				logger.error('Invalid process definition loaded from file', { filePath });
 				return null;
 			}
 
@@ -197,7 +197,7 @@ export class InMemoryProcessDefinitionRepository implements ProcessDefinitionRep
 				version: result.version
 			});
 		} else {
-			logger.warn(`Process definition not found for ID: '${processId}'`);
+			logger.error(`Process definition not found for ID: '${processId}'`);
 		}
 
 		return result;
