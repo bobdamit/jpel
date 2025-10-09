@@ -1350,6 +1350,13 @@ export class ProcessEngine {
 	/**
 	 * Find the first non-completed activity in a process instance
 	 * Simplified approach: scan all activities and find first non-completed executable one
+	 * This is brain-dead and totally broken.  It's just walking through a flat list of activitites.
+	 * What it needs to do is "fast-forward" through the activity executing every activity as if
+	 * the process was being run.  It should be able to do this without actually executing the activities
+	 * and without any side effects. 
+	 * Effectively we should get to the activity where we would be if we re-stepped through the instance
+	 * and got to a step where we had left off (and is not complete)
+	 * 
 	 */
 	private getFirstPendingActivityId(instance: ProcessInstance, processDefinition: ProcessDefinition): string | null {
 		logger.debug(`ProcessEngine: Looking for first pending activity`);
@@ -1377,160 +1384,7 @@ export class ProcessEngine {
 		return null;
 	}
 
-	/**
-	 * Find the first pending activity by following the process flow
-	 * This method properly traverses sequences, switches, and branches to find executable activities
-	 */
-	private findFirstPendingInFlow(activityId: string, instance: ProcessInstance, processDefinition: ProcessDefinition): string | null {
-		const activity = processDefinition.activities[activityId];
-		const activityInstance = instance.activities[activityId];
-		
-		if (!activity) {
-			logger.warn(`ProcessEngine: Activity '${activityId}' not found in process definition`);
-			return null;
-		}
-		
-		logger.debug(`ProcessEngine: Checking activity '${activityId}' type=${activity.type} status=${activityInstance?.status || 'undefined'}`);
-		
-		// Handle different activity types
-		switch (activity.type) {
-			case ActivityType.Sequence:
-				return this.findPendingInSequence(activity as SequenceActivity, activityInstance as SequenceActivityInstance, instance, processDefinition);
-			
-			case ActivityType.Switch:
-				return this.findPendingInSwitch(activity as SwitchActivity, activityInstance as SwitchActivityInstance, instance, processDefinition);
-			
-			case ActivityType.Branch:
-				return this.findPendingInBranch(activity as BranchActivity, activityInstance as BranchActivityInstance, instance, processDefinition);
-			
-			case ActivityType.Parallel:
-				return this.findPendingInParallel(activity as ParallelActivity, activityInstance as ParallelActivityInstance, instance, processDefinition);
-			
-			default:
-				// For executable activities (human, compute, api, terminate)
-				if (!activityInstance || activityInstance.status !== ActivityStatus.Completed) {
-					logger.debug(`ProcessEngine: Found pending executable activity '${activityId}'`);
-					return activityId;
-				}
-				logger.debug(`ProcessEngine: Activity '${activityId}' is completed, skipping`);
-				return null;
-		}
-	}
-
-	/**
-	 * Find pending activity within a sequence
-	 */
-	private findPendingInSequence(sequence: SequenceActivity, sequenceInstance: SequenceActivityInstance | undefined, instance: ProcessInstance, processDefinition: ProcessDefinition): string | null {
-		// If sequence hasn't started or isn't completed, follow its activities
-		if (!sequenceInstance || sequenceInstance.status !== ActivityStatus.Completed) {
-			// Check each activity in the sequence
-			for (const childRef of sequence.activities) {
-				const childId = this.extractActivityId(childRef);
-				const childInstance = instance.activities[childId];
-				
-				// If child is not completed, look for pending activities within it
-				if (!childInstance || childInstance.status !== ActivityStatus.Completed) {
-					const pendingInChild = this.findFirstPendingInFlow(childId, instance, processDefinition);
-					if (pendingInChild) {
-						// If this pending activity is the current one, return it
-						// (This handles the case where we're navigating to "next pending" and we're already at a pending activity)
-						return pendingInChild;
-					}
-				}
-			}
-		}
-		return null;
-	}
-
-	/**
-	 * Find pending activity within a switch
-	 */
-	private findPendingInSwitch(switchActivity: SwitchActivity, switchInstance: SwitchActivityInstance | undefined, instance: ProcessInstance, processDefinition: ProcessDefinition): string | null {
-		// If switch is completed, follow the taken path
-		if (switchInstance && switchInstance.status === ActivityStatus.Completed && switchInstance.nextActivity) {
-			const nextActivityId = this.extractActivityId(switchInstance.nextActivity);
-			return this.findFirstPendingInFlow(nextActivityId, instance, processDefinition);
-		}
-		
-		// If switch is not completed, we need to evaluate it to determine the path
-		if (!switchInstance || switchInstance.status !== ActivityStatus.Completed) {
-			// For navigation purposes, we can try to evaluate the switch expression
-			try {
-				const expressionResult = this.expressionEvaluator.executeCode([`return ${switchActivity.expression};`], instance, switchActivity.id || 'switch');
-				const switchValue = typeof expressionResult === 'object' && expressionResult !== null
-					? JSON.stringify(expressionResult)
-					: String(expressionResult);
-				
-				let nextActivityRef: string | undefined;
-				if (switchActivity.cases[switchValue]) {
-					nextActivityRef = switchActivity.cases[switchValue];
-				} else if (switchActivity.default) {
-					nextActivityRef = switchActivity.default;
-				}
-				
-				if (nextActivityRef) {
-					const nextActivityId = this.extractActivityId(nextActivityRef);
-					return this.findFirstPendingInFlow(nextActivityId, instance, processDefinition);
-				}
-			} catch (error) {
-				logger.warn(`ProcessEngine: Could not evaluate switch expression for navigation: ${error}`);
-				// Return the switch itself as pending if we can't evaluate it
-				return switchActivity.id || 'switch';
-			}
-		}
-		
-		return null;
-	}
-
-	/**
-	 * Find pending activity within a branch
-	 */
-	private findPendingInBranch(branch: BranchActivity, branchInstance: BranchActivityInstance | undefined, instance: ProcessInstance, processDefinition: ProcessDefinition): string | null {
-		// If branch is completed, follow the taken path
-		if (branchInstance && branchInstance.status === ActivityStatus.Completed && branchInstance.nextActivity) {
-			const nextActivityId = this.extractActivityId(branchInstance.nextActivity);
-			return this.findFirstPendingInFlow(nextActivityId, instance, processDefinition);
-		}
-		
-		// If branch is not completed, try to evaluate the condition
-		if (!branchInstance || branchInstance.status !== ActivityStatus.Completed) {
-			try {
-				const conditionResult = this.expressionEvaluator.evaluateCondition(branch.condition, instance);
-				const nextActivityRef = conditionResult ? branch.then : branch.else;
-				
-				if (nextActivityRef) {
-					const nextActivityId = this.extractActivityId(nextActivityRef);
-					return this.findFirstPendingInFlow(nextActivityId, instance, processDefinition);
-				}
-			} catch (error) {
-				logger.warn(`ProcessEngine: Could not evaluate branch condition for navigation: ${error}`);
-				// Return the branch itself as pending if we can't evaluate it
-				return branch.id || 'branch';
-			}
-		}
-		
-		return null;
-	}
-
-	/**
-	 * Find pending activity within a parallel activity
-	 */
-	private findPendingInParallel(parallel: ParallelActivity, parallelInstance: ParallelActivityInstance | undefined, instance: ProcessInstance, processDefinition: ProcessDefinition): string | null {
-		// For parallel activities, find the first pending child
-		for (const childRef of parallel.activities) {
-			const childId = this.extractActivityId(childRef);
-			const childInstance = instance.activities[childId];
-			
-			if (!childInstance || childInstance.status !== ActivityStatus.Completed) {
-				const pendingInChild = this.findFirstPendingInFlow(childId, instance, processDefinition);
-				if (pendingInChild) {
-					return pendingInChild;
-				}
-			}
-		}
-		return null;
-	}
-
+	
 	/**
 	 * Find the first executable activity in a flow, ignoring completion status
 	 * This is used for navigation to start - we want to find what the user should work on first

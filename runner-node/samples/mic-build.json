@@ -20,7 +20,8 @@
 			"activities": [
 				"a:basicFactsSequence",
 				"a:validateCommonFacts",
-				"a:micTypeDecision"
+				"a:micTypeDecision",
+				"a.visualInspectionSequence"
 			]
 		},
 
@@ -311,12 +312,66 @@
 			]
 		},
 
-		"visualInspection" : {
+		"visualInspectionSequence" : {
+			"name" : "Visual Inspection Sequence",
+			"type" : "sequence",
+			"activities" : [
+				"a:visualInspection",
+				"a:visualInspectionValidation"
+			]
+		},
 
+		"visualInspection" : {
+			"type":"human",
+			"name":"Visual Inspection",
+			"inputs" : [
+				{
+					"name" : "finish",
+					"label" : "Body Finish",
+					"type" : "boolean",
+					"required" : true
+				},
+				{
+					"name" : "engraving",
+					"label" : "Engraving Clean and Correct",
+					"type" : "boolean",
+					"required" : true
+				},
+				{
+					"name":"headbasket",
+					"label":"Headbasket Clean and Neat",
+					"type":"boolean",
+					"required":true
+				}
+			]
+		},
+
+		"visualInspectionValidation" : {
+			"type":"compute",
+			"name":"Visual Inspection Validation",
+			"code": [
+				"a:visualInspectionValidation.passFail = a:visualInspection.v:finish && a:visualInspection.v:engraving && a:visualInspection.v:headbasket ? 'pass' : 'fail';"
+			]
 		},
 
 		"mechanicalInspection" : {
-
+			"name" : "Mechanical Inspection",
+			"type" : "human",
+			"description" : "Mountings, Fasteners, Clearance...",
+			"inputs" :[
+				{
+					"name" : "mountings",
+					"label" : "Mountings and Fasteners",
+					"type" : "boolean",
+					"required" : true
+				},
+				{
+					"name" : "clearance",
+					"label" : "Clearance",
+					"type" : "boolean",
+					"required" : true
+				}
+			]
 		},
 
 		"tcValidation" : {
@@ -392,6 +447,8 @@
 				}
 			]
 		},
+
+
 		"validateCommonFacts": {
 			"name": "Validate Common Facts",
 			"description": "Ensure all common facts are correctly provided",
