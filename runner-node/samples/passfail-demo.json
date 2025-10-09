@@ -1,0 +1,47 @@
+{
+  "id": "passfail-demo",
+  "name": "Pass/Fail Aggregate Demo",
+  "description": "Demonstrates aggregate pass/fail calculation with multiple activities",
+  "version": "1.0.0",
+  "start": "a:sequence",
+  "activities": {
+    "sequence": {
+      "id": "sequence",
+      "type": "sequence",
+      "activities": ["a:validation", "a:processing", "a:verification"]
+    },
+    "validation": {
+      "id": "validation",
+      "name": "Input Validation",
+      "type": "compute",
+      "code": [
+        "// Simulate validation that passes",
+        "a:validation.passFail = 'pass';",
+        "a:validation.result = 'Validation successful';",
+        "console.log('Validation completed with PASS');"
+      ]
+    },
+    "processing": {
+      "id": "processing", 
+      "name": "Data Processing",
+      "type": "compute",
+      "code": [
+        "// Simulate processing that fails",
+        "a:processing.passFail = 'fail';",
+        "a:processing.result = 'Processing encountered errors';",
+        "a:processing.error = 'Data integrity check failed';",
+        "console.log('Processing completed with FAIL');"
+      ]
+    },
+    "verification": {
+      "id": "verification",
+      "name": "Final Verification", 
+      "type": "compute",
+      "code": [
+        "// Simulate verification with no pass/fail set",
+        "a:verification.result = 'Verification completed';",
+        "console.log('Verification completed without pass/fail status');"
+      ]
+    }
+  }
+}

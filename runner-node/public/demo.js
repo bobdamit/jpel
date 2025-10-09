@@ -206,6 +206,43 @@ function renderCurrentActivitiesSimple(instance) {
     container.innerHTML = html;
 }
 
+// Render simplified instance status for the right column
+function renderInstanceStatusSimple(instance) {
+    const container = document.getElementById('instance-status-simple');
+    if (!container) return;
+    
+    if (!instance) {
+        container.innerHTML = '<p style="color: #6c757d; font-style: italic;">No running instance</p>';
+        return;
+    }
+
+    const statusEmoji = {
+        'running': '▶️',
+        'completed': '✅',
+        'failed': '❌',
+        'cancelled': '⏹️'
+    }[instance.status] || '❓';
+
+    let aggregateHtml = '';
+    if (instance.aggregatePassFail) {
+        const aggregateDisplay = {
+            'all_pass': '✅ All Pass',
+            'any_fail': '❌ Contains Failures'
+        }[instance.aggregatePassFail] || instance.aggregatePassFail;
+        aggregateHtml = `<div class="aggregate-status ${instance.aggregatePassFail}" style="margin-top: 8px;">${aggregateDisplay}</div>`;
+    }
+
+    const html = `
+        <div class="instance-summary">
+            <div class="instance-status">${statusEmoji} ${instance.status}</div>
+            <div class="instance-id">ID: ${instance.instanceId}</div>
+            ${aggregateHtml}
+        </div>
+    `;
+    
+    container.innerHTML = html;
+}
+
 // Initialize the demo by loading available processes
 async function initializeDemo() {
     try {
@@ -425,6 +462,16 @@ function renderInstanceList(instances, processId) {
 
         const startedAt = new Date(instance.startedAt).toLocaleString();
         const completedAt = instance.completedAt ? new Date(instance.completedAt).toLocaleString() : 'Not completed';
+        
+        // Add aggregate pass/fail display
+        let aggregateHtml = '';
+        if (instance.aggregatePassFail) {
+            const aggregateDisplay = {
+                'all_pass': '✅ All Pass',
+                'any_fail': '❌ Contains Failures'
+            }[instance.aggregatePassFail] || instance.aggregatePassFail;
+            aggregateHtml = `<div class="aggregate-status ${instance.aggregatePassFail}">Overall: ${aggregateDisplay}</div>`;
+        }
 
         return `
             <div class="instance-card">
@@ -433,6 +480,7 @@ function renderInstanceList(instances, processId) {
                     <div>Status: ${instance.status}</div>
                     <div>Started: ${startedAt}</div>
                     <div>Completed: ${completedAt}</div>
+                    ${aggregateHtml}
                 </div>
                 <button class="btn btn-secondary" data-action="view-instance" data-instance="${instance.instanceId}">View Details</button>
                 <button class="btn btn-primary" data-action="rerun-instance" data-instance="${instance.instanceId}">Re-run Process</button>
@@ -473,6 +521,7 @@ async function viewInstance(instanceId) {
             renderInstanceVariables(instance);
             renderRunningActivities(instance);
             // Also render simplified versions for the right column
+            renderInstanceStatusSimple(instance);
             renderProcessVariablesSimple(instance);
             renderCurrentActivitiesSimple(instance);
                 detectAndRenderFinishedActivities(instance);
@@ -511,6 +560,117 @@ async function rerunInstance(instanceId) {
     } catch (error) {
         console.error('Error re-running instance', error);
         showStatus(`❌ Error re-running instance: ${error.message}`, 'error');
+    }
+}
+
+async function navigateToStart() {
+    if (!currentInstanceId) {
+        showExecutionStatus('No active instance to navigate!', 'error');
+        return;
+    }
+
+    try {
+        showExecutionStatus('Navigating to start...', 'info');
+        
+        const response = await fetch(`${API_BASE}/instances/${currentInstanceId}/navigate/start`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({})
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            showExecutionStatus(`✅ ${result.data.message}`, 'success');
+            
+            // Refresh the instance view
+            const instanceResponse = await fetch(`${API_BASE}/instances/${currentInstanceId}`);
+            const instanceResult = await instanceResponse.json();
+            if (instanceResult.success && instanceResult.data) {
+                renderInstanceStatusSimple(instanceResult.data);
+                renderProcessVariablesSimple(instanceResult.data);
+                renderCurrentActivitiesSimple(instanceResult.data);
+                detectAndRenderFinishedActivities(instanceResult.data);
+                
+                // Check if the current activity is a human task and show the interface
+                await checkAndShowHumanTask();
+            }
+        } else {
+            showExecutionStatus(`❌ Navigation failed: ${result.error}`, 'error');
+        }
+    } catch (error) {
+        console.error('Error navigating to start', error);
+        showExecutionStatus(`❌ Error navigating to start: ${error.message}`, 'error');
+    }
+}
+
+async function navigateToNextPending() {
+    if (!currentInstanceId) {
+        showExecutionStatus('No active instance to navigate!', 'error');
+        return;
+    }
+
+    try {
+        showExecutionStatus('Navigating to next pending...', 'info');
+        
+        const response = await fetch(`${API_BASE}/instances/${currentInstanceId}/navigate/next-pending`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({})
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            if (result.data.status === 'completed') {
+                showExecutionStatus(`✅ All activities completed!`, 'success');
+            } else {
+                showExecutionStatus(`✅ ${result.data.message}`, 'success');
+            }
+            
+            // Refresh the instance view
+            const instanceResponse = await fetch(`${API_BASE}/instances/${currentInstanceId}`);
+            const instanceResult = await instanceResponse.json();
+            if (instanceResult.success && instanceResult.data) {
+                renderInstanceStatusSimple(instanceResult.data);
+                renderProcessVariablesSimple(instanceResult.data);
+                renderCurrentActivitiesSimple(instanceResult.data);
+                detectAndRenderFinishedActivities(instanceResult.data);
+                
+                // Check if the current activity is a human task and show the interface
+                await checkAndShowHumanTask();
+            }
+        } else {
+            showExecutionStatus(`❌ Navigation failed: ${result.error}`, 'error');
+        }
+    } catch (error) {
+        console.error('Error navigating to next pending', error);
+        showExecutionStatus(`❌ Error navigating to next pending: ${error.message}`, 'error');
+    }
+}
+
+// Helper function to check if current activity is a human task and show the interface
+async function checkAndShowHumanTask() {
+    if (!currentInstanceId) return;
+    
+    try {
+        // Check for current human task
+        const taskResponse = await fetch(`${API_BASE}/instances/${currentInstanceId}/current-task`);
+        const taskResult = await taskResponse.json();
+        
+        if (taskResult.success && taskResult.data.humanTask) {
+            // Show human task interface
+            showHumanTask(taskResult.data.humanTask);
+            if (taskResult.data.instance) {
+                renderInstanceVariables(taskResult.data.instance);
+                renderRunningActivities(taskResult.data.instance);
+            }
+        } else {
+            // Hide human task interface if no human task
+            hideHumanTaskInterface();
+        }
+    } catch (error) {
+        console.error('Error checking for human task', error);
     }
 }
 
@@ -566,6 +726,7 @@ async function continueExecution() {
             if (taskResult.data.instance) {
                 renderInstanceVariables(taskResult.data.instance);
                 renderRunningActivities(taskResult.data.instance);
+                renderInstanceStatusSimple(taskResult.data.instance);
                 renderProcessVariablesSimple(taskResult.data.instance);
                 renderCurrentActivitiesSimple(taskResult.data.instance);
                     detectAndRenderFinishedActivities(taskResult.data.instance);
@@ -587,6 +748,7 @@ async function continueExecution() {
             if (stepResult.data && stepResult.data.instance) {
                 renderInstanceVariables(stepResult.data.instance);
                 renderRunningActivities(stepResult.data.instance);
+                renderInstanceStatusSimple(stepResult.data.instance);
                 renderProcessVariablesSimple(stepResult.data.instance);
                 renderCurrentActivitiesSimple(stepResult.data.instance);
                     detectAndRenderFinishedActivities(stepResult.data.instance);
@@ -755,6 +917,7 @@ async function submitHumanTask(event) {
             if (result.data && result.data.instance) {
                 renderInstanceVariables(result.data.instance);
                 renderRunningActivities(result.data.instance);
+                renderInstanceStatusSimple(result.data.instance);
                 renderProcessVariablesSimple(result.data.instance);
                 renderCurrentActivitiesSimple(result.data.instance);
                     detectAndRenderFinishedActivities(result.data.instance);
@@ -844,6 +1007,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 break;
             case 'rerun-instance':
                 if (instance) rerunInstance(instance);
+                break;
+            case 'continue-execution':
+                continueExecution();
+                break;
+            case 'navigate-start':
+                navigateToStart();
+                break;
+            case 'navigate-next-pending':
+                navigateToNextPending();
                 break;
         }
     });

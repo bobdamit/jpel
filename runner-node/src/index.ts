@@ -395,6 +395,40 @@ app.post(
 	})
 );
 
+// Navigate to start activity
+app.post(
+	"/api/instances/:instanceId/navigate/start",
+	asyncHandler(async (req: Request, res: Response): Promise<void> => {
+		const { instanceId } = req.params;
+
+		const result: ProcessExecutionResult = await processEngine.navigateToStart(instanceId);
+
+		if (result.status === "failed") {
+			res.status(400).json(createResponse(false, null, result.message));
+			return;
+		}
+
+		res.json(createResponse(true, result));
+	})
+);
+
+// Navigate to next pending activity
+app.post(
+	"/api/instances/:instanceId/navigate/next-pending",
+	asyncHandler(async (req: Request, res: Response): Promise<void> => {
+		const { instanceId } = req.params;
+
+		const result: ProcessExecutionResult = await processEngine.navigateToNextPending(instanceId);
+
+		if (result.status === "failed") {
+			res.status(400).json(createResponse(false, null, result.message));
+			return;
+		}
+
+		res.json(createResponse(true, result));
+	})
+);
+
 // Error handling middleware
 app.use((error: any, req: Request, res: Response, next: NextFunction) => {
 	console.error("Error:", error);

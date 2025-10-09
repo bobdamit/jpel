@@ -15,7 +15,8 @@ import {
 	SwitchActivity,
 	TerminateActivity,
 	FieldType,
-	Variable
+	Variable,
+	PassFail
 } from './models/process-types';
 import { ExpressionEvaluator } from './expression-evaluator';
 import { APIExecutor } from './api-executor';
@@ -28,7 +29,7 @@ import ProcessNormalizer from './process-normalizer';
 import { ActivityInstance, APIActivityInstance, BranchActivityInstance, ProcessExecutionResult,
 	FieldValue, ComputeActivityInstance, HumanActivityInstance, HumanTaskData, 
 	ParallelActivityInstance, ProcessInstance, ProcessInstanceFlyweight, SequenceActivityInstance, 
-	SwitchActivityInstance } from './models/instance-types';
+	SwitchActivityInstance, AggregatePassFail } from './models/instance-types';
 
 // Using centralized logger
 
@@ -1137,6 +1138,28 @@ export class ProcessEngine {
 		instance.completedAt = new Date();
 		instance.currentActivity = undefined;
 
+		// Calculate aggregate pass/fail when process completes
+		if (instance.status === ProcessStatus.Completed) {
+			const passFailValues: PassFail[] = [];
+			
+			// Collect all non-undefined passFail values from activities
+			Object.values(instance.activities).forEach(activity => {
+				if (activity.passFail !== undefined && activity.passFail !== null) {
+					passFailValues.push(activity.passFail);
+				}
+			});
+
+			// Set aggregate based on collected values
+			if (passFailValues.length > 0) {
+				if (passFailValues.some(pf => pf === PassFail.Fail)) {
+					instance.aggregatePassFail = AggregatePassFail.AnyFail;
+				} else if (passFailValues.every(pf => pf === PassFail.Pass)) {
+					instance.aggregatePassFail = AggregatePassFail.AllPass;
+				}
+				// If neither all pass nor any fail (shouldn't happen with current enum), leave undefined
+			}
+		}
+
 		await this.processInstanceRepo.save(instance);
 
 		return {
@@ -1274,6 +1297,475 @@ export class ProcessEngine {
 
 		// Execute from the start
 		return await this.executeNextStep(instanceId);
+	}
+
+	/**
+	 * Find the start activity for a process definition
+	 * Follows sequences to find the first interactive (human) activity
+	 */
+	private getStartActivityId(processDefinition: ProcessDefinition): string | null {
+		if (!processDefinition.start) {
+			return null;
+		}
+		
+		// Remove 'a:' prefix if present
+		const startActivityId = processDefinition.start.startsWith('a:') ? 
+			processDefinition.start.substring(2) : processDefinition.start;
+			
+		// Follow sequences to find the first interactive activity
+		return this.findFirstInteractiveActivity(startActivityId, processDefinition);
+	}
+
+	/**
+	 * Find the first interactive (human) activity by following sequences
+	 */
+	private findFirstInteractiveActivity(activityId: string, processDefinition: ProcessDefinition): string | null {
+		const activity = processDefinition.activities[activityId];
+		if (!activity) {
+			return null;
+		}
+		
+		// If this is a human activity, we found our target
+		if (activity.type === ActivityType.Human) {
+			return activityId;
+		}
+		
+		// If this is a sequence, follow it to find the first interactive activity
+		if (activity.type === ActivityType.Sequence) {
+			const sequenceActivity = activity as SequenceActivity;
+			for (const childRef of sequenceActivity.activities) {
+				const childId = this.extractActivityId(childRef);
+				const firstInteractive = this.findFirstInteractiveActivity(childId, processDefinition);
+				if (firstInteractive) {
+					return firstInteractive;
+				}
+			}
+		}
+		
+		// For other activity types (compute, api, etc.), return the activity itself
+		// The execution engine will handle them appropriately
+		return activityId;
+	}
+
+	/**
+	 * Find the first non-completed activity in a process instance
+	 * Simplified approach: scan all activities and find first non-completed executable one
+	 */
+	private getFirstPendingActivityId(instance: ProcessInstance, processDefinition: ProcessDefinition): string | null {
+		logger.debug(`ProcessEngine: Looking for first pending activity`);
+		
+		// Simple scan: find any activity that is executable (human, compute, api) and not completed
+		for (const [activityId, activityDef] of Object.entries(processDefinition.activities)) {
+			const activityInstance = instance.activities[activityId];
+			
+			// Skip container activities (sequence, switch, branch, parallel)
+			if (activityDef.type === ActivityType.Sequence ||
+				activityDef.type === ActivityType.Switch ||
+				activityDef.type === ActivityType.Branch ||
+				activityDef.type === ActivityType.Parallel) {
+				continue;
+			}
+			
+			// Check if this executable activity is not completed
+			if (!activityInstance || activityInstance.status !== ActivityStatus.Completed) {
+				logger.debug(`ProcessEngine: Found pending activity: ${activityId}`);
+				return activityId;
+			}
+		}
+		
+		logger.debug(`ProcessEngine: No pending activities found`);
+		return null;
+	}
+
+	/**
+	 * Find the first pending activity by following the process flow
+	 * This method properly traverses sequences, switches, and branches to find executable activities
+	 */
+	private findFirstPendingInFlow(activityId: string, instance: ProcessInstance, processDefinition: ProcessDefinition): string | null {
+		const activity = processDefinition.activities[activityId];
+		const activityInstance = instance.activities[activityId];
+		
+		if (!activity) {
+			logger.warn(`ProcessEngine: Activity '${activityId}' not found in process definition`);
+			return null;
+		}
+		
+		logger.debug(`ProcessEngine: Checking activity '${activityId}' type=${activity.type} status=${activityInstance?.status || 'undefined'}`);
+		
+		// Handle different activity types
+		switch (activity.type) {
+			case ActivityType.Sequence:
+				return this.findPendingInSequence(activity as SequenceActivity, activityInstance as SequenceActivityInstance, instance, processDefinition);
+			
+			case ActivityType.Switch:
+				return this.findPendingInSwitch(activity as SwitchActivity, activityInstance as SwitchActivityInstance, instance, processDefinition);
+			
+			case ActivityType.Branch:
+				return this.findPendingInBranch(activity as BranchActivity, activityInstance as BranchActivityInstance, instance, processDefinition);
+			
+			case ActivityType.Parallel:
+				return this.findPendingInParallel(activity as ParallelActivity, activityInstance as ParallelActivityInstance, instance, processDefinition);
+			
+			default:
+				// For executable activities (human, compute, api, terminate)
+				if (!activityInstance || activityInstance.status !== ActivityStatus.Completed) {
+					logger.debug(`ProcessEngine: Found pending executable activity '${activityId}'`);
+					return activityId;
+				}
+				logger.debug(`ProcessEngine: Activity '${activityId}' is completed, skipping`);
+				return null;
+		}
+	}
+
+	/**
+	 * Find pending activity within a sequence
+	 */
+	private findPendingInSequence(sequence: SequenceActivity, sequenceInstance: SequenceActivityInstance | undefined, instance: ProcessInstance, processDefinition: ProcessDefinition): string | null {
+		// If sequence hasn't started or isn't completed, follow its activities
+		if (!sequenceInstance || sequenceInstance.status !== ActivityStatus.Completed) {
+			// Check each activity in the sequence
+			for (const childRef of sequence.activities) {
+				const childId = this.extractActivityId(childRef);
+				const childInstance = instance.activities[childId];
+				
+				// If child is not completed, look for pending activities within it
+				if (!childInstance || childInstance.status !== ActivityStatus.Completed) {
+					const pendingInChild = this.findFirstPendingInFlow(childId, instance, processDefinition);
+					if (pendingInChild) {
+						// If this pending activity is the current one, return it
+						// (This handles the case where we're navigating to "next pending" and we're already at a pending activity)
+						return pendingInChild;
+					}
+				}
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * Find pending activity within a switch
+	 */
+	private findPendingInSwitch(switchActivity: SwitchActivity, switchInstance: SwitchActivityInstance | undefined, instance: ProcessInstance, processDefinition: ProcessDefinition): string | null {
+		// If switch is completed, follow the taken path
+		if (switchInstance && switchInstance.status === ActivityStatus.Completed && switchInstance.nextActivity) {
+			const nextActivityId = this.extractActivityId(switchInstance.nextActivity);
+			return this.findFirstPendingInFlow(nextActivityId, instance, processDefinition);
+		}
+		
+		// If switch is not completed, we need to evaluate it to determine the path
+		if (!switchInstance || switchInstance.status !== ActivityStatus.Completed) {
+			// For navigation purposes, we can try to evaluate the switch expression
+			try {
+				const expressionResult = this.expressionEvaluator.executeCode([`return ${switchActivity.expression};`], instance, switchActivity.id || 'switch');
+				const switchValue = typeof expressionResult === 'object' && expressionResult !== null
+					? JSON.stringify(expressionResult)
+					: String(expressionResult);
+				
+				let nextActivityRef: string | undefined;
+				if (switchActivity.cases[switchValue]) {
+					nextActivityRef = switchActivity.cases[switchValue];
+				} else if (switchActivity.default) {
+					nextActivityRef = switchActivity.default;
+				}
+				
+				if (nextActivityRef) {
+					const nextActivityId = this.extractActivityId(nextActivityRef);
+					return this.findFirstPendingInFlow(nextActivityId, instance, processDefinition);
+				}
+			} catch (error) {
+				logger.warn(`ProcessEngine: Could not evaluate switch expression for navigation: ${error}`);
+				// Return the switch itself as pending if we can't evaluate it
+				return switchActivity.id || 'switch';
+			}
+		}
+		
+		return null;
+	}
+
+	/**
+	 * Find pending activity within a branch
+	 */
+	private findPendingInBranch(branch: BranchActivity, branchInstance: BranchActivityInstance | undefined, instance: ProcessInstance, processDefinition: ProcessDefinition): string | null {
+		// If branch is completed, follow the taken path
+		if (branchInstance && branchInstance.status === ActivityStatus.Completed && branchInstance.nextActivity) {
+			const nextActivityId = this.extractActivityId(branchInstance.nextActivity);
+			return this.findFirstPendingInFlow(nextActivityId, instance, processDefinition);
+		}
+		
+		// If branch is not completed, try to evaluate the condition
+		if (!branchInstance || branchInstance.status !== ActivityStatus.Completed) {
+			try {
+				const conditionResult = this.expressionEvaluator.evaluateCondition(branch.condition, instance);
+				const nextActivityRef = conditionResult ? branch.then : branch.else;
+				
+				if (nextActivityRef) {
+					const nextActivityId = this.extractActivityId(nextActivityRef);
+					return this.findFirstPendingInFlow(nextActivityId, instance, processDefinition);
+				}
+			} catch (error) {
+				logger.warn(`ProcessEngine: Could not evaluate branch condition for navigation: ${error}`);
+				// Return the branch itself as pending if we can't evaluate it
+				return branch.id || 'branch';
+			}
+		}
+		
+		return null;
+	}
+
+	/**
+	 * Find pending activity within a parallel activity
+	 */
+	private findPendingInParallel(parallel: ParallelActivity, parallelInstance: ParallelActivityInstance | undefined, instance: ProcessInstance, processDefinition: ProcessDefinition): string | null {
+		// For parallel activities, find the first pending child
+		for (const childRef of parallel.activities) {
+			const childId = this.extractActivityId(childRef);
+			const childInstance = instance.activities[childId];
+			
+			if (!childInstance || childInstance.status !== ActivityStatus.Completed) {
+				const pendingInChild = this.findFirstPendingInFlow(childId, instance, processDefinition);
+				if (pendingInChild) {
+					return pendingInChild;
+				}
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * Find the first executable activity in a flow, ignoring completion status
+	 * This is used for navigation to start - we want to find what the user should work on first
+	 */
+	private findFirstExecutableInFlow(activityId: string, instance: ProcessInstance, processDefinition: ProcessDefinition): string | null {
+		const activity = processDefinition.activities[activityId];
+		
+		if (!activity) {
+			logger.warn(`ProcessEngine: Activity '${activityId}' not found in process definition`);
+			return null;
+		}
+		
+		// Handle different activity types
+		switch (activity.type) {
+			case ActivityType.Sequence:
+				return this.findFirstExecutableInSequence(activity as SequenceActivity, instance, processDefinition);
+			
+			case ActivityType.Switch:
+				return this.findFirstExecutableInSwitch(activity as SwitchActivity, instance, processDefinition);
+			
+			case ActivityType.Branch:
+				return this.findFirstExecutableInBranch(activity as BranchActivity, instance, processDefinition);
+			
+			case ActivityType.Parallel:
+				return this.findFirstExecutableInParallel(activity as ParallelActivity, instance, processDefinition);
+			
+			default:
+				// For executable activities (human, compute, api, terminate), return the activity itself
+				return activityId;
+		}
+	}
+
+	/**
+	 * Find first executable activity within a sequence
+	 */
+	private findFirstExecutableInSequence(sequence: SequenceActivity, instance: ProcessInstance, processDefinition: ProcessDefinition): string | null {
+		// Return the first activity in the sequence
+		if (sequence.activities.length > 0) {
+			const firstChildRef = sequence.activities[0];
+			const firstChildId = this.extractActivityId(firstChildRef);
+			return this.findFirstExecutableInFlow(firstChildId, instance, processDefinition);
+		}
+		return null;
+	}
+
+	/**
+	 * Find first executable activity within a switch
+	 */
+	private findFirstExecutableInSwitch(switchActivity: SwitchActivity, instance: ProcessInstance, processDefinition: ProcessDefinition): string | null {
+		// Try to evaluate the switch expression to determine the path
+		try {
+			const expressionResult = this.expressionEvaluator.executeCode([`return ${switchActivity.expression};`], instance, switchActivity.id || 'switch');
+			const switchValue = typeof expressionResult === 'object' && expressionResult !== null
+				? JSON.stringify(expressionResult)
+				: String(expressionResult);
+			
+			let nextActivityRef: string | undefined;
+			if (switchActivity.cases[switchValue]) {
+				nextActivityRef = switchActivity.cases[switchValue];
+			} else if (switchActivity.default) {
+				nextActivityRef = switchActivity.default;
+			}
+			
+			if (nextActivityRef) {
+				const nextActivityId = this.extractActivityId(nextActivityRef);
+				return this.findFirstExecutableInFlow(nextActivityId, instance, processDefinition);
+			}
+		} catch (error) {
+			logger.warn(`ProcessEngine: Could not evaluate switch expression for start navigation: ${error}`);
+			// Return the switch itself if we can't evaluate it
+			return switchActivity.id || 'switch';
+		}
+		
+		return null;
+	}
+
+	/**
+	 * Find first executable activity within a branch
+	 */
+	private findFirstExecutableInBranch(branch: BranchActivity, instance: ProcessInstance, processDefinition: ProcessDefinition): string | null {
+		// Try to evaluate the condition
+		try {
+			const conditionResult = this.expressionEvaluator.evaluateCondition(branch.condition, instance);
+			const nextActivityRef = conditionResult ? branch.then : branch.else;
+			
+			if (nextActivityRef) {
+				const nextActivityId = this.extractActivityId(nextActivityRef);
+				return this.findFirstExecutableInFlow(nextActivityId, instance, processDefinition);
+			}
+		} catch (error) {
+			logger.warn(`ProcessEngine: Could not evaluate branch condition for start navigation: ${error}`);
+			// Return the branch itself if we can't evaluate it
+			return branch.id || 'branch';
+		}
+		
+		return null;
+	}
+
+	/**
+	 * Find first executable activity within a parallel activity
+	 */
+	private findFirstExecutableInParallel(parallel: ParallelActivity, instance: ProcessInstance, processDefinition: ProcessDefinition): string | null {
+		// For parallel activities, return the first child activity
+		if (parallel.activities.length > 0) {
+			const firstChildRef = parallel.activities[0];
+			const firstChildId = this.extractActivityId(firstChildRef);
+			return this.findFirstExecutableInFlow(firstChildId, instance, processDefinition);
+		}
+		return null;
+	}
+
+	/**
+	 * Navigate to the start activity of a process instance
+	 */
+	async navigateToStart(instanceId: string): Promise<ProcessExecutionResult> {
+		try {
+			const instance = await this.processInstanceRepo.findById(instanceId);
+			if (!instance) {
+				return {
+					instanceId,
+					status: ProcessStatus.Failed,
+					message: `Process instance '${instanceId}' not found`
+				};
+			}
+
+			const processDefinition = await this.processDefinitionRepo.findById(instance.processId);
+			if (!processDefinition) {
+				return {
+					instanceId,
+					status: ProcessStatus.Failed,
+					message: `Process definition '${instance.processId}' not found`
+				};
+			}
+
+			const startActivityId = this.getStartActivityId(processDefinition);
+			if (!startActivityId) {
+				return {
+					instanceId,
+					status: ProcessStatus.Failed,
+					message: `No start activity defined for process '${instance.processId}'`
+				};
+			}
+
+			// Follow the flow from the start to find the first executable activity
+			const firstExecutableActivityId = this.findFirstExecutableInFlow(startActivityId, instance, processDefinition);
+			if (!firstExecutableActivityId) {
+				return {
+					instanceId,
+					status: ProcessStatus.Failed,
+					message: `No executable activity found from start`
+				};
+			}
+
+			// Update the current activity to the first executable activity
+			instance.currentActivity = firstExecutableActivityId;
+			await this.processInstanceRepo.save(instance);
+
+			// Get the activity definition for better messaging
+			const activityDef = processDefinition.activities[firstExecutableActivityId];
+			const activityName = activityDef?.name || firstExecutableActivityId;
+
+			logger.info(`ProcessEngine: Navigated instance '${instanceId}' to start activity '${firstExecutableActivityId}'`);
+
+			return {
+				instanceId,
+				status: ProcessStatus.Running,
+				currentActivity: firstExecutableActivityId,
+				message: `Navigated to start activity: ${activityName}`
+			};
+		} catch (error) {
+			logger.error(`ProcessEngine: Error navigating to start for instance '${instanceId}'`, error);
+			return {
+				instanceId,
+				status: ProcessStatus.Failed,
+				message: `Error navigating to start: ${error instanceof Error ? error.message : 'Unknown error'}`
+			};
+		}
+	}
+
+	/**
+	 * Navigate to the first non-completed activity (next pending)
+	 */
+	async navigateToNextPending(instanceId: string): Promise<ProcessExecutionResult> {
+		try {
+			const instance = await this.processInstanceRepo.findById(instanceId);
+			if (!instance) {
+				return {
+					instanceId,
+					status: ProcessStatus.Failed,
+					message: `Process instance '${instanceId}' not found`
+				};
+			}
+
+			const processDefinition = await this.processDefinitionRepo.findById(instance.processId);
+			if (!processDefinition) {
+				return {
+					instanceId,
+					status: ProcessStatus.Failed,
+					message: `Process definition '${instance.processId}' not found`
+				};
+			}
+
+			const pendingActivityId = this.getFirstPendingActivityId(instance, processDefinition);
+			if (!pendingActivityId) {
+				return {
+					instanceId,
+					status: ProcessStatus.Completed,
+					message: 'All activities are completed'
+				};
+			}
+
+			// Update the current activity to the first pending activity
+			instance.currentActivity = pendingActivityId;
+			await this.processInstanceRepo.save(instance);
+
+			// Get the activity definition for better messaging
+			const activityDef = processDefinition.activities[pendingActivityId];
+			const activityName = activityDef?.name || pendingActivityId;
+
+			logger.info(`ProcessEngine: Navigated instance '${instanceId}' to next pending activity '${pendingActivityId}'`);
+
+			return {
+				instanceId,
+				status: ProcessStatus.Running,
+				currentActivity: pendingActivityId,
+				message: `Navigated to next pending activity: ${activityName}`
+			};
+		} catch (error) {
+			logger.error(`ProcessEngine: Error navigating to next pending for instance '${instanceId}'`, error);
+			return {
+				instanceId,
+				status: ProcessStatus.Failed,
+				message: `Error navigating to next pending: ${error instanceof Error ? error.message : 'Unknown error'}`
+			};
+		}
 	}
 
 	async getProcessStatistics(): Promise<{ [key: string]: number }> {

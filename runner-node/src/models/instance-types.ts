@@ -21,6 +21,12 @@ export interface ProcessInstance {
 	currentActivity?: string;
 	variables: { [key: string]: any };
 	activities: { [key: string]: ActivityInstance };
+	aggregatePassFail?: AggregatePassFail; 
+}
+
+export enum AggregatePassFail {
+	AllPass = "all_pass",
+	AnyFail = "any_fail"
 }
 
 /**
