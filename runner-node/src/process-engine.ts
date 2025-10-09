@@ -29,7 +29,9 @@ import ProcessNormalizer from './process-normalizer';
 import { ActivityInstance, APIActivityInstance, BranchActivityInstance, ProcessExecutionResult,
 	FieldValue, ComputeActivityInstance, HumanActivityInstance, HumanTaskData, 
 	ParallelActivityInstance, ProcessInstance, ProcessInstanceFlyweight, SequenceActivityInstance, 
-	SwitchActivityInstance, AggregatePassFail } from './models/instance-types';
+	SwitchActivityInstance, AggregatePassFail, 
+	ExecutionContext} from './models/instance-types';
+import e from 'express';
 
 // Using centralized logger
 
@@ -154,13 +156,14 @@ export class ProcessEngine {
 			};
 		}
 
+		// initialize an execution context
+		let executionContext = new ExecutionContext();
+		executionContext.currentActivity = startActivityId;
+
 		const instance: ProcessInstance = {
 			instanceId,
 			processId,
-			executionContext : {
-				activityBreadcrums : [],
-				currentActivity : startActivityId,
-			},
+			executionContext,
 			status: ProcessStatus.Running,
 			startedAt: new Date(),
 			variables: this.initializeVariables(processDefinition.variables || []),
