@@ -30,9 +30,9 @@ import { ActivityInstance, APIActivityInstance, BranchActivityInstance, ProcessE
 	ProcessInstance, ProcessInstanceFlyweight, SequenceActivityInstance, 
 	SwitchActivityInstance, AggregatePassFail, 
 	ExecutionContext, ExecutionFrame} from './models/instance-types';
-import e from 'express';
 
-// Using centralized logger
+
+
 
 export class ProcessEngine {
 	private processDefinitionRepo: ProcessDefinitionRepository;
@@ -102,9 +102,13 @@ export class ProcessEngine {
 		return await this.processDefinitionRepo.findById(processId);
 	}
 
-	// Create a new process instance
+	/**
+	 * Create a new process instance from a Process Definition
+	 * This effectively makes a runtime snapshot of the process
+	 * @param processId 
+	 * @returns 
+	 */
 	async createInstance(processId: string): Promise<ProcessExecutionResult> {
-		logger.info(`ProcessEngine: Creating instance for process '${processId}'`);
 
 		const processDefinition = await this.processDefinitionRepo.findById(processId);
 		if (!processDefinition) {
@@ -123,7 +127,7 @@ export class ProcessEngine {
 			activitiesKeys: Object.keys(processDefinition.activities || {})
 		});
 
-		// Normalize any process data coming from repositories (on-demand loads)
+		// Normalize any process data coming from repositories
 		ProcessNormalizer.normalize(processDefinition);
 
 		if (!processDefinition.start) {
@@ -140,7 +144,6 @@ export class ProcessEngine {
 		}
 
 		const instanceId = uuidv4();
-		logger.info(`ProcessEngine: Generated instance ID '${instanceId}'`);
 
 		let startActivityId: string;
 		try {
@@ -277,12 +280,6 @@ export class ProcessEngine {
 
 		let executionContext = instance.executionContext;
 
-		logger.debug(`ProcessEngine: Found instance for human task submission`, {
-			instanceId,
-			currentActivity: executionContext.currentActivity,
-			status: instance.status
-		});
-
 		const activityInstance = instance.activities[activityId] as HumanActivityInstance;
 		if (!activityInstance || activityInstance.status !== ActivityStatus.Running) {
 			logger.error(`ProcessEngine: Activity '${activityId}' not found or not waiting for input`, {
@@ -365,6 +362,11 @@ export class ProcessEngine {
 		return await this.checkForProcessCompletion(instanceId, activityId);
 	}
 
+	/**
+	 * Execute an Activity
+	 * instanceId - the ID of the running instance
+	 * activity - the Activity
+	 */
 	private async executeActivity(instanceId: string, activity: Activity): Promise<ProcessExecutionResult> {
 		logger.info(`ProcessEngine: Executing activity '${activity.id}' of type '${activity.type}' for instance '${instanceId}'`);
 

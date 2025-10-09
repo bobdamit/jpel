@@ -1,6 +1,24 @@
-import { Activity, ActivityStatus, ActivityType, APIActivity, Attachment, BranchActivity, ComputeActivity, 
-	 FileUpload, HumanActivity, ParallelActivity, PassFail, ProcessStatus, SequenceActivity, SwitchActivity, Variable } from "./process-types";
+import {
+	Activity,
+	ActivityStatus,
+	ActivityType,
+	APIActivity,
+	Attachment,
+	BranchActivity,
+	ComputeActivity,
+	FileUpload,
+	HumanActivity,
+	ParallelActivity,
+	PassFail,
+	ProcessStatus,
+	SequenceActivity,
+	SwitchActivity,
+	Variable,
+} from "./process-types";
 
+/**
+ * Lightweight Instance reference for returning lists of instances
+ */
 export interface ProcessInstanceFlyweight {
 	instanceId: string;
 	processId: string;
@@ -10,29 +28,36 @@ export interface ProcessInstanceFlyweight {
 	completedAt?: Date;
 }
 
-
+/**
+ * A runtime instance of a process with all
+ * runtime state
+ */
 export interface ProcessInstance {
 	instanceId: string;
 	processId: string;
-	executionContext : ExecutionContext;
+	executionContext: ExecutionContext;
 	title?: string;
 	status: ProcessStatus;
 	startedAt: Date;
 	completedAt?: Date;
 	variables: { [key: string]: any };
 	activities: { [key: string]: ActivityInstance };
-	aggregatePassFail?: AggregatePassFail; 
+	aggregatePassFail?: AggregatePassFail;
 }
 
+/**
+ * Execution Context for the process engine
+ * This maintains call stack frames
+ */
 export class ExecutionContext {
 	private callStack: ExecutionFrame[] = [];
 
-	public get currentActivity() : string | undefined {
+	public get currentActivity(): string | undefined {
 		const topFrame = this.getCurrentFrame();
 		return topFrame ? topFrame.activityId : undefined;
 	}
 
-	public isAtRoot() : boolean {
+	public isAtRoot(): boolean {
 		return this.callStack.length === 0;
 	}
 
@@ -42,11 +67,15 @@ export class ExecutionContext {
 	 * @param parentId The parent container activity (sequence, switch, etc.)
 	 * @param position Current position in parent (for sequences, switch cases, etc.)
 	 */
-	public pushFrame(activityId: string, parentId?: string, position?: number): void {
+	public pushFrame(
+		activityId: string,
+		parentId?: string,
+		position?: number
+	): void {
 		const frame: ExecutionFrame = {
 			activityId,
 			parentId,
-			position
+			position,
 		};
 		this.callStack.push(frame);
 	}
@@ -68,7 +97,9 @@ export class ExecutionContext {
 	 * Get the current frame without removing it
 	 */
 	public getCurrentFrame(): ExecutionFrame | null {
-		return this.callStack.length > 0 ? this.callStack[this.callStack.length - 1] : null;
+		return this.callStack.length > 0
+			? this.callStack[this.callStack.length - 1]
+			: null;
 	}
 
 	/**
@@ -96,7 +127,9 @@ export class ExecutionContext {
 	 * Get the parent frame information for determining next steps
 	 */
 	public getParentFrame(): ExecutionFrame | null {
-		return this.callStack.length > 1 ? this.callStack[this.callStack.length - 2] : null;
+		return this.callStack.length > 1
+			? this.callStack[this.callStack.length - 2]
+			: null;
 	}
 }
 
@@ -105,14 +138,14 @@ export class ExecutionContext {
  */
 export interface ExecutionFrame {
 	activityId: string;
-	parentId?: string;  // The container activity that called this one
-	position?: number;  // Position within parent (sequence index, switch case, etc.)
-	metadata?: any;     // Additional context data
+	parentId?: string; // The container activity that called this one
+	position?: number; // Position within parent (sequence index, switch case, etc.)
+	metadata?: any; // Additional context data
 }
 
 export enum AggregatePassFail {
 	AllPass = "all_pass",
-	AnyFail = "any_fail"
+	AnyFail = "any_fail",
 }
 
 /**
@@ -148,14 +181,18 @@ export interface APIActivityInstance extends ActivityInstance, APIActivity {
 /**
  * Runtime instance of a compute activity with execution results
  */
-export interface ComputeActivityInstance extends ActivityInstance, ComputeActivity {
+export interface ComputeActivityInstance
+	extends ActivityInstance,
+		ComputeActivity {
 	type: ActivityType.Compute;
 }
 
 /**
  * Runtime instance of a sequence activity with execution state
  */
-export interface SequenceActivityInstance extends ActivityInstance, SequenceActivity {
+export interface SequenceActivityInstance
+	extends ActivityInstance,
+		SequenceActivity {
 	type: ActivityType.Sequence;
 	sequenceIndex?: number;
 	sequenceActivities?: string[];
@@ -164,18 +201,21 @@ export interface SequenceActivityInstance extends ActivityInstance, SequenceActi
 /**
  * Runtime instance of a parallel activity with execution state
  */
-export interface ParallelActivityInstance extends ActivityInstance, ParallelActivity {
+export interface ParallelActivityInstance
+	extends ActivityInstance,
+		ParallelActivity {
 	type: ActivityType.Parallel;
-	parallelState?: 'running' | 'completed';
+	parallelState?: "running" | "completed";
 	activeActivities?: string[];
 	completedActivities?: string[];
 }
 
-
 /**
  * Runtime instance of a branch activity with execution result
  */
-export interface BranchActivityInstance extends ActivityInstance, BranchActivity {
+export interface BranchActivityInstance
+	extends ActivityInstance,
+		BranchActivity {
 	type: ActivityType.Branch;
 	conditionResult?: boolean;
 	nextActivity?: string;
@@ -184,7 +224,9 @@ export interface BranchActivityInstance extends ActivityInstance, BranchActivity
 /**
  * Runtime instance of a switch activity with execution result
  */
-export interface SwitchActivityInstance extends ActivityInstance, SwitchActivity {
+export interface SwitchActivityInstance
+	extends ActivityInstance,
+		SwitchActivity {
 	type: ActivityType.Switch;
 	expressionValue?: any;
 	matchedCase?: string;
@@ -219,8 +261,6 @@ export interface ApiResponse<T = any> {
 	error?: string;
 	timestamp: string;
 }
-
-
 
 /**
  * Result of a process execution step (NOT the entire process state)
