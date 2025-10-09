@@ -25,22 +25,82 @@ export interface ProcessInstance {
 }
 
 export class ExecutionContext {
-	activityBreadcrums : string[] = [];
 	private _currentActivity? : string;
-	private ancesterActivity? : string;
+	private callStack: ExecutionFrame[] = [];
 
 	public set currentActivity(activityId : string | undefined) {
-		this.ancesterActivity = this._currentActivity;
 		this._currentActivity = activityId;
-		if(activityId) {
-			this.activityBreadcrums.push(activityId);
-		}
 	}	
 
 	public get currentActivity() : string | undefined{
-		return this.currentActivity;
+		return this._currentActivity;
 	}
 
+	public isAtRoot() : boolean {
+		return this.callStack.length === 0;
+	}
+
+	/**
+	 * Push a new execution frame onto the call stack
+	 * @param activityId The activity being entered
+	 * @param parentId The parent container activity (sequence, switch, etc.)
+	 * @param position Current position in parent (for sequences, switch cases, etc.)
+	 */
+	public pushFrame(activityId: string, parentId?: string, position?: number): void {
+		const frame: ExecutionFrame = {
+			activityId,
+			parentId,
+			position
+		};
+		this.callStack.push(frame);
+		this.currentActivity = activityId;
+	}
+
+	/**
+	 * Pop the current frame and return to the caller
+	 * @returns The parent frame information for continuation, or null if at root
+	 */
+	public popFrame(): ExecutionFrame | null {
+		if (this.callStack.length === 0) {
+			return null; // Already at root
+		}
+
+		const completedFrame = this.callStack.pop()!;
+		
+		// Set current activity to the parent frame (if any)
+		if (this.callStack.length > 0) {
+			const parentFrame = this.callStack[this.callStack.length - 1];
+			this._currentActivity = parentFrame.activityId;
+		} else {
+			this._currentActivity = undefined;
+		}
+
+		return completedFrame;
+	}
+
+	/**
+	 * Get the current frame without removing it
+	 */
+	public getCurrentFrame(): ExecutionFrame | null {
+		return this.callStack.length > 0 ? this.callStack[this.callStack.length - 1] : null;
+	}
+
+	/**
+	 * Get the parent frame information for determining next steps
+	 */
+	public getParentFrame(): ExecutionFrame | null {
+		return this.callStack.length > 1 ? this.callStack[this.callStack.length - 2] : null;
+	}
+}
+
+/**
+ * Represents a frame in the execution call stack
+ */
+export interface ExecutionFrame {
+	activityId: string;
+	parentId?: string;  // The container activity that called this one
+	position?: number;  // Position within parent (sequence index, switch case, etc.)
+	metadata?: any;     // Additional context data
 }
 
 export enum AggregatePassFail {

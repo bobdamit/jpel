@@ -10,7 +10,6 @@ import {
 	ComputeActivity,
 	APIActivity,
 	SequenceActivity,
-	ParallelActivity,
 	BranchActivity,
 	SwitchActivity,
 	TerminateActivity,
@@ -28,9 +27,9 @@ import { logger } from './logger';
 import ProcessNormalizer from './process-normalizer';
 import { ActivityInstance, APIActivityInstance, BranchActivityInstance, ProcessExecutionResult,
 	FieldValue, ComputeActivityInstance, HumanActivityInstance, HumanTaskData, 
-	ParallelActivityInstance, ProcessInstance, ProcessInstanceFlyweight, SequenceActivityInstance, 
+	ProcessInstance, ProcessInstanceFlyweight, SequenceActivityInstance, 
 	SwitchActivityInstance, AggregatePassFail, 
-	ExecutionContext} from './models/instance-types';
+	ExecutionContext, ExecutionFrame} from './models/instance-types';
 import e from 'express';
 
 // Using centralized logger
@@ -156,9 +155,10 @@ export class ProcessEngine {
 			};
 		}
 
-		// initialize an execution context
+		// initialize an execution context with the start activity
 		let executionContext = new ExecutionContext();
-		executionContext.currentActivity = startActivityId;
+		// Push the start activity as the root frame (no parent)
+		executionContext.pushFrame(startActivityId);
 
 		const instance: ProcessInstance = {
 			instanceId,
@@ -361,8 +361,8 @@ export class ProcessEngine {
 
 		logger.info(`ProcessEngine: Human Activity '${activityId}' completed, continuing execution for instance '${instanceId}'`);
 
-		// Continue execution
-		return await this.continueExecution(instanceId);
+		// Check for process completion and continue execution through call stack
+		return await this.checkForProcessCompletion(instanceId, activityId);
 	}
 
 	private async executeActivity(instanceId: string, activity: Activity): Promise<ProcessExecutionResult> {
@@ -422,9 +422,6 @@ export class ProcessEngine {
 				case ActivityType.Sequence:
 					logger.info(`ProcessEngine: Executing sequence activity '${activity.id}'`);
 					result = await this.executeSequenceActivity(instanceId, activity as SequenceActivity);
-					break; case ActivityType.Parallel:
-					logger.info(`ProcessEngine: Executing parallel activity '${activity.id}'`);
-					result = await this.executeParallelActivity(instanceId, activity as ParallelActivity);
 					break;
 
 				case ActivityType.Branch:
@@ -619,7 +616,9 @@ export class ProcessEngine {
 			activityInstance.completedAt = new Date();
 
 			await this.processInstanceRepo.save(instance);
-			return await this.continueExecution(instanceId);
+
+			// Check for process completion and continue execution through call stack
+			return await this.checkForProcessCompletion(instanceId, activity.id!);
 		} catch (error) {
 			activityInstance.status = ActivityStatus.Failed;
 			activityInstance.error = error instanceof Error ? error.message : String(error);
@@ -662,7 +661,9 @@ export class ProcessEngine {
 			activityInstance.completedAt = new Date();
 
 			await this.processInstanceRepo.save(instance);
-			return await this.continueExecution(instanceId);
+
+			// Check for process completion and continue execution through call stack
+			return await this.checkForProcessCompletion(instanceId, activity.id!);
 		} catch (error) {
 			activityInstance.status = ActivityStatus.Failed;
 			activityInstance.error = error instanceof Error ? error.message : String(error);
@@ -677,119 +678,36 @@ export class ProcessEngine {
 	}
 
 	private async executeSequenceActivity(instanceId: string, activity: SequenceActivity): Promise<ProcessExecutionResult> {
+		logger.info(`ProcessEngine: Executing sequence activity '${activity.id}'`);
+		
+		// Mark sequence as running
 		const instance = await this.processInstanceRepo.findById(instanceId);
 		if (!instance) {
-			return {
-				instanceId,
-				status: ProcessStatus.Failed,
-				message: 'Process instance not found'
-			};
+			return { instanceId, status: ProcessStatus.Failed, message: 'Process instance not found' };
 		}
 
 		if (!activity.id) {
-			logger.error('ProcessEngine: Sequence activity missing ID');
-			return {
-				instanceId,
-				status: ProcessStatus.Failed,
-				message: 'Activity missing ID'
-			};
+			return { instanceId, status: ProcessStatus.Failed, message: 'Activity missing ID' };
 		}
 
-		let executionContext = instance.executionContext;
+		const activityInstance = instance.activities[activity.id] as SequenceActivityInstance;
+		activityInstance.status = ActivityStatus.Running;
+		activityInstance.startedAt = new Date();
 
-		// For sequence activities, we execute the first child activity
+		// Execute the first activity in the sequence if any
 		if (activity.activities.length > 0) {
-			const firstActivity = this.extractActivityId(activity.activities[0]);
-			executionContext.currentActivity = firstActivity;
-
-			// Store sequence state for continuation
-			const activityInstance = instance.activities[activity.id] as SequenceActivityInstance;
-			activityInstance.sequenceIndex = 0;
-			activityInstance.sequenceActivities = activity.activities;
-
-			await this.processInstanceRepo.save(instance);
-			return await this.executeNextStep(instanceId);
+			const firstActivityRef = activity.activities[0];
+			const firstActivityId = this.extractActivityId(firstActivityRef);
+			
+			logger.info(`ProcessEngine: Starting sequence '${activity.id}' with first activity '${firstActivityId}'`);
+			return await this.executeActivityInFrame(instanceId, firstActivityId, activity.id, 0);
 		} else {
 			// Empty sequence completes immediately
-			const activityInstance = instance.activities[activity.id] as SequenceActivityInstance;
+			logger.info(`ProcessEngine: Empty sequence '${activity.id}' completed immediately`);
 			activityInstance.status = ActivityStatus.Completed;
 			activityInstance.completedAt = new Date();
-
 			await this.processInstanceRepo.save(instance);
-			return await this.continueExecution(instanceId);
-		}
-	}
-
-	private async executeParallelActivity(instanceId: string, activity: ParallelActivity): Promise<ProcessExecutionResult> {
-		const instance = await this.processInstanceRepo.findById(instanceId);
-		if (!instance) {
-			return {
-				instanceId,
-				status: ProcessStatus.Failed,
-				message: 'Process instance not found'
-			};
-		}
-
-		if (!activity.id) {
-			logger.error('ProcessEngine: Parallel activity missing ID');
-			return {
-				instanceId,
-				status: ProcessStatus.Failed,
-				message: 'Activity missing ID'
-			};
-		}
-
-		const activityInstance = instance.activities[activity.id] as ParallelActivityInstance;
-		logger.info(`ProcessEngine: Executing parallel activity '${activity.id}' with ${activity.activities.length} child activities`);
-
-		let executionContext = instance.executionContext;
-
-		// Initialize parallel state if not already done
-		if (!activityInstance.parallelState) {
-			activityInstance.parallelState = 'running';
-			activityInstance.activeActivities = activity.activities.map(a => this.extractActivityId(a));
-			activityInstance.completedActivities = [];
-
-			// Start the first activity (we'll simulate parallel by allowing any to be worked on)
-			const firstActivity = this.extractActivityId(activity.activities[0]);
-			executionContext.currentActivity = firstActivity;
-
-			await this.processInstanceRepo.save(instance);
-			return await this.executeNextStep(instanceId);
-		}
-
-
-		// Check if all parallel activities are completed
-		const allActivities = activityInstance.activeActivities as string[];
-		const completedActivities = activityInstance.completedActivities as string[];
-
-		logger.debug(`ProcessEngine: Parallel status - Total: ${allActivities.length}, Completed: ${completedActivities.length}`);
-
-		if (completedActivities.length === allActivities.length) {
-			// All parallel activities completed
-			logger.info(`ProcessEngine: All parallel activities completed for '${activity.id}'`);
-			activityInstance.status = ActivityStatus.Completed;
-			activityInstance.completedAt = new Date();
-			activityInstance.parallelState = 'completed';
-
-			// Set current activity to the parallel activity itself so sequence continuation works
-			executionContext.currentActivity = activity.id;
-
-			await this.processInstanceRepo.save(instance);
-			return await this.continueExecution(instanceId);
-		} else {
-			// Find next uncompleted activity to work on
-			const nextActivity = allActivities.find(actId => !completedActivities.includes(actId));
-			if (nextActivity) {
-				logger.info(`ProcessEngine: Continuing parallel execution with activity '${nextActivity}'`);
-				executionContext.currentActivity = nextActivity;
-				await this.processInstanceRepo.save(instance);
-				return await this.executeNextStep(instanceId);
-			} else {
-				// This shouldn't happen, but handle gracefully
-				logger.warn(`ProcessEngine: No next parallel activity found, but not all completed`);
-				return await this.continueExecution(instanceId);
-			}
+			return await this.checkForProcessCompletion(instanceId, activity.id);
 		}
 	}
 
@@ -831,12 +749,12 @@ export class ProcessEngine {
 				await this.processInstanceRepo.save(instance);
 				return await this.executeNextStep(instanceId);
 			} else {
-				// No else branch, continue to next activity
+				// No else branch, complete activity and continue through call stack
 				activityInstance.status = ActivityStatus.Completed;
 				activityInstance.completedAt = new Date();
 
 				await this.processInstanceRepo.save(instance);
-				return await this.continueExecution(instanceId);
+				return await this.checkForProcessCompletion(instanceId, activity.id!);
 			}
 		} catch (error) {
 			activityInstance.status = ActivityStatus.Failed;
@@ -897,17 +815,17 @@ export class ProcessEngine {
 				throw new Error(`No matching case found for value '${switchValue}' in Activity ${activity.id} `);
 			}
 
-			// Set next activity and complete this one
-			executionContext.currentActivity = this.extractActivityId(nextActivity);
-
-			activityInstance.status = ActivityStatus.Completed;
-			activityInstance.completedAt = new Date();
+			// Update switch activity instance with the selection
+			activityInstance.status = ActivityStatus.Running; // Keep running until selected branch completes
 			activityInstance.expressionValue = switchValue;
 			activityInstance.matchedCase = activity.cases[switchValue] ? switchValue : 'default';
 			activityInstance.nextActivity = nextActivity;
 
 			await this.processInstanceRepo.save(instance);
-			return await this.executeNextStep(instanceId);
+
+			// Execute the selected branch using proper call stack frame management
+			const selectedActivityId = this.extractActivityId(nextActivity);
+			return await this.executeActivityInFrame(instanceId, selectedActivityId, activity.id, undefined);
 		} catch (error) {
 			activityInstance.status = ActivityStatus.Failed;
 			activityInstance.error = error instanceof Error ? error.message : String(error);
@@ -987,31 +905,6 @@ export class ProcessEngine {
 
 		// Check if we're in a sequence and need to continue
 		if (processDefinition) {
-			// First check for parallel activities that contain the current activity
-			for (const [activityId, activityDef] of Object.entries(processDefinition.activities)) {
-				if (activityDef.type === ActivityType.Parallel) {
-					const parallelActivity = activityDef as ParallelActivity;
-					const parallelInstance = instance.activities[activityId];
-
-					// Check if this parallel activity contains our current activity
-					if ((parallelInstance as ParallelActivityInstance).parallelState === 'running' &&
-						parallelActivity.activities.some(a => this.extractActivityId(a) === executionContext.currentActivity)) {
-
-						logger.debug(`ProcessEngine: Current activity '${executionContext.currentActivity}' is part of parallel '${activityId}'`);
-						const parallelActivityInstance = parallelInstance as ParallelActivityInstance;
-
-						// Mark current activity as completed in parallel tracking
-						if (!parallelActivityInstance.completedActivities!.includes(executionContext.currentActivity)) {
-							parallelActivityInstance.completedActivities!.push(executionContext.currentActivity);
-							logger.info(`ProcessEngine: Marked '${executionContext.currentActivity}' as completed in parallel '${activityId}'`);
-						}
-						// Continue parallel execution
-						await this.processInstanceRepo.save(instance);
-						return await this.executeParallelActivity(instanceId, parallelActivity);
-					}
-				}
-			}
-
 			// Then check for sequence activities
 			for (const [activityId, activityDef] of Object.entries(processDefinition.activities)) {
 				if (activityDef.type === ActivityType.Sequence) {
@@ -1144,6 +1037,196 @@ export class ProcessEngine {
 		// If we reach here and no sequence continuation happened, the process is complete
 		logger.info(`ProcessEngine: No sequence continuation found, completing process for instance '${instanceId}'`);
 		return await this.completeProcess(instanceId, 'Process completed successfully');
+	}
+
+	/**
+	 * Check if process should complete after an activity finishes
+	 * Process completes when the call stack is empty (at root)
+	 */
+	private async checkForProcessCompletion(instanceId: string, completedActivityId: string): Promise<ProcessExecutionResult> {
+		const instance = await this.processInstanceRepo.findById(instanceId);
+		if (!instance) {
+			return {
+				instanceId,
+				status: ProcessStatus.Failed,
+				message: 'Process instance not found'
+			};
+		}
+
+		// Pop the completed frame from call stack
+		const completedFrame = instance.executionContext.popFrame();
+		
+		// If call stack is now empty, process is complete
+		if (instance.executionContext.isAtRoot()) {
+			logger.info(`ProcessEngine: Call stack empty after completing '${completedActivityId}', process complete for instance '${instanceId}'`);
+			return await this.completeProcess(instanceId, `Process completed - call stack empty after '${completedActivityId}'`);
+		}
+
+		// There's still a parent frame, so continue execution from there
+		const parentFrame = instance.executionContext.getCurrentFrame();
+		if (parentFrame) {
+			logger.info(`ProcessEngine: Returning to parent frame '${parentFrame.activityId}' after completing '${completedActivityId}'`);
+			return await this.continueFromParent(instanceId, completedFrame!);
+		}
+
+		// Fallback - should not reach here
+		return await this.completeProcess(instanceId, 'Unexpected completion state');
+	}
+
+	/**
+	 * Continue execution from a parent frame after a child activity completes
+	 */
+	private async continueFromParent(instanceId: string, completedFrame: ExecutionFrame): Promise<ProcessExecutionResult> {
+		const instance = await this.processInstanceRepo.findById(instanceId);
+		if (!instance) {
+			return {
+				instanceId,
+				status: ProcessStatus.Failed,
+				message: 'Process instance not found'
+			};
+		}
+
+		const processDefinition = await this.processDefinitionRepo.findById(instance.processId);
+		if (!processDefinition) {
+			return {
+				instanceId,
+				status: ProcessStatus.Failed,
+				message: 'Process definition not found'
+			};
+		}
+
+		const parentFrame = instance.executionContext.getCurrentFrame();
+		logger.info(`ProcessEngine: continueFromParent - completedFrame: ${JSON.stringify(completedFrame)}, parentFrame: ${JSON.stringify(parentFrame)}`);
+		
+		if (!parentFrame) {
+			// No parent frame, process should complete
+			return await this.completeProcess(instanceId, 'No parent frame found');
+		}
+
+		// The parentFrame.activityId is the sequence/switch/branch that contains the completed activity
+		const parentActivity = processDefinition.activities[parentFrame.activityId];
+		if (!parentActivity) {
+			return {
+				instanceId,
+				status: ProcessStatus.Failed,
+				message: `Parent activity '${parentFrame.activityId}' not found`
+			};
+		}
+
+		logger.info(`ProcessEngine: Parent activity type: ${parentActivity.type}, ID: ${parentActivity.id}`);
+
+		// Handle continuation based on parent type
+		switch (parentActivity.type) {
+			case ActivityType.Sequence:
+				return await this.continueSequence(instanceId, parentActivity as SequenceActivity, completedFrame);
+			
+			case ActivityType.Switch:
+				return await this.continueSwitch(instanceId, parentActivity as SwitchActivity, completedFrame);
+			
+			case ActivityType.Branch:
+				return await this.continueBranch(instanceId, parentActivity as BranchActivity, completedFrame);
+			
+			default:
+				// Parent completed, pop it and continue up the stack
+				logger.info(`ProcessEngine: Unknown parent activity type ${parentActivity.type}, completing parent`);
+				return await this.checkForProcessCompletion(instanceId, parentFrame.activityId);
+		}
+	}
+
+	/**
+	 * Continue a sequence after a child activity completes
+	 */
+	private async continueSequence(instanceId: string, sequence: SequenceActivity, completedFrame: ExecutionFrame): Promise<ProcessExecutionResult> {
+		const instance = await this.processInstanceRepo.findById(instanceId);
+		if (!instance) {
+			return { instanceId, status: ProcessStatus.Failed, message: 'Instance not found' };
+		}
+
+		const processDefinition = await this.processDefinitionRepo.findById(instance.processId);
+		if (!processDefinition) {
+			return { instanceId, status: ProcessStatus.Failed, message: 'Process definition not found' };
+		}
+
+		const currentPosition = completedFrame.position || 0;
+		const nextPosition = currentPosition + 1;
+
+		logger.info(`ProcessEngine: Continuing sequence '${sequence.id}' from position ${currentPosition} to ${nextPosition}`);
+
+		// Check if there are more activities in the sequence
+		if (nextPosition < sequence.activities.length) {
+			// Execute next activity in sequence
+			const nextActivityRef = sequence.activities[nextPosition];
+			const nextActivityId = this.extractActivityId(nextActivityRef);
+			
+			// NOTE: Do NOT modify parentFrame.position here - that represents where this sequence 
+			// is positioned within its parent, not the internal position within this sequence
+
+			logger.info(`ProcessEngine: Continuing sequence '${sequence.id}' to activity '${nextActivityId}' (position ${nextPosition})`);
+			return await this.executeActivityInFrame(instanceId, nextActivityId, sequence.id!, nextPosition);
+		} else {
+			// Sequence completed, mark it as completed and return to parent
+			logger.info(`ProcessEngine: Sequence '${sequence.id}' completed`);
+			const sequenceInstance = instance.activities[sequence.id!] as SequenceActivityInstance;
+			sequenceInstance.status = ActivityStatus.Completed;
+			sequenceInstance.completedAt = new Date();
+			await this.processInstanceRepo.save(instance);
+			
+			return await this.checkForProcessCompletion(instanceId, sequence.id!);
+		}
+	}
+
+	/**
+	 * Execute an activity within a frame context
+	 */
+	private async executeActivityInFrame(instanceId: string, activityId: string, parentId: string, position?: number): Promise<ProcessExecutionResult> {
+		const instance = await this.processInstanceRepo.findById(instanceId);
+		if (!instance) {
+			return { instanceId, status: ProcessStatus.Failed, message: 'Instance not found' };
+		}
+
+		const processDefinition = await this.processDefinitionRepo.findById(instance.processId);
+		if (!processDefinition) {
+			return { instanceId, status: ProcessStatus.Failed, message: 'Process definition not found' };
+		}
+
+		const activity = processDefinition.activities[activityId];
+		if (!activity) {
+			return { instanceId, status: ProcessStatus.Failed, message: `Activity '${activityId}' not found` };
+		}
+
+		// Push new frame onto call stack
+		instance.executionContext.pushFrame(activityId, parentId, position);
+		await this.processInstanceRepo.save(instance);
+
+		// Execute the activity
+		return await this.executeActivity(instanceId, activity);
+	}
+
+	/**
+	 * Simplified continuation methods for other container types
+	 */
+	private async continueSwitch(instanceId: string, switchActivity: SwitchActivity, completedFrame: ExecutionFrame): Promise<ProcessExecutionResult> {
+		// When the selected branch completes, mark the switch as completed
+		logger.info(`ProcessEngine: Switch '${switchActivity.id}' completed after branch execution`);
+		
+		const instance = await this.processInstanceRepo.findById(instanceId);
+		if (!instance) {
+			return { instanceId, status: ProcessStatus.Failed, message: 'Instance not found' };
+		}
+
+		// Mark the switch activity as completed
+		const switchInstance = instance.activities[switchActivity.id!] as SwitchActivityInstance;
+		switchInstance.status = ActivityStatus.Completed;
+		switchInstance.completedAt = new Date();
+		await this.processInstanceRepo.save(instance);
+
+		return await this.checkForProcessCompletion(instanceId, switchActivity.id!);
+	}
+
+	private async continueBranch(instanceId: string, branchActivity: BranchActivity, completedFrame: ExecutionFrame): Promise<ProcessExecutionResult> {
+		// Branch activities execute one path, so completion means branch is done
+		logger.info(`ProcessEngine: Branch '${branchActivity.id}' completed`);
+		return await this.checkForProcessCompletion(instanceId, branchActivity.id!);
 	}
 
 	private async completeProcess(instanceId: string, reason: string, success: boolean = true): Promise<ProcessExecutionResult> {
@@ -1377,29 +1460,87 @@ export class ProcessEngine {
 	 * and got to a step where we had left off (and is not complete)
 	 * 
 	 */
+	/**
+	 * Get the first pending activity using ExecutionContext breadcrumbs for intelligent navigation
+	 */
 	private getFirstPendingActivityId(instance: ProcessInstance, processDefinition: ProcessDefinition): string | null {
-		logger.debug(`ProcessEngine: Looking for first pending activity`);
+		logger.debug(`ProcessEngine: Looking for first pending activity using breadcrumbs`);
 		
-		// Simple scan: find any activity that is executable (human, compute, api) and not completed
-		for (const [activityId, activityDef] of Object.entries(processDefinition.activities)) {
-			const activityInstance = instance.activities[activityId];
-			
-			// Skip container activities (sequence, switch, branch, parallel)
-			if (activityDef.type === ActivityType.Sequence ||
-				activityDef.type === ActivityType.Switch ||
-				activityDef.type === ActivityType.Branch ||
-				activityDef.type === ActivityType.Parallel) {
-				continue;
+		const breadcrumbs = instance.executionContext.activityBreadcrums;
+		logger.debug(`ProcessEngine: Breadcrumbs: ${breadcrumbs.join(' -> ')}`);
+		
+		// Start from where we are in the breadcrumbs and look for the next incomplete activity
+		// This follows the actual execution path rather than scanning all activities
+		
+		// First check if there are any breadcrumbs
+		if (breadcrumbs.length === 0) {
+			// No execution history, find the start activity
+			const startActivityId = this.getStartActivityId(processDefinition);
+			if (startActivityId) {
+				const firstExecutable = this.findFirstExecutableInFlow(startActivityId, instance, processDefinition);
+				logger.debug(`ProcessEngine: No breadcrumbs, found start activity: ${firstExecutable}`);
+				return firstExecutable;
 			}
-			
-			// Check if this executable activity is not completed
-			if (!activityInstance || activityInstance.status !== ActivityStatus.Completed) {
-				logger.debug(`ProcessEngine: Found pending activity: ${activityId}`);
-				return activityId;
+			return null;
+		}
+		
+		// Get the last executed activity from breadcrumbs
+		const lastExecutedActivity = breadcrumbs[breadcrumbs.length - 1];
+		logger.debug(`ProcessEngine: Last executed activity from breadcrumbs: ${lastExecutedActivity}`);
+		
+		// Check if the last executed activity is still pending (not completed)
+		const lastActivityInstance = instance.activities[lastExecutedActivity];
+		if (!lastActivityInstance || lastActivityInstance.status !== ActivityStatus.Completed) {
+			const activityDef = processDefinition.activities[lastExecutedActivity];
+			// Make sure it's an executable activity (not a container)
+			if (activityDef && this.isExecutableActivity(activityDef)) {
+				logger.debug(`ProcessEngine: Last executed activity is still pending: ${lastExecutedActivity}`);
+				return lastExecutedActivity;
 			}
 		}
 		
-		logger.debug(`ProcessEngine: No pending activities found`);
+		// The last executed activity is completed, so we need to find what comes next
+		// Use the existing flow logic to determine the next activity after the last executed one
+		const nextActivity = this.findNextActivityAfter(lastExecutedActivity, instance, processDefinition);
+		if (nextActivity) {
+			logger.debug(`ProcessEngine: Found next pending activity after ${lastExecutedActivity}: ${nextActivity}`);
+			return nextActivity;
+		}
+		
+		logger.debug(`ProcessEngine: No pending activities found in execution flow`);
+		return null;
+	}
+
+	/**
+	 * Check if an activity is executable (not a container)
+	 */
+	private isExecutableActivity(activity: Activity): boolean {
+		return activity.type !== ActivityType.Sequence &&
+			   activity.type !== ActivityType.Switch &&
+			   activity.type !== ActivityType.Branch;
+	}
+
+	/**
+	 * Find the next activity that should execute after the given activity
+	 * This follows the same logic as the existing flow continuation
+	 */
+	private findNextActivityAfter(activityId: string, instance: ProcessInstance, processDefinition: ProcessDefinition): string | null {
+		// Look for sequence continuation using existing logic
+		// Find the parent sequence/switch/branch that contains this activity
+		for (const [parentId, parentActivity] of Object.entries(processDefinition.activities)) {
+			if (parentActivity.type === ActivityType.Sequence) {
+				const sequence = parentActivity as SequenceActivity;
+				const activityIndex = sequence.activities.findIndex(a => this.extractActivityId(a) === activityId);
+				if (activityIndex >= 0 && activityIndex < sequence.activities.length - 1) {
+					// Found the activity in this sequence, get the next one
+					const nextInSequence = this.extractActivityId(sequence.activities[activityIndex + 1]);
+					const nextExecutable = this.findFirstExecutableInFlow(nextInSequence, instance, processDefinition);
+					if (nextExecutable) return nextExecutable;
+				}
+			}
+		}
+
+		// If no next activity found in the current flow, the process might be complete
 		return null;
 	}
 
@@ -1426,9 +1567,6 @@ export class ProcessEngine {
 			
 			case ActivityType.Branch:
 				return this.findFirstExecutableInBranch(activity as BranchActivity, instance, processDefinition);
-			
-			case ActivityType.Parallel:
-				return this.findFirstExecutableInParallel(activity as ParallelActivity, instance, processDefinition);
 			
 			default:
 				// For executable activities (human, compute, api, terminate), return the activity itself
@@ -1503,20 +1641,7 @@ export class ProcessEngine {
 	}
 
 	/**
-	 * Find first executable activity within a parallel activity
-	 */
-	private findFirstExecutableInParallel(parallel: ParallelActivity, instance: ProcessInstance, processDefinition: ProcessDefinition): string | null {
-		// For parallel activities, return the first child activity
-		if (parallel.activities.length > 0) {
-			const firstChildRef = parallel.activities[0];
-			const firstChildId = this.extractActivityId(firstChildRef);
-			return this.findFirstExecutableInFlow(firstChildId, instance, processDefinition);
-		}
-		return null;
-	}
-
-	/**
-	 * Navigate to the start activity of a process instance
+	 * Navigate to the start activity of a process instance using ExecutionContext breadcrumbs
 	 */
 	async navigateToStart(instanceId: string): Promise<ProcessExecutionResult> {
 		try {
@@ -1540,41 +1665,45 @@ export class ProcessEngine {
 
 			let executionContext = instance.executionContext;
 
-			const startActivityId = this.getStartActivityId(processDefinition);
-			if (!startActivityId) {
+			// Use breadcrumbs to find the first activity that was executed
+			// If no breadcrumbs exist, find the start activity
+			let firstActivityId: string | null = null;
+			
+			if (executionContext.activityBreadcrums.length > 0) {
+				// Go to the first activity in the breadcrumbs
+				firstActivityId = executionContext.activityBreadcrums[0];
+				logger.debug(`ProcessEngine: Using first breadcrumb activity: ${firstActivityId}`);
+			} else {
+				// No breadcrumbs, find the start activity
+				const startActivityId = this.getStartActivityId(processDefinition);
+				if (startActivityId) {
+					firstActivityId = this.findFirstExecutableInFlow(startActivityId, instance, processDefinition);
+					logger.debug(`ProcessEngine: No breadcrumbs, found start activity: ${firstActivityId}`);
+				}
+			}
+
+			if (!firstActivityId) {
 				return {
 					instanceId,
 					status: ProcessStatus.Failed,
-					message: `No start activity defined for process '${instance.processId}'`
+					message: `No start activity found`
 				};
 			}
 
-			// Follow the flow from the start to find the first executable activity
-			const firstExecutableActivityId = this.findFirstExecutableInFlow(startActivityId, instance, processDefinition);
-			if (!firstExecutableActivityId) {
-				return {
-					instanceId,
-					status: ProcessStatus.Failed,
-					message: `No executable activity found from start`
-				};
-			}
-
-			// Update the current activity to the first executable activity
-			executionContext.currentActivity = firstExecutableActivityId;
-			executionContext.activityBreadcrums = [firstExecutableActivityId];
-
+			// Update the current activity to the first activity
+			executionContext.currentActivity = firstActivityId;
 			await this.processInstanceRepo.save(instance);
 
 			// Get the activity definition for better messaging
-			const activityDef = processDefinition.activities[firstExecutableActivityId];
-			const activityName = activityDef?.name || firstExecutableActivityId;
+			const activityDef = processDefinition.activities[firstActivityId];
+			const activityName = activityDef?.name || firstActivityId;
 
-			logger.info(`ProcessEngine: Navigated instance '${instanceId}' to start activity '${firstExecutableActivityId}'`);
+			logger.info(`ProcessEngine: Navigated instance '${instanceId}' to start activity '${firstActivityId}'`);
 
 			return {
 				instanceId,
 				status: ProcessStatus.Running,
-				currentActivity: firstExecutableActivityId,
+				currentActivity: firstActivityId,
 				message: `Navigated to start activity: ${activityName}`
 			};
 		} catch (error) {
@@ -1643,6 +1772,69 @@ export class ProcessEngine {
 				instanceId,
 				status: ProcessStatus.Failed,
 				message: `Error navigating to next pending: ${error instanceof Error ? error.message : 'Unknown error'}`
+			};
+		}
+	}
+
+	/**
+	 * Navigate to the last executed activity (end of breadcrumbs)
+	 */
+	async navigateToLastExecuted(instanceId: string): Promise<ProcessExecutionResult> {
+		try {
+			const instance = await this.processInstanceRepo.findById(instanceId);
+			if (!instance) {
+				return {
+					instanceId,
+					status: ProcessStatus.Failed,
+					message: `Process instance '${instanceId}' not found`
+				};
+			}
+
+			const processDefinition = await this.processDefinitionRepo.findById(instance.processId);
+			if (!processDefinition) {
+				return {
+					instanceId,
+					status: ProcessStatus.Failed,
+					message: `Process definition '${instance.processId}' not found`
+				};
+			}
+
+			let executionContext = instance.executionContext;
+
+			// Check if there are any breadcrumbs
+			if (executionContext.activityBreadcrums.length === 0) {
+				return {
+					instanceId,
+					status: ProcessStatus.Failed,
+					message: 'No execution history found'
+				};
+			}
+
+			// Get the last activity from breadcrumbs
+			const lastExecutedActivityId = executionContext.activityBreadcrums[executionContext.activityBreadcrums.length - 1];
+
+			// Update the current activity to the last executed activity
+			executionContext.currentActivity = lastExecutedActivityId;
+			await this.processInstanceRepo.save(instance);
+
+			// Get the activity definition for better messaging
+			const activityDef = processDefinition.activities[lastExecutedActivityId];
+			const activityName = activityDef?.name || lastExecutedActivityId;
+
+			logger.info(`ProcessEngine: Navigated instance '${instanceId}' to last executed activity '${lastExecutedActivityId}'`);
+
+			return {
+				instanceId,
+				status: ProcessStatus.Running,
+				currentActivity: lastExecutedActivityId,
+				message: `Navigated to last executed activity: ${activityName}`
+			};
+		} catch (error) {
+			logger.error(`ProcessEngine: Error navigating to last executed for instance '${instanceId}'`, error);
+			return {
+				instanceId,
+				status: ProcessStatus.Failed,
+				message: `Error navigating to last executed: ${error instanceof Error ? error.message : 'Unknown error'}`
 			};
 		}
 	}
