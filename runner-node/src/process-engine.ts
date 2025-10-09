@@ -739,7 +739,8 @@ export class ProcessEngine {
 
 			const nextActivity = conditionResult ? activity.then : activity.else;
 			if (nextActivity) {
-				executionContext.currentActivity = this.extractActivityId(nextActivity);
+				const nextActivityId = this.extractActivityId(nextActivity);
+				executionContext.pushFrame(nextActivityId);
 
 				activityInstance.status = ActivityStatus.Completed;
 				activityInstance.completedAt = new Date();
@@ -939,7 +940,7 @@ export class ProcessEngine {
 								// Continue with next activity in sequence
 								seqInst.sequenceIndex = nextIndex;
 								const nextActivity = this.extractActivityId(seqInst.sequenceActivities![nextIndex]);
-								executionContext.currentActivity = nextActivity;
+								executionContext.pushFrame(nextActivity, activityId, nextIndex);
 								logger.info(`ProcessEngine: Continuing sequence '${activityId}' - moving to activity '${nextActivity}' (index ${nextIndex})`);
 								await this.processInstanceRepo.save(instance);
 								return await this.executeNextStep(instanceId);
@@ -1014,7 +1015,7 @@ export class ProcessEngine {
 								// Continue to next activity in parent sequence
 								parentInstance.sequenceIndex = nextIndex;
 								const nextActivity = this.extractActivityId(parentInstance.sequenceActivities[nextIndex]);
-								executionContext.currentActivity = nextActivity;
+								executionContext.pushFrame(nextActivity, parentId, nextIndex);
 								logger.info(`ProcessEngine: Parent sequence '${parentId}' continuing to activity '${nextActivity}' (index ${nextIndex})`);
 								await this.processInstanceRepo.save(instance);
 								// Clear the completed sequence marker
@@ -1241,7 +1242,6 @@ export class ProcessEngine {
 
 		instance.status = success ? ProcessStatus.Completed : ProcessStatus.Failed;
 		instance.completedAt = new Date();
-		instance.executionContext.currentActivity = undefined;
 
 		// Calculate aggregate pass/fail when process completes
 		if (instance.status === ProcessStatus.Completed) {
@@ -1376,7 +1376,10 @@ export class ProcessEngine {
 		// Keep all activity data (including field values) - just reset statuses
 		instance.status = ProcessStatus.Running;
 		instance.completedAt = undefined;
-		instance.executionContext.currentActivity = startActivityId;
+		
+		// Clear call stack and set up for start activity
+		instance.executionContext.clearCallStack();
+		instance.executionContext.pushFrame(startActivityId);
 
 		// Reset all activity statuses to pending (but keep their data!)
 		for (const activityId in instance.activities) {
@@ -1464,46 +1467,75 @@ export class ProcessEngine {
 	 * Get the first pending activity using ExecutionContext breadcrumbs for intelligent navigation
 	 */
 	private getFirstPendingActivityId(instance: ProcessInstance, processDefinition: ProcessDefinition): string | null {
-		logger.debug(`ProcessEngine: Looking for first pending activity using breadcrumbs`);
+		logger.debug(`ProcessEngine: Looking for first pending activity using call stack`);
+		logger.debug(`ProcessEngine: Current activity: ${instance.executionContext.currentActivity}`);
+		logger.debug(`ProcessEngine: Instance status: ${instance.status}`);
 		
-		const breadcrumbs = instance.executionContext.activityBreadcrums;
-		logger.debug(`ProcessEngine: Breadcrumbs: ${breadcrumbs.join(' -> ')}`);
+		const executionContext = instance.executionContext;
 		
-		// Start from where we are in the breadcrumbs and look for the next incomplete activity
-		// This follows the actual execution path rather than scanning all activities
+		// If the process is already completed, there are no pending activities
+		if (instance.status === ProcessStatus.Completed) {
+			logger.debug(`ProcessEngine: Process is completed, no pending activities`);
+			return null;
+		}
 		
-		// First check if there are any breadcrumbs
-		if (breadcrumbs.length === 0) {
+		// If currentActivity is null, the process engine has determined the process is complete
+		// We should not look for more activities to execute
+		if (executionContext.currentActivity === null) {
+			logger.debug(`ProcessEngine: Current activity is null, process is complete`);
+			return null;
+		}
+		
+		// Check if we have a current activity that's still pending
+		if (executionContext.currentActivity) {
+			const currentActivityInstance = instance.activities[executionContext.currentActivity];
+			if (!currentActivityInstance || currentActivityInstance.status !== ActivityStatus.Completed) {
+				const activityDef = processDefinition.activities[executionContext.currentActivity];
+				// Make sure it's an executable activity (not a container)
+				if (activityDef && this.isExecutableActivity(activityDef)) {
+					logger.debug(`ProcessEngine: Current activity is still pending: ${executionContext.currentActivity}`);
+					return executionContext.currentActivity;
+				}
+			}
+		}
+		
+		// If no current activity or it's completed, check call stack
+		if (!executionContext.hasCallStack()) {
 			// No execution history, find the start activity
 			const startActivityId = this.getStartActivityId(processDefinition);
 			if (startActivityId) {
 				const firstExecutable = this.findFirstExecutableInFlow(startActivityId, instance, processDefinition);
-				logger.debug(`ProcessEngine: No breadcrumbs, found start activity: ${firstExecutable}`);
+				logger.debug(`ProcessEngine: No call stack, found start activity: ${firstExecutable}`);
 				return firstExecutable;
 			}
 			return null;
 		}
 		
-		// Get the last executed activity from breadcrumbs
-		const lastExecutedActivity = breadcrumbs[breadcrumbs.length - 1];
-		logger.debug(`ProcessEngine: Last executed activity from breadcrumbs: ${lastExecutedActivity}`);
+		// Get the top frame from call stack (most recent)
+		const topFrame = executionContext.getCurrentFrame();
+		if (!topFrame) {
+			logger.debug(`ProcessEngine: No top frame available`);
+			return null;
+		}
 		
-		// Check if the last executed activity is still pending (not completed)
-		const lastActivityInstance = instance.activities[lastExecutedActivity];
-		if (!lastActivityInstance || lastActivityInstance.status !== ActivityStatus.Completed) {
-			const activityDef = processDefinition.activities[lastExecutedActivity];
+		logger.debug(`ProcessEngine: Top frame activity: ${topFrame.activityId}, position: ${topFrame.position}`);
+		
+		// Check if the top frame activity is still pending (not completed)
+		const topActivityInstance = instance.activities[topFrame.activityId];
+		if (!topActivityInstance || topActivityInstance.status !== ActivityStatus.Completed) {
+			const activityDef = processDefinition.activities[topFrame.activityId];
 			// Make sure it's an executable activity (not a container)
 			if (activityDef && this.isExecutableActivity(activityDef)) {
-				logger.debug(`ProcessEngine: Last executed activity is still pending: ${lastExecutedActivity}`);
-				return lastExecutedActivity;
+				logger.debug(`ProcessEngine: Top frame activity is still pending: ${topFrame.activityId}`);
+				return topFrame.activityId;
 			}
 		}
 		
-		// The last executed activity is completed, so we need to find what comes next
-		// Use the existing flow logic to determine the next activity after the last executed one
-		const nextActivity = this.findNextActivityAfter(lastExecutedActivity, instance, processDefinition);
+		// The top frame activity is completed, so we need to find what comes next
+		// Use the existing flow logic to determine the next activity after the top frame activity
+		const nextActivity = this.findNextActivityAfter(topFrame.activityId, instance, processDefinition);
 		if (nextActivity) {
-			logger.debug(`ProcessEngine: Found next pending activity after ${lastExecutedActivity}: ${nextActivity}`);
+			logger.debug(`ProcessEngine: Found next pending activity after ${topFrame.activityId}: ${nextActivity}`);
 			return nextActivity;
 		}
 		
@@ -1665,20 +1697,23 @@ export class ProcessEngine {
 
 			let executionContext = instance.executionContext;
 
-			// Use breadcrumbs to find the first activity that was executed
-			// If no breadcrumbs exist, find the start activity
+			// Use call stack to find the first activity that was executed
+			// If no call stack exists, find the start activity
 			let firstActivityId: string | null = null;
 			
-			if (executionContext.activityBreadcrums.length > 0) {
-				// Go to the first activity in the breadcrumbs
-				firstActivityId = executionContext.activityBreadcrums[0];
-				logger.debug(`ProcessEngine: Using first breadcrumb activity: ${firstActivityId}`);
+			if (executionContext.hasCallStack()) {
+				// Get the bottom frame from call stack (first executed)
+				const bottomFrame = executionContext.getFirstFrame();
+				if (bottomFrame) {
+					firstActivityId = bottomFrame.activityId;
+					logger.debug(`ProcessEngine: Using first call stack activity: ${firstActivityId}`);
+				}
 			} else {
-				// No breadcrumbs, find the start activity
+				// No call stack, find the start activity
 				const startActivityId = this.getStartActivityId(processDefinition);
 				if (startActivityId) {
 					firstActivityId = this.findFirstExecutableInFlow(startActivityId, instance, processDefinition);
-					logger.debug(`ProcessEngine: No breadcrumbs, found start activity: ${firstActivityId}`);
+					logger.debug(`ProcessEngine: No call stack, found start activity: ${firstActivityId}`);
 				}
 			}
 
@@ -1690,8 +1725,9 @@ export class ProcessEngine {
 				};
 			}
 
-			// Update the current activity to the first activity
-			executionContext.currentActivity = firstActivityId;
+			// Navigate to the first activity
+			executionContext.clearCallStack();
+			executionContext.pushFrame(firstActivityId);
 			await this.processInstanceRepo.save(instance);
 
 			// Get the activity definition for better messaging
@@ -1750,8 +1786,9 @@ export class ProcessEngine {
 				};
 			}
 
-			// Update the current activity to the first pending activity
-			executionContext.currentActivity = pendingActivityId;
+			// Navigate to the pending activity
+			executionContext.clearCallStack();
+			executionContext.pushFrame(pendingActivityId);
 			await this.processInstanceRepo.save(instance);
 
 			// Get the activity definition for better messaging
@@ -1801,8 +1838,8 @@ export class ProcessEngine {
 
 			let executionContext = instance.executionContext;
 
-			// Check if there are any breadcrumbs
-			if (executionContext.activityBreadcrums.length === 0) {
+			// Check if there are any call stack frames
+			if (!executionContext.hasCallStack()) {
 				return {
 					instanceId,
 					status: ProcessStatus.Failed,
@@ -1810,11 +1847,19 @@ export class ProcessEngine {
 				};
 			}
 
-			// Get the last activity from breadcrumbs
-			const lastExecutedActivityId = executionContext.activityBreadcrums[executionContext.activityBreadcrums.length - 1];
+			// Get the last activity from call stack (top frame)
+			const topFrame = executionContext.getCurrentFrame();
+			if (!topFrame) {
+				return {
+					instanceId,
+					status: ProcessStatus.Failed,
+					message: 'No current execution frame found'
+				};
+			}
 
-			// Update the current activity to the last executed activity
-			executionContext.currentActivity = lastExecutedActivityId;
+			const lastExecutedActivityId = topFrame.activityId;
+
+			// The call stack already has the correct last executed activity
 			await this.processInstanceRepo.save(instance);
 
 			// Get the activity definition for better messaging

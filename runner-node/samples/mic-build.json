@@ -21,7 +21,7 @@
 				"a:basicFactsSequence",
 				"a:validateCommonFacts",
 				"a:micTypeDecision",
-				"a.visualInspectionSequence"
+				"a:visualInspectionSequence"
 			]
 		},
 

@@ -25,15 +25,11 @@ export interface ProcessInstance {
 }
 
 export class ExecutionContext {
-	private _currentActivity? : string;
 	private callStack: ExecutionFrame[] = [];
 
-	public set currentActivity(activityId : string | undefined) {
-		this._currentActivity = activityId;
-	}	
-
-	public get currentActivity() : string | undefined{
-		return this._currentActivity;
+	public get currentActivity() : string | undefined {
+		const topFrame = this.getCurrentFrame();
+		return topFrame ? topFrame.activityId : undefined;
 	}
 
 	public isAtRoot() : boolean {
@@ -53,7 +49,6 @@ export class ExecutionContext {
 			position
 		};
 		this.callStack.push(frame);
-		this.currentActivity = activityId;
 	}
 
 	/**
@@ -66,15 +61,6 @@ export class ExecutionContext {
 		}
 
 		const completedFrame = this.callStack.pop()!;
-		
-		// Set current activity to the parent frame (if any)
-		if (this.callStack.length > 0) {
-			const parentFrame = this.callStack[this.callStack.length - 1];
-			this._currentActivity = parentFrame.activityId;
-		} else {
-			this._currentActivity = undefined;
-		}
-
 		return completedFrame;
 	}
 
@@ -83,6 +69,27 @@ export class ExecutionContext {
 	 */
 	public getCurrentFrame(): ExecutionFrame | null {
 		return this.callStack.length > 0 ? this.callStack[this.callStack.length - 1] : null;
+	}
+
+	/**
+	 * Check if the call stack has any frames
+	 */
+	public hasCallStack(): boolean {
+		return this.callStack.length > 0;
+	}
+
+	/**
+	 * Get the first frame (bottom of stack) without removing it
+	 */
+	public getFirstFrame(): ExecutionFrame | null {
+		return this.callStack.length > 0 ? this.callStack[0] : null;
+	}
+
+	/**
+	 * Clear the entire call stack (for process rerun)
+	 */
+	public clearCallStack(): void {
+		this.callStack = [];
 	}
 
 	/**
