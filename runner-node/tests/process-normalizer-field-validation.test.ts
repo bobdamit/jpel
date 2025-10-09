@@ -1,5 +1,5 @@
 import ProcessNormalizer from '../src/process-normalizer';
-import { ProcessDefinition, ActivityType } from '../src/types';
+import { ProcessDefinition, ActivityType } from '../src/models/process-types';
 
 describe('ProcessNormalizer Field Reference Validation', () => {
     let normalizer: typeof ProcessNormalizer;

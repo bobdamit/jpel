@@ -1,4 +1,4 @@
-import { ProcessDefinition, ProcessTemplateFlyweight } from '../types';
+import { ProcessDefinition, ProcessTemplateFlyweight } from '../models/process-types';
 
 /**
  * Repository interface for process definitions

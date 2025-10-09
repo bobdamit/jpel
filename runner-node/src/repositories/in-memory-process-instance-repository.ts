@@ -1,6 +1,7 @@
-import { ProcessInstance, ProcessInstanceFlyweight, ProcessStatus } from '../types';
+import {  ProcessStatus } from '../models/process-types';
 import { ProcessInstanceRepository } from './process-instance-repository';
 import { logger } from '../logger';
+import { ProcessInstance, ProcessInstanceFlyweight } from '@/models/instance-types';
 
 // using centralized logger
 

@@ -1,4 +1,5 @@
-import { ProcessInstance, ProcessInstanceFlyweight, ProcessStatus } from '../types';
+import { ProcessInstance, ProcessInstanceFlyweight } from '@/models/instance-types';
+import { ProcessStatus } from '../models/process-types';
 
 /**
  * Repository interface for process runtime instances

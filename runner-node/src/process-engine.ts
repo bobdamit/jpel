@@ -2,35 +2,21 @@ import { v4 as uuidv4 } from 'uuid';
 import {
 	ProcessDefinition,
 	ProcessTemplateFlyweight,
-	ProcessInstance,
 	ProcessStatus,
 	Activity,
-	ActivityInstance,
 	ActivityStatus,
 	ActivityType,
-	PassFail,
 	HumanActivity,
-	HumanActivityInstance,
 	ComputeActivity,
-	ComputeActivityInstance,
 	APIActivity,
-	APIActivityInstance,
 	SequenceActivity,
-	SequenceActivityInstance,
 	ParallelActivity,
-	ParallelActivityInstance,
 	BranchActivity,
-	BranchActivityInstance,
 	SwitchActivity,
-	SwitchActivityInstance,
 	TerminateActivity,
-	ProcessExecutionResult,
-	HumanTaskData,
-	FieldValue,
 	FieldType,
-	Variable,
-	ProcessInstanceFlyweight
-} from './types';
+	Variable
+} from './models/process-types';
 import { ExpressionEvaluator } from './expression-evaluator';
 import { APIExecutor } from './api-executor';
 import { FieldValidator } from './field-validator';
@@ -39,6 +25,10 @@ import { ProcessDefinitionRepository } from './repositories/process-definition-r
 import { ProcessInstanceRepository } from './repositories/process-instance-repository';
 import { logger } from './logger';
 import ProcessNormalizer from './process-normalizer';
+import { ActivityInstance, APIActivityInstance, BranchActivityInstance, ProcessExecutionResult,
+	FieldValue, ComputeActivityInstance, HumanActivityInstance, HumanTaskData, 
+	ParallelActivityInstance, ProcessInstance, ProcessInstanceFlyweight, SequenceActivityInstance, 
+	SwitchActivityInstance } from './models/instance-types';
 
 // Using centralized logger
 

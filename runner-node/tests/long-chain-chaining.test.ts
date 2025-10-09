@@ -1,6 +1,6 @@
 import { ProcessEngine } from '../src/process-engine';
 import { RepositoryFactory } from '../src/repositories/repository-factory';
-import { ActivityType, FieldType, ProcessStatus } from '../src/types';
+import { ActivityType, FieldType, ProcessStatus } from '../src/models/process-types';
 
 describe('Long mixed chain execution', () => {
     let engine: ProcessEngine;

@@ -2,14 +2,12 @@ import { ProcessEngine } from '../src/process-engine';
 import { 
     ProcessDefinition, 
     ProcessStatus, 
-    ActivityStatus, 
     ActivityType,
-    Field,
-    FieldValue,
     FieldType,
     HumanActivity
-} from '../src/types';
+} from '../src/models/process-types';
 import { RepositoryFactory } from '../src/repositories/repository-factory';
+import { FieldValue } from '@/models/instance-types';
 
 describe('ProcessEngine FieldValue Architecture', () => {
     let processEngine: ProcessEngine;

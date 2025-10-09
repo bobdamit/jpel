@@ -1,5 +1,6 @@
 import axios, { AxiosResponse } from 'axios';
-import { APIActivity, ProcessInstance } from './types';
+import { APIActivity } from './models/process-types';
+import { ProcessInstance } from './models/instance-types';
 
 export class APIExecutor {
 

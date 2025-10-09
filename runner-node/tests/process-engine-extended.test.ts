@@ -14,7 +14,7 @@ import {
     BranchActivity,
     SwitchActivity,
     TerminateActivity
-} from '../src/types';
+} from '../src/models/process-types';
 import { RepositoryFactory } from '../src/repositories/repository-factory';
 
 describe('ProcessEngine Extended Coverage', () => {

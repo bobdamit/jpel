@@ -1,4 +1,4 @@
-import { ProcessDefinition } from './types';
+import { ProcessDefinition } from './models/process-types';
 import { logger } from './logger';
 import fs from 'fs';
 import path from 'path';

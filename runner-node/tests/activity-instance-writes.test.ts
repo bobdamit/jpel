@@ -1,7 +1,7 @@
 import { ProcessEngine } from '../src/process-engine';
 import { RepositoryFactory } from '../src/repositories/repository-factory';
 import { createMockProcessDefinition } from './setup';
-import { ActivityStatus } from '../src/types';
+import { ActivityStatus } from '../src/models/process-types';
 
 describe('ActivityInstance native field write access', () => {
   let engine: ProcessEngine;

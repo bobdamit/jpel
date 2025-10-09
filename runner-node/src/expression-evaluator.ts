@@ -1,4 +1,4 @@
-import { ProcessInstance } from './types';
+import { ProcessInstance } from './models/instance-types';
 import { logger } from './logger';
 
 export class ExpressionEvaluator {

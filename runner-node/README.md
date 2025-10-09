@@ -373,7 +373,7 @@ npm run lint
 ### Adding New Features
 
 **New Activity Types:**
-1. Update `src/types.ts` with the new activity type
+1. Update `src/models/process-types.ts` with the new activity type
 2. Implement executor logic in `src/process-engine.ts`
 3. Add validation in `src/process-normalizer.ts`
 4. Write tests in `tests/`

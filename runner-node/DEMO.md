@@ -119,7 +119,7 @@ curl http://localhost:3000/api/processes
 
 ### **Adding New Activity Types**
 ```typescript
-// 1. Update types.ts
+// 1. Update `src/models/process-types.ts`
 export type ActivityType = 'human' | 'compute' | 'api' | 'custom';
 
 // 2. Implement in process-engine.ts

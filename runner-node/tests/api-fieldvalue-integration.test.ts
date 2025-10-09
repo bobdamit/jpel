@@ -7,7 +7,7 @@ import {
     ActivityType, 
     FieldType,
     HumanActivity 
-} from '../src/types';
+} from '../src/models/process-types';
 
 // Import the updated getActivityData function
 function getActivityData(activity: any): any {

@@ -8,10 +8,9 @@ import { ProcessEngine } from "./process-engine";
 import { RepositoryFactory } from "./repositories/repository-factory";
 import { logger } from './logger';
 import {
-	ProcessDefinition,
-	ApiResponse,
-	ProcessExecutionResult,
-} from "./types";
+	ProcessDefinition
+} from "./models/process-types";
+import { ApiResponse, ProcessExecutionResult } from "./models/instance-types";
 
 /**
  * Extracts data from typed activity instances for API responses

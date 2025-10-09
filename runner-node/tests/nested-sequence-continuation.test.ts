@@ -1,6 +1,6 @@
 import { ProcessEngine } from '../src/process-engine';
 import { RepositoryFactory } from '../src/repositories/repository-factory';
-import { ActivityType, FieldType, ProcessStatus, ActivityStatus } from '../src/types';
+import { ActivityType, FieldType, ProcessStatus, ActivityStatus } from '../src/models/process-types';
 import fs from 'fs';
 import path from 'path';
 

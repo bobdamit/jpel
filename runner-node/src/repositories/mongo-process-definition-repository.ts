@@ -1,4 +1,4 @@
-import { ProcessDefinition, ProcessTemplateFlyweight } from '../types';
+import { ProcessDefinition, ProcessTemplateFlyweight } from '../models/process-types';
 import { ProcessDefinitionRepository } from './process-definition-repository';
 import { logger } from '../logger';
 

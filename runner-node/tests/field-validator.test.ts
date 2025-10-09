@@ -1,5 +1,5 @@
 import { FieldValidator } from '../src/field-validator';
-import { Field, FieldType } from '../src/types';
+import { Field, FieldType } from '../src/models/process-types';
 
 describe('FieldValidator', () => {
   describe('validateField', () => {
