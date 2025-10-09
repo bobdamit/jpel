@@ -14,14 +14,33 @@ export interface ProcessInstanceFlyweight {
 export interface ProcessInstance {
 	instanceId: string;
 	processId: string;
+	executionContext : ExecutionContext;
 	title?: string;
 	status: ProcessStatus;
 	startedAt: Date;
 	completedAt?: Date;
-	currentActivity?: string;
 	variables: { [key: string]: any };
 	activities: { [key: string]: ActivityInstance };
 	aggregatePassFail?: AggregatePassFail; 
+}
+
+export class ExecutionContext {
+	activityBreadcrums : string[] = [];
+	private _currentActivity? : string;
+	private ancesterActivity? : string;
+
+	public set currentActivity(activityId : string | undefined) {
+		this.ancesterActivity = this._currentActivity;
+		this._currentActivity = activityId;
+		if(activityId) {
+			this.activityBreadcrums.push(activityId);
+		}
+	}	
+
+	public get currentActivity() : string | undefined{
+		return this.currentActivity;
+	}
+
 }
 
 export enum AggregatePassFail {

@@ -60,12 +60,12 @@ const createTestApp = (processEngine: ProcessEngine) => {
                 return;
             }
 
-            if (!instance.currentActivity) {
+            if (!instance.executionContext.currentActivity) {
                 res.json(createResponse(true, { message: "No current activity" }));
                 return;
             }
 
-            const currentActivity = instance.activities[instance.currentActivity];
+            const currentActivity = instance.activities[instance.executionContext.currentActivity];
 
             if (currentActivity.status === "running" && currentActivity.type === "human") {
                 // Convert variables to FieldValue[] for UI (same as main API)

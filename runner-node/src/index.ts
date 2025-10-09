@@ -324,12 +324,14 @@ app.get(
 			return;
 		}
 
-		if (!instance.currentActivity) {
+		let executionContext = instance.executionContext;
+
+		if (!executionContext.currentActivity) {
 			res.json(createResponse(true, { message: "No current activity", instance }));
 			return;
 		}
 
-		const currentActivity = instance.activities[instance.currentActivity];
+		const currentActivity = instance.activities[executionContext.currentActivity];
 
 		if (
 			currentActivity.status === "running" &&

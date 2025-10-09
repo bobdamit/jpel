@@ -47,7 +47,7 @@ describe('Process Navigation Tests', () => {
         const instance = await engine.getInstance(instanceId);
         expect(instance).not.toBeNull();
         if (instance) {
-            expect(instance.currentActivity).toBe('step1');
+            expect(instance.executionContext.currentActivity).toBe('step1');
         }
     });
 
@@ -83,14 +83,14 @@ describe('Process Navigation Tests', () => {
         // The instance should start at step1 (first activity in sequence)
         let instance = await engine.getInstance(instanceId);
         expect(instance).not.toBeNull();
-        expect(instance?.currentActivity).toBe('step1');
+        expect(instance?.executionContext.currentActivity).toBe('step1');
         
         // Complete step1 to move to step2
         await engine.submitHumanTask(instanceId, 'step1', { input1: 'test' });
         
         // Verify we're now at step2
         instance = await engine.getInstance(instanceId);
-        expect(instance?.currentActivity).toBe('step2');
+        expect(instance?.executionContext.currentActivity).toBe('step2');
         
         // Now navigate to next pending (which should still be step2 since it's not completed)
         const navigateResult = await engine.navigateToNextPending(instanceId);
@@ -102,7 +102,7 @@ describe('Process Navigation Tests', () => {
         const updatedInstance = await engine.getInstance(instanceId);
         expect(updatedInstance).not.toBeNull();
         if (updatedInstance) {
-            expect(updatedInstance.currentActivity).toBe('step2');
+            expect(updatedInstance.executionContext.currentActivity).toBe('step2');
         }
     });
 

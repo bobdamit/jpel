@@ -32,14 +32,14 @@ describe('Sequence + Switch Chaining Tests', () => {
         // After starting, the switch should route to 'donor'
         let instance = await engine.getInstance(instanceId);
         expect(instance).toBeDefined();
-        expect(instance?.currentActivity).toBe('donor');
+        expect(instance?.executionContext.currentActivity).toBe('donor');
 
         // Complete donor
         await engine.submitHumanTask(instanceId, 'donor', { donor: '990' });
 
         // Now sequence should continue to afterSwitch
         instance = await engine.getInstance(instanceId);
-        expect(instance?.currentActivity).toBe('afterSwitch');
+        expect(instance?.executionContext.currentActivity).toBe('afterSwitch');
         // The sequence child (seq) should have progressed; verify sequence child instance
         const seqInst = instance?.activities['seq'];
         expect(seqInst?.status === ActivityStatus.Running || seqInst?.status === ActivityStatus.Completed).toBeTruthy();
@@ -73,17 +73,17 @@ describe('Sequence + Switch Chaining Tests', () => {
 
         // chooser should set currentActivity to innerOne (first child of innerSeq)
         let instance = await engine.getInstance(instanceId);
-        expect(instance?.currentActivity).toBe('innerOne');
+        expect(instance?.executionContext.currentActivity).toBe('innerOne');
 
         // Complete innerOne -> should go to innerTwo
         await engine.submitHumanTask(instanceId, 'innerOne', { one: 'x' });
         instance = await engine.getInstance(instanceId);
-        expect(instance?.currentActivity).toBe('innerTwo');
+        expect(instance?.executionContext.currentActivity).toBe('innerTwo');
 
         // Complete innerTwo -> nested sequence completes and parent should continue to afterParent
         await engine.submitHumanTask(instanceId, 'innerTwo', { two: 'y' });
         instance = await engine.getInstance(instanceId);
-        expect(instance?.currentActivity).toBe('afterParent');
+        expect(instance?.executionContext.currentActivity).toBe('afterParent');
 
         // Finish
         await engine.submitHumanTask(instanceId, 'afterParent', { after: 'ok' });

@@ -55,20 +55,7 @@ export class InMemoryProcessInstanceRepository implements ProcessInstanceReposit
 			});
 		}
 
-		logger.debug(`Saving process instance`, {
-			operation,
-			instanceId: instance.instanceId,
-			processId: instance.processId,
-			status: instance.status,
-			currentActivity: instance.currentActivity || null,
-			variablesCount: instance.variables ? Object.keys(instance.variables).length : 0,
-			activitiesCount: instance.activities ? Object.keys(instance.activities).length : 0,
-			startedAt: instance.startedAt,
-			completedAt: instance.completedAt,
-			processVariables: variableValues,
-			stepFieldValues: stepFieldValues,
-			activityStatuses
-		});
+
 
 		this.instances.set(instance.instanceId, { ...instance });
 
@@ -76,7 +63,7 @@ export class InMemoryProcessInstanceRepository implements ProcessInstanceReposit
 			instanceId: instance.instanceId,
 			processId: instance.processId,
 			status: instance.status,
-			currentActivity: instance.currentActivity || null,
+			currentActivity: instance.executionContext.currentActivity || null,
 			totalInstances: this.instances.size
 		});
 	}
@@ -92,7 +79,7 @@ export class InMemoryProcessInstanceRepository implements ProcessInstanceReposit
 				instanceId: result.instanceId,
 				processId: result.processId,
 				status: result.status,
-				currentActivity: result.currentActivity
+				currentActivity: result.executionContext.currentActivity
 			});
 		} else {
 			logger.warn(`Process instance not found for ID: '${instanceId}'`, {
@@ -223,32 +210,6 @@ export class InMemoryProcessInstanceRepository implements ProcessInstanceReposit
 		return result;
 	}
 
-	async findInstancesWaitingForHumanTask(): Promise<ProcessInstance[]> {
-		const result: ProcessInstance[] = [];
-
-		for (const instance of this.instances.values()) {
-			if (instance.status === ProcessStatus.Running && instance.currentActivity) {
-				const currentActivity = instance.activities[instance.currentActivity];
-				if (currentActivity?.type === 'human' && currentActivity?.status === 'running') {
-					result.push({ ...instance });
-				}
-			}
-		}
-
-		return result;
-	}
-
-	async findInstancesByCurrentActivity(activityId: string): Promise<ProcessInstance[]> {
-		const result: ProcessInstance[] = [];
-
-		for (const instance of this.instances.values()) {
-			if (instance.currentActivity === activityId) {
-				result.push({ ...instance });
-			}
-		}
-
-		return result;
-	}
 
 	async count(): Promise<number> {
 		return this.instances.size;

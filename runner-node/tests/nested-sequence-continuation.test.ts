@@ -86,7 +86,7 @@ describe('Nested Sequence Continuation Tests', () => {
         let instance = await engine.getInstance(instanceId);
         
         // Verify that the current activity is validateCommonFacts (not stuck)
-        expect(instance?.currentActivity).toBe('validateCommonFacts');
+        expect(instance?.executionContext.currentActivity).toBe('validateCommonFacts');
         expect(instance?.status).toBe(ProcessStatus.Running);
         
         // Verify basicFactsSequence is completed
@@ -100,7 +100,7 @@ describe('Nested Sequence Continuation Tests', () => {
         
         // Now should be at finalDecision
         instance = await engine.getInstance(instanceId);
-        expect(instance?.currentActivity).toBe('finalDecision');
+        expect(instance?.executionContext.currentActivity).toBe('finalDecision');
         expect(instance?.status).toBe(ProcessStatus.Running);
         
         // Complete the decision to finish the process
@@ -111,7 +111,7 @@ describe('Nested Sequence Continuation Tests', () => {
         // Process should now be completed
         instance = await engine.getInstance(instanceId);
         expect(instance?.status).toBe(ProcessStatus.Completed);
-        expect(instance?.currentActivity).toBeUndefined();
+        expect(instance?.executionContext.currentActivity).toBeUndefined();
     });
 
     test('should handle multiple levels of nested sequences', async () => {
@@ -180,21 +180,21 @@ describe('Nested Sequence Continuation Tests', () => {
         
         // Should now be at secondActivity
         let instance = await engine.getInstance(instanceId);
-        expect(instance?.currentActivity).toBe('secondActivity');
+        expect(instance?.executionContext.currentActivity).toBe('secondActivity');
         
         // Complete secondActivity (completes deepestSeq)
         await engine.submitHumanTask(instanceId, 'secondActivity', { input2: 'test2' });
         
         // Should now be at middleActivity (innerSeq1 continues)
         instance = await engine.getInstance(instanceId);
-        expect(instance?.currentActivity).toBe('middleActivity');
+        expect(instance?.executionContext.currentActivity).toBe('middleActivity');
         
         // Complete middleActivity (completes innerSeq1)
         await engine.submitHumanTask(instanceId, 'middleActivity', { input3: 'test3' });
         
         // Should now be at finalActivity (outerSeq continues)
         instance = await engine.getInstance(instanceId);
-        expect(instance?.currentActivity).toBe('finalActivity');
+        expect(instance?.executionContext.currentActivity).toBe('finalActivity');
         
         // Complete finalActivity (completes entire process)
         await engine.submitHumanTask(instanceId, 'finalActivity', { input4: 'test4' });
@@ -202,6 +202,6 @@ describe('Nested Sequence Continuation Tests', () => {
         // Process should be completed
         instance = await engine.getInstance(instanceId);
         expect(instance?.status).toBe(ProcessStatus.Completed);
-        expect(instance?.currentActivity).toBeUndefined();
+        expect(instance?.executionContext.currentActivity).toBeUndefined();
     });
 });

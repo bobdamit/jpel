@@ -49,7 +49,7 @@ describe('ProcessEngine compute copying activity field to variable', () => {
     const instanceBefore = await engine.getInstance(instanceId);
     expect(instanceBefore).not.toBeNull();
     if (!instanceBefore) return;
-    expect(instanceBefore.currentActivity).toBe('enterName');
+    expect(instanceBefore.executionContext.currentActivity).toBe('enterName');
 
     // Submit the human task with a customerName
     const submitResult = await engine.submitHumanTask(instanceId, 'enterName', { customerName: 'Alice' });

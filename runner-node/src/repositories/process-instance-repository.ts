@@ -27,9 +27,6 @@ export interface ProcessInstanceRepository {
 	findByDateRange(startDate: Date, endDate: Date): Promise<ProcessInstance[]>;
 	findActiveInstancesOlderThan(date: Date): Promise<ProcessInstance[]>;
 
-	// Activity-specific queries
-	findInstancesWaitingForHumanTask(): Promise<ProcessInstance[]>;
-	findInstancesByCurrentActivity(activityId: string): Promise<ProcessInstance[]>;
 
 	// Performance and monitoring
 	count(): Promise<number>;
