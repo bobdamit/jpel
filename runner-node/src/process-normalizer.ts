@@ -12,6 +12,11 @@ export interface ValidationResult {
 	warnings: string[];
 }
 
+/**
+ * Loads, validates and prepares a Process for instantiation
+ * into a process Instance
+ * TODO: rename this ProcessLoader ?
+ */
 export class ProcessNormalizer {
 
 	// cached schema validator

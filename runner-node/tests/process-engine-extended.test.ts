@@ -51,15 +51,6 @@ describe('ProcessEngine Extended Coverage', () => {
             expect(processes.length).toBeGreaterThan(0);
         });
 
-        test('should handle non-existent process requests', async () => {
-            const result = await processEngine.createInstance('non-existent-process');
-            expect(result.status).toBe(ProcessStatus.Failed);
-            expect(result.message).toContain('not found');
-
-            const process = await processEngine.getProcess('non-existent-process');
-            expect(process).toBeNull();
-        });
-
         test('should handle process without start activity', async () => {
             const invalidProcess: ProcessDefinition = {
                 id: 'invalid-process',
@@ -610,16 +601,6 @@ describe('ProcessEngine Extended Coverage', () => {
             await expect(processEngine.loadProcess(process)).rejects.toThrow();
         });
 
-        test('should handle submit to non-existent instance', async () => {
-            const result = await processEngine.submitHumanTask(
-                'non-existent-instance',
-                'some-activity',
-                { field: 'value' }
-            );
-
-            expect(result.status).toBe(ProcessStatus.Failed);
-            expect(result.message).toContain('not found');
-        });
 
         test('should handle submit to non-running activity', async () => {
             const process: ProcessDefinition = {

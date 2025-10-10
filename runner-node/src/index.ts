@@ -129,81 +129,7 @@ app.get("/health", (req: Request, res: Response) => {
 	res.json(createResponse(true, { status: "OK", service: "JPEL Runner" }));
 });
 
-// Load a process definition from file
-app.post(
-	"/api/processes/load",
-	asyncHandler(async (req: Request, res: Response): Promise<void> => {
-		const { filePath } = req.body;
 
-		if (!filePath) {
-			res
-				.status(400)
-				.json(createResponse(false, null, "File path is required"));
-			return;
-		}
-
-		try {
-			const fullPath = path.resolve(filePath);
-			const processJson = fs.readFileSync(fullPath, "utf8");
-			const processDefinition: ProcessDefinition = JSON.parse(processJson);
-
-			await processEngine.loadProcess(processDefinition);
-
-			res.json(
-				createResponse(true, {
-					message: `Process '${processDefinition.id}' loaded successfully`,
-					processId: processDefinition.id,
-				})
-			);
-		} catch (error: any) {
-			res
-				.status(400)
-				.json(
-					createResponse(
-						false,
-						null,
-						`Failed to load process: ${error.message}`
-					)
-				);
-		}
-	})
-);
-
-// Load a process definition from JSON body
-app.post(
-	"/api/processes",
-	asyncHandler(async (req: Request, res: Response): Promise<void> => {
-		try {
-			const processDefinition: ProcessDefinition = req.body;
-
-			if (!processDefinition.id || !processDefinition.name) {
-				res
-					.status(400)
-					.json(createResponse(false, null, "Process must have id and name"));
-				return;
-			}
-
-			await processEngine.loadProcess(processDefinition);
-
-			res.json(
-				createResponse(true, {
-					message: `Process '${processDefinition.id}' loaded successfully`,
-					processId: processDefinition.id,
-				})
-			);
-		} catch (error: any) {
-			res
-				.status(400)
-				.json(
-					createResponse(
-						false,
-						null,
-						`Failed to load process: ${error.message}`
-					)
-				);
-		}
-	})
-);
 
 // Get all loaded processes
 app.get("/api/processes", async (req: Request, res: Response) => {
@@ -414,39 +340,7 @@ app.post(
 	})
 );
 
-// Navigate to next pending activity
-app.post(
-	"/api/instances/:instanceId/navigate/next-pending",
-	asyncHandler(async (req: Request, res: Response): Promise<void> => {
-		const { instanceId } = req.params;
 
-		const result: ProcessExecutionResult = await processEngine.navigateToNextPending(instanceId);
-
-		if (result.status === "failed") {
-			res.status(400).json(createResponse(false, null, result.message));
-			return;
-		}
-
-		res.json(createResponse(true, result));
-	})
-);
-
-// Navigate to last executed activity
-app.post(
-	"/api/instances/:instanceId/navigate/last-executed",
-	asyncHandler(async (req: Request, res: Response): Promise<void> => {
-		const { instanceId } = req.params;
-
-		const result: ProcessExecutionResult = await processEngine.navigateToLastExecuted(instanceId);
-
-		if (result.status === "failed") {
-			res.status(400).json(createResponse(false, null, result.message));
-			return;
-		}
-
-		res.json(createResponse(true, result));
-	})
-);
 
 // Error handling middleware
 app.use((error: any, req: Request, res: Response, next: NextFunction) => {

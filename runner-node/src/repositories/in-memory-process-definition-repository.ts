@@ -165,7 +165,7 @@ export class InMemoryProcessDefinitionRepository implements ProcessDefinitionRep
 		});
 	}
 
-	async findById(processId: string): Promise<ProcessDefinition | null> {
+	async findById(processId: string): Promise<ProcessDefinition> {
 		logger.debug(`Looking up process definition by ID: '${processId}'`);
 
 		// First check if it's already loaded in memory
@@ -190,17 +190,18 @@ export class InMemoryProcessDefinitionRepository implements ProcessDefinitionRep
 			}
 		}
 
-		if (result) {
-			logger.debug(`Found process definition`, {
-				id: result.id,
-				name: result.name,
-				version: result.version
-			});
-		} else {
+		if(!result) {
 			logger.error(`Process definition not found for ID: '${processId}'`);
+			throw new Error(`Process definition not found for ID: '${processId}'`);
 		}
 
+		logger.debug(`Found process definition`, {
+			id: result.id,
+			name: result.name,
+			version: result.version
+		});
 		return result;
+
 	}
 
 	async findAll(): Promise<ProcessDefinition[]> {

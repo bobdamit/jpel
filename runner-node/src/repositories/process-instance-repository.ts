@@ -8,7 +8,7 @@ import { ProcessStatus } from '../models/process-types';
 export interface ProcessInstanceRepository {
 	// Basic CRUD operations
 	save(instance: ProcessInstance): Promise<void>;
-	findById(instanceId: string): Promise<ProcessInstance | null>;
+	findById(instanceId: string): Promise<ProcessInstance >;
 	findAll(): Promise<ProcessInstance[]>;
 	delete(instanceId: string): Promise<boolean>;
 	exists(instanceId: string): Promise<boolean>;

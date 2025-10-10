@@ -482,8 +482,8 @@ function renderInstanceList(instances, processId) {
                     <div>Completed: ${completedAt}</div>
                     ${aggregateHtml}
                 </div>
-                <button class="btn btn-secondary" data-action="view-instance" data-instance="${instance.instanceId}">View Details</button>
-                <button class="btn btn-primary" data-action="rerun-instance" data-instance="${instance.instanceId}">Re-run Process</button>
+                <button class="btn btn-secondary" data-action="view-instance" data-instance="${instance.instanceId}">View JSON</button>
+                <button class="btn btn-primary" data-action="rerun-instance" data-instance="${instance.instanceId}">Resume Instance</button>
             </div>
         `;
     }).join('');
@@ -543,7 +543,7 @@ async function viewInstance(instanceId) {
         if (result.success) {
             const instance = result.data;
             const details = `
-                <h4>Instance Details</h4>
+                <h4>Instance JSON</h4>
                 <pre style="background: #f5f5f5; padding: 10px; border-radius: 4px; overflow-x: auto; white-space: pre-wrap;">${JSON.stringify(instance, null, 2)}</pre>
             `;
             showStatus(details, 'info');
@@ -584,68 +584,13 @@ async function navigateToStart() {
         if (result.success) {
             showExecutionStatus(`✅ ${result.data.message}`, 'success');
             
-            // Refresh the instance view
-            const instanceResponse = await fetch(`${API_BASE}/instances/${currentInstanceId}`);
-            const instanceResult = await instanceResponse.json();
-            if (instanceResult.success && instanceResult.data) {
-                renderInstanceStatusSimple(instanceResult.data);
-                renderProcessVariablesSimple(instanceResult.data);
-                renderCurrentActivitiesSimple(instanceResult.data);
-                detectAndRenderFinishedActivities(instanceResult.data);
-                
-                // Navigation to start executes automatically - execution happens in the backend
-            }
+            await continueExecution();
         } else {
             showExecutionStatus(`❌ Navigation failed: ${result.error}`, 'error');
         }
     } catch (error) {
         console.error('Error navigating to start', error);
         showExecutionStatus(`❌ Error navigating to start: ${error.message}`, 'error');
-    }
-}
-
-async function navigateToNextPending() {
-    if (!currentInstanceId) {
-        showExecutionStatus('No active instance to navigate!', 'error');
-        return;
-    }
-
-    try {
-        showExecutionStatus('Navigating to next pending...', 'info');
-        
-        const response = await fetch(`${API_BASE}/instances/${currentInstanceId}/navigate/next-pending`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({})
-        });
-
-        const result = await response.json();
-
-        if (result.success) {
-            if (result.data.status === 'completed') {
-                showExecutionStatus(`✅ All activities completed!`, 'success');
-            } else {
-                showExecutionStatus(`✅ ${result.data.message}`, 'success');
-            }
-            
-            // Refresh the instance view
-            const instanceResponse = await fetch(`${API_BASE}/instances/${currentInstanceId}`);
-            const instanceResult = await instanceResponse.json();
-            if (instanceResult.success && instanceResult.data) {
-                renderInstanceStatusSimple(instanceResult.data);
-                renderProcessVariablesSimple(instanceResult.data);
-                renderCurrentActivitiesSimple(instanceResult.data);
-                detectAndRenderFinishedActivities(instanceResult.data);
-                
-                // After navigation, trigger execution to start the flow
-                await executeCurrentStep();
-            }
-        } else {
-            showExecutionStatus(`❌ Navigation failed: ${result.error}`, 'error');
-        }
-    } catch (error) {
-        console.error('Error navigating to next pending', error);
-        showExecutionStatus(`❌ Error navigating to next pending: ${error.message}`, 'error');
     }
 }
 
@@ -663,7 +608,7 @@ async function checkAndShowHumanTask() {
             showHumanTask(taskResult.data.humanTask);
             if (taskResult.data.instance) {
                 renderInstanceVariables(taskResult.data.instance);
-                renderRunningActivities(taskResult.data.instance);
+                renderRunningActivities(taskResult.data.instance);s
             }
         } else {
             // Hide human task interface if no human task
@@ -1015,9 +960,6 @@ document.addEventListener('DOMContentLoaded', function() {
             case 'view-process':
                 if (process) viewProcess(process);
                 break;
-            case 'list-processes':
-                listProcesses();
-                break;
             case 'list-instances':
                 listInstances();
                 break;
@@ -1040,9 +982,7 @@ document.addEventListener('DOMContentLoaded', function() {
             case 'navigate-start':
                 navigateToStart();
                 break;
-            case 'navigate-next-pending':
-                navigateToNextPending();
-                break;
+
         }
     });
 });
