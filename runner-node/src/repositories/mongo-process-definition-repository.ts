@@ -128,7 +128,7 @@ export class MongoProcessDefinitionRepository implements ProcessDefinitionReposi
 		}
 	}
 
-	async findById(processId: string): Promise<ProcessDefinition | null> {
+	async findById(processId: string): Promise<ProcessDefinition> {
 		logger.debug(`Looking up process definition in MongoDB by ID: '${processId}'`);
 
 		try {
@@ -139,16 +139,15 @@ export class MongoProcessDefinitionRepository implements ProcessDefinitionReposi
 
 			const result = document ? this.documentToProcessDefinition(document) : null;
 
-			if (result) {
-				logger.debug(`Found process definition in MongoDB`, {
-					id: result.id,
-					name: result.name,
-					version: result.version
-				});
-			} else {
-				logger.warn(`Process definition not found in MongoDB for ID: '${processId}'`);
-			}
+			if(!result) {
+				throw new Error(`Process definition not found for ID: '${processId}'`);
+			}	
 
+			logger.debug(`Found process definition in MongoDB`, {
+				id: result.id,
+				name: result.name,
+				version: result.version
+			});
 			return result;
 		} catch (error) {
 			logger.error(`Failed to find process definition in MongoDB`, {

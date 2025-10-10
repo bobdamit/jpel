@@ -32,106 +32,10 @@ import { ActivityInstance, APIActivityInstance, BranchActivityInstance, ProcessE
 	ExecutionContext, ExecutionFrame} from './models/instance-types';
 
 
-/**
- * Result of activity continuation logic
- */
-interface ContinuationResult {
-	nextActivityId?: string;
-	parentId?: string;
-	position?: number;
-	completed?: boolean; // If true, the parent activity is complete
-}
 
 /**
- * Strategy interface for handling activity continuation
- */
-interface ActivityContinuationStrategy {
-	continue(
-		activity: ActivityInstance,
-		completedFrame: ExecutionFrame,
-		processEngine: ProcessEngine,
-		instanceId: string
-	): Promise<ContinuationResult | null>;
-}
-
-/**
- * Continuation strategy for sequence activities
- */
-class SequenceContinuationStrategy implements ActivityContinuationStrategy {
-	async continue(
-		activity: ActivityInstance,
-		completedFrame: ExecutionFrame,
-		processEngine: ProcessEngine,
-		instanceId: string
-	): Promise<ContinuationResult | null> {
-		const sequence = activity as SequenceActivityInstance;
-		const currentPosition = completedFrame.position || 0;
-		const nextPosition = currentPosition + 1;
-
-		// Check if there are more activities in the sequence
-		if (nextPosition < sequence.activities.length) {
-			// Execute next activity in sequence
-			const nextActivityRef = sequence.activities[nextPosition];
-			const nextActivityId = processEngine.extractActivityId(nextActivityRef);
-			
-			return {
-				nextActivityId,
-				parentId: sequence.id!,
-				position: nextPosition
-			};
-		} else {
-			// Sequence completed
-			return { completed: true };
-		}
-	}
-}
-
-/**
- * Continuation strategy for switch activities
- */
-class SwitchContinuationStrategy implements ActivityContinuationStrategy {
-	async continue(
-		activity: ActivityInstance,
-		completedFrame: ExecutionFrame,
-		processEngine: ProcessEngine,
-		instanceId: string
-	): Promise<ContinuationResult | null> {
-		// Switch activities complete when their selected branch completes
-		return { completed: true };
-	}
-}
-
-/**
- * Continuation strategy for branch activities
- */
-class BranchContinuationStrategy implements ActivityContinuationStrategy {
-	async continue(
-		activity: ActivityInstance,
-		completedFrame: ExecutionFrame,
-		processEngine: ProcessEngine,
-		instanceId: string
-	): Promise<ContinuationResult | null> {
-		// Branch activities complete when their path completes
-		return { completed: true };
-	}
-}
-
-/**
- * Default continuation strategy for simple activities (Human, Compute, API, Terminate)
- */
-class DefaultContinuationStrategy implements ActivityContinuationStrategy {
-	async continue(
-		activity: ActivityInstance,
-		completedFrame: ExecutionFrame,
-		processEngine: ProcessEngine,
-		instanceId: string
-	): Promise<ContinuationResult | null> {
-		// Simple activities complete when their child completes
-		return { completed: true };
-	}
-}
-
-
+* Process Engine for loading, executing, and managing process definitions and instances
+*/
 export class ProcessEngine {
 	private processDefinitionRepo: ProcessDefinitionRepository;
 	private processInstanceRepo: ProcessInstanceRepository;
@@ -140,7 +44,7 @@ export class ProcessEngine {
 	private continuationStrategies: Map<ActivityType, ActivityContinuationStrategy>;
 
 	constructor() {
-		logger.info('ProcessEngine: Initializing...');
+
 		this.processDefinitionRepo = RepositoryFactory.getProcessDefinitionRepository();
 		this.processInstanceRepo = RepositoryFactory.getProcessInstanceRepository();
 		this.expressionEvaluator = new ExpressionEvaluator();
@@ -160,61 +64,37 @@ export class ProcessEngine {
 		this.continuationStrategies.set(ActivityType.Terminate, defaultStrategy);
 		this.continuationStrategies.set(ActivityType.Parallel, defaultStrategy);
 		
-		logger.info('ProcessEngine: Initialization complete');
+		logger.info('ProcessEngine: ctor complete');
 	}
 
-	// Load a process definition
-	async loadProcess(processDefinition: ProcessDefinition): Promise<void> {
-		logger.info(`ProcessEngine: Loading process definition`, {
-			id: processDefinition.id,
-			name: processDefinition.name,
-			start: processDefinition.start,
-			activitiesCount: Object.keys(processDefinition.activities || {}).length
-		});
 
-		if (!processDefinition.id) {
-			logger.error('ProcessEngine: Process definition missing required id field');
-			throw new Error('Process definition must have an id');
-		}
 
-		if (!processDefinition.name) {
-			logger.error('ProcessEngine: Process definition missing required name field');
-			throw new Error('Process definition must have a name');
-		}
-
-		if (!processDefinition.start) {
-			logger.warn('ProcessEngine: Process definition missing start activity reference', {
-				processId: processDefinition.id,
-				name: processDefinition.name,
-				start: processDefinition.start
-			});
-		}
-
-		// Validate and normalize the incoming process definition
-		const validation = ProcessNormalizer.validate(processDefinition);
-		if (!validation.valid) {
-			// ProcessNormalizer already logs individual AJV schema diagnostics at ERROR.
-			logger.error('ProcessEngine: Process definition validation failed', { errors: validation.errors });
-			throw new Error(`Process definition validation failed: ${validation.errors.join('; ')}`);
-		}
-		if (validation.warnings && validation.warnings.length) {
-			logger.warn('ProcessEngine: Process definition validation warnings', { warnings: validation.warnings });
-		}
-		ProcessNormalizer.normalize(processDefinition);
-
-		await this.processDefinitionRepo.save(processDefinition);
-		logger.info(`ProcessEngine: Process definition '${processDefinition.id}' loaded successfully`);
-	}
-
-	// Get all available process templates (flyweights)
+	/**
+	 * Get all available process templates (flyweights)
+	 * @returns 
+	 */
 	async getProcesses(): Promise<ProcessTemplateFlyweight[]> {
 		return await this.processDefinitionRepo.listAvailableTemplates();
 	}
 
-	// Get a specific process definition
+	/**
+	 * Get a specific process definition
+	 * @param processId 
+	 * @returns 
+	 */
 	async getProcess(processId: string): Promise<ProcessDefinition | null> {
 		return await this.processDefinitionRepo.findById(processId);
 	}
+
+	/**
+	 * Get a process instance by ID
+	 * @param instanceId 
+	 * @returns 
+	 */
+	async getInstance(instanceId: string): Promise<ProcessInstance | null> {
+		return await this.processInstanceRepo.findById(instanceId);
+	}
+
 
 	/**
 	 * Create a new process instance from a Process Definition
@@ -237,19 +117,14 @@ export class ProcessEngine {
 		logger.debug(`ProcessEngine: Found process definition`, {
 			id: processDefinition.id,
 			name: processDefinition.name,
-			start: processDefinition.start,
-			activitiesKeys: Object.keys(processDefinition.activities || {})
+			start: processDefinition.start
 		});
 
 		// Normalize any process data coming from repositories
 		ProcessNormalizer.normalize(processDefinition);
 
 		if (!processDefinition.start) {
-			logger.error(`ProcessEngine: Process definition '${processId}' has no start activity defined`, {
-				processId,
-				name: processDefinition.name,
-				start: processDefinition.start
-			});
+			logger.error(`ProcessEngine: Process definition '${processId}' has no start activity defined`);
 			return {
 				instanceId: '',
 				status: ProcessStatus.Failed,
@@ -273,10 +148,9 @@ export class ProcessEngine {
 		}
 
 		// initialize an execution context with the start activity
-		let executionContext = new ExecutionContext();
-		// Push the start activity as the root frame (no parent)
-		executionContext.pushFrame(startActivityId);
+		let executionContext =  this.initExecutionContextAtStart(processDefinition);
 
+		// materialize a new run instance from the process def
 		const instance: ProcessInstance = {
 			instanceId,
 			processId,
@@ -287,45 +161,56 @@ export class ProcessEngine {
 			activities: this.initializeActivities(processDefinition.activities)
 		};
 
-		logger.debug(`ProcessEngine: Created instance object`, {
+		logger.info(`ProcessEngine: Created instance object`, {
 			instanceId,
 			processId,
-			currentActivity: startActivityId,
-			variableCount: Object.keys(instance.variables).length,
-			activityCount: Object.keys(instance.activities).length
+			executionContext
 		});
 
 		await this.processInstanceRepo.save(instance);
-		logger.info(`ProcessEngine: Instance '${instanceId}' saved to repository`);
 
 		return await this.executeNextStep(instanceId);
 	}
 
-	// Get process instance
-	async getInstance(instanceId: string): Promise<ProcessInstance | null> {
-		return await this.processInstanceRepo.findById(instanceId);
+
+	/**
+	 * Create a new execution context starting at the Start activity
+	 * @param startActivityId 
+	 * @returns 
+	 */
+	private initExecutionContextAtStart(processDefinition: ProcessDefinition) : ExecutionContext {
+		let executionContext = new ExecutionContext();
+
+		// determine the start activity ID
+		const startActivityId = this.extractActivityId(processDefinition.start);
+		if (!startActivityId) {
+			throw new Error(`Invalid start activity reference: ${processDefinition.start}`);
+		}
+
+		// Push the start activity as the root frame (no parent)
+		executionContext.pushFrame(startActivityId);
+		return executionContext;
 	}
 
-	// Execute the next step in a process instance
+
+
+
+	/**
+	 * Execute the next step in a process instance
+	 * @param instanceId 
+	 * @returns ProcessExecutionResult
+	 */
 	async executeNextStep(instanceId: string): Promise<ProcessExecutionResult> {
 		logger.info(`ProcessEngine: Executing next step for instance '${instanceId}'`);
 
 		const instance = await this.processInstanceRepo.findById(instanceId);
-		if (!instance) {
-			logger.error(`ProcessEngine: Instance '${instanceId}' not found`);
-			return {
-				instanceId,
-				status: ProcessStatus.Failed,
-				message: 'Process instance not found'
-			};
-		}
 
-		let executionContext = instance.executionContext;
+		const executionContext = instance.executionContext;
 
-		logger.debug(`ProcessEngine: Found instance`, {
+		logger.info(`ProcessEngine: Found instance`, {
 			instanceId,
 			status: instance.status,
-			currentActivity: executionContext.currentActivity
+			executionContext
 		});
 
 		if (instance.status !== ProcessStatus.Running) {
@@ -375,6 +260,15 @@ export class ProcessEngine {
 		}
 	}
 
+
+	/**
+	 * Handle Submission of a human task
+	 * @param instanceId The Instance ID
+	 * @param activityId The activity ID
+	 * @param data The submitted data
+	 * @param files The submitted files
+	 * @returns 
+	 */
 	// Submit data for a human task
 	async submitHumanTask(instanceId: string, activityId: string, data: any, files?: any[]): Promise<ProcessExecutionResult> {
 		logger.info(`ProcessEngine: Submitting human task for instance '${instanceId}', activity '${activityId}'`, {
@@ -383,16 +277,6 @@ export class ProcessEngine {
 		});
 
 		const instance = await this.processInstanceRepo.findById(instanceId);
-		if (!instance) {
-			logger.error(`ProcessEngine: Instance '${instanceId}' not found during human task submission`);
-			return {
-				instanceId,
-				status: ProcessStatus.Failed,
-				message: 'Process instance not found'
-			};
-		}
-
-		let executionContext = instance.executionContext;
 
 		const activityInstance = instance.activities[activityId] as HumanActivityInstance;
 		if (!activityInstance || activityInstance.status !== ActivityStatus.Running) {
@@ -438,6 +322,7 @@ export class ProcessEngine {
 		}
 
 		// Update variables array with submitted data
+		// TODO: move this into a class with a unit test
 		Object.keys(data).forEach(key => {
 			let variable = activityInstance.variables!.find(v => v.name === key);
 			if (variable) {
@@ -456,12 +341,9 @@ export class ProcessEngine {
 
 		if (files) {
 			activityInstance._files = files;
+			// TODO - need a whole definition framework for what to do with these files
+			// maybe a file handler plugin or someething
 		}
-
-		logger.debug(`ProcessEngine: Stored human task data as variables`, {
-			activityId,
-			variablesCount: activityInstance.variables?.length || 0
-		});
 
 		// Complete the human task
 		activityInstance.status = ActivityStatus.Completed;
@@ -484,6 +366,7 @@ export class ProcessEngine {
 	private async executeActivity(instanceId: string, activity: Activity): Promise<ProcessExecutionResult> {
 		logger.info(`ProcessEngine: Executing activity '${activity.id}' of type '${activity.type}' for instance '${instanceId}'`);
 
+		// do some sanity checks on the activity and instance
 		if (!activity.id) {
 			logger.error(`ProcessEngine: Activity missing ID during execution`, activity);
 			return {
@@ -494,14 +377,6 @@ export class ProcessEngine {
 		}
 
 		const instance = await this.processInstanceRepo.findById(instanceId);
-		if (!instance) {
-			logger.error(`ProcessEngine: Instance '${instanceId}' not found during activity execution`);
-			return {
-				instanceId,
-				status: ProcessStatus.Failed,
-				message: 'Process instance not found'
-			};
-		}
 
 		const activityInstance = instance.activities[activity.id];
 		if (!activityInstance) {
@@ -514,12 +389,10 @@ export class ProcessEngine {
 		}
 
 		// Check if activity is already completed - if so, continue to completion check
-		// EXCEPT for container activities (sequences, switches) which may need to re-execute
+		// EXCEPT for container activities (sequences) which may need to re-execute
 		// to build proper call stack structure during navigation
 		if (activityInstance.status === ActivityStatus.Completed) {
-			const isContainerActivity = activity.type === ActivityType.Sequence || 
-										activity.type === ActivityType.Switch || 
-										activity.type === ActivityType.Branch;
+			const isContainerActivity = activity.type === ActivityType.Sequence ;
 			
 			if (!isContainerActivity) {
 				logger.info(`ProcessEngine: Activity '${activity.id}' already completed, skipping execution`);
@@ -579,12 +452,8 @@ export class ProcessEngine {
 
 			// Save the updated instance after activity execution
 			const updatedInstance = await this.processInstanceRepo.findById(instanceId);
-			if (updatedInstance) {
-				await this.processInstanceRepo.save(updatedInstance);
-				logger.debug(`ProcessEngine: Saved updated instance '${instanceId}' after activity execution`);
-			}
-
-			logger.info(`ProcessEngine: Activity '${activity.id}' execution completed with status '${result.status}'`);
+			await this.processInstanceRepo.save(updatedInstance);
+			logger.debug(`ProcessEngine: Saved updated instance '${instanceId}' after activity execution`);
 			return result;
 		} catch (error) {
 			logger.error(`ProcessEngine: Activity '${activity.id}' execution failed`, error);
@@ -606,13 +475,6 @@ export class ProcessEngine {
 	private async executeHumanActivity(instanceId: string, activity: HumanActivity): Promise<ProcessExecutionResult> {
 		// Human activities wait for external input
 		const instance = await this.processInstanceRepo.findById(instanceId);
-		if (!instance) {
-			return {
-				instanceId,
-				status: ProcessStatus.Failed,
-				message: 'Process instance not found'
-			};
-		}
 
 		if (!activity.id) {
 			logger.error('ProcessEngine: Human activity missing ID');
@@ -697,13 +559,6 @@ export class ProcessEngine {
 
 	private async executeComputeActivity(instanceId: string, activity: ComputeActivity): Promise<ProcessExecutionResult> {
 		const instance = await this.processInstanceRepo.findById(instanceId);
-		if (!instance) {
-			return {
-				instanceId,
-				status: ProcessStatus.Failed,
-				message: 'Process instance not found'
-			};
-		}
 
 		if (!activity.id) {
 			logger.error('ProcessEngine: Compute activity missing ID');
@@ -767,13 +622,6 @@ export class ProcessEngine {
 
 	private async executeAPIActivity(instanceId: string, activity: APIActivity): Promise<ProcessExecutionResult> {
 		const instance = await this.processInstanceRepo.findById(instanceId);
-		if (!instance) {
-			return {
-				instanceId,
-				status: ProcessStatus.Failed,
-				message: 'Process instance not found'
-			};
-		}
 
 		if (!activity.id) {
 			logger.error('ProcessEngine: API activity missing ID');
@@ -815,9 +663,6 @@ export class ProcessEngine {
 		
 		// Mark sequence as running
 		const instance = await this.processInstanceRepo.findById(instanceId);
-		if (!instance) {
-			return { instanceId, status: ProcessStatus.Failed, message: 'Process instance not found' };
-		}
 
 		if (!activity.id) {
 			return { instanceId, status: ProcessStatus.Failed, message: 'Activity missing ID' };
@@ -846,13 +691,6 @@ export class ProcessEngine {
 
 	private async executeBranchActivity(instanceId: string, activity: BranchActivity): Promise<ProcessExecutionResult> {
 		const instance = await this.processInstanceRepo.findById(instanceId);
-		if (!instance) {
-			return {
-				instanceId,
-				status: ProcessStatus.Failed,
-				message: 'Process instance not found'
-			};
-		}
 
 		if (!activity.id) {
 			logger.error('ProcessEngine: Branch activity missing ID');
@@ -905,13 +743,6 @@ export class ProcessEngine {
 
 	private async executeSwitchActivity(instanceId: string, activity: SwitchActivity): Promise<ProcessExecutionResult> {
 		const instance = await this.processInstanceRepo.findById(instanceId);
-		if (!instance) {
-			return {
-				instanceId,
-				status: ProcessStatus.Failed,
-				message: 'Process instance not found'
-			};
-		}
 
 		if (!activity.id) {
 			logger.error('ProcessEngine: Switch activity missing ID');
@@ -977,13 +808,6 @@ export class ProcessEngine {
 
 	private async executeTerminateActivity(instanceId: string, activity: TerminateActivity): Promise<ProcessExecutionResult> {
 		const instance = await this.processInstanceRepo.findById(instanceId);
-		if (!instance) {
-			return {
-				instanceId,
-				status: ProcessStatus.Failed,
-				message: 'Process instance not found'
-			};
-		}
 
 		if (!activity.id) {
 			logger.error('ProcessEngine: Terminate activity missing ID');
@@ -1010,14 +834,6 @@ export class ProcessEngine {
 		logger.info(`ProcessEngine: Continuing execution for instance '${instanceId}'`);
 
 		const instance = await this.processInstanceRepo.findById(instanceId);
-		if (!instance) {
-			logger.error(`ProcessEngine: Instance '${instanceId}' not found during continue execution`);
-			return {
-				instanceId,
-				status: ProcessStatus.Failed,
-				message: 'Process instance not found'
-			};
-		}
 
 		let executionContext = instance.executionContext;
 
@@ -1179,13 +995,6 @@ export class ProcessEngine {
 	 */
 	private async checkForProcessCompletion(instanceId: string, completedActivityId: string): Promise<ProcessExecutionResult> {
 		const instance = await this.processInstanceRepo.findById(instanceId);
-		if (!instance) {
-			return {
-				instanceId,
-				status: ProcessStatus.Failed,
-				message: 'Process instance not found'
-			};
-		}
 
 		// Pop the completed frame from call stack
 		const completedFrame = instance.executionContext.popFrame();
@@ -1212,13 +1021,6 @@ export class ProcessEngine {
 	 */
 	private async continueFromParent(instanceId: string, completedFrame: ExecutionFrame): Promise<ProcessExecutionResult> {
 		const instance = await this.processInstanceRepo.findById(instanceId);
-		if (!instance) {
-			return {
-				instanceId,
-				status: ProcessStatus.Failed,
-				message: 'Process instance not found'
-			};
-		}
 
 		const processDefinition = await this.processDefinitionRepo.findById(instance.processId);
 		if (!processDefinition) {
@@ -1309,9 +1111,6 @@ export class ProcessEngine {
 	 */
 	private async executeActivityInFrame(instanceId: string, activityId: string, parentId: string, position?: number): Promise<ProcessExecutionResult> {
 		const instance = await this.processInstanceRepo.findById(instanceId);
-		if (!instance) {
-			return { instanceId, status: ProcessStatus.Failed, message: 'Instance not found' };
-		}
 
 		const processDefinition = await this.processDefinitionRepo.findById(instance.processId);
 		if (!processDefinition) {
@@ -1333,13 +1132,6 @@ export class ProcessEngine {
 
 	private async completeProcess(instanceId: string, reason: string, success: boolean = true): Promise<ProcessExecutionResult> {
 		const instance = await this.processInstanceRepo.findById(instanceId);
-		if (!instance) {
-			return {
-				instanceId,
-				status: ProcessStatus.Failed,
-				message: 'Process instance not found'
-			};
-		}
 
 		instance.status = success ? ProcessStatus.Completed : ProcessStatus.Failed;
 		instance.completedAt = new Date();
@@ -1375,6 +1167,12 @@ export class ProcessEngine {
 		};
 	}
 
+	/**
+	 * Extracts the activity ID from a given activity reference string.
+	 * TODO: Move to utility class if needed elsewhere.
+	 * @param activityRef The activity reference string (e.g., "a:123").
+	 * @returns The extracted activity ID (e.g., "123").
+	 */
 	public extractActivityId(activityRef: string | undefined): string {
 		logger.debug(`ProcessEngine: Extracting activity ID from reference '${activityRef}'`);
 
@@ -1456,10 +1254,6 @@ export class ProcessEngine {
 	async reRunInstance(instanceId: string): Promise<ProcessExecutionResult> {
 		// Get the existing instance
 		const instance = await this.processInstanceRepo.findById(instanceId);
-		if (!instance) {
-			throw new Error(`Instance ${instanceId} not found`);
-		}
-
 		logger.info(`ProcessEngine: Re-running instance '${instanceId}'`, {
 			processId: instance.processId,
 			previousStatus: instance.status
@@ -1965,13 +1759,6 @@ export class ProcessEngine {
 	 */
 	async navigateToStart(instanceId: string): Promise<ProcessExecutionResult> {
 		const instance = await this.processInstanceRepo.findById(instanceId);
-		if (!instance) {
-			return {
-				instanceId,
-				status: ProcessStatus.Failed,
-				message: `Process instance '${instanceId}' not found`
-			};
-		}
 
 		logger.info(`ProcessEngine: Navigate to start - NO-OP for instance '${instanceId}'`);
 		
@@ -1989,13 +1776,6 @@ export class ProcessEngine {
 	 */
 	async navigateToNextPending(instanceId: string): Promise<ProcessExecutionResult> {
 		const instance = await this.processInstanceRepo.findById(instanceId);
-		if (!instance) {
-			return {
-				instanceId,
-				status: ProcessStatus.Failed,
-				message: `Process instance '${instanceId}' not found`
-			};
-		}
 
 		logger.info(`ProcessEngine: Navigate to next pending - NO-OP for instance '${instanceId}'`);
 		
@@ -2013,13 +1793,6 @@ export class ProcessEngine {
 	async navigateToLastExecuted(instanceId: string): Promise<ProcessExecutionResult> {
 		try {
 			const instance = await this.processInstanceRepo.findById(instanceId);
-			if (!instance) {
-				return {
-					instanceId,
-					status: ProcessStatus.Failed,
-					message: `Process instance '${instanceId}' not found`
-				};
-			}
 
 			const processDefinition = await this.processDefinitionRepo.findById(instance.processId);
 			if (!processDefinition) {
@@ -2100,5 +1873,154 @@ export class ProcessEngine {
 			completedInstances,
 			failedInstances
 		};
+	}
+
+
+	/**
+	 * Load a process definition - This is only used by Tests to inject process definitions
+	 * TODO: This should go away and the Test should load processes via the Repo
+	 * @param processDefinition
+	 */
+	async loadProcess(processDefinition: ProcessDefinition): Promise<void> {
+		logger.info(`ProcessEngine: Loading process definition`, {
+			id: processDefinition.id,
+			name: processDefinition.name,
+			start: processDefinition.start,
+			activitiesCount: Object.keys(processDefinition.activities || {}).length
+		});
+
+		if (!processDefinition.id) {
+			logger.error('ProcessEngine: Process definition missing required id field');
+			throw new Error('Process definition must have an id');
+		}
+
+		if (!processDefinition.name) {
+			logger.error('ProcessEngine: Process definition missing required name field');
+			throw new Error('Process definition must have a name');
+		}
+
+		if (!processDefinition.start) {
+			logger.warn('ProcessEngine: Process definition missing start activity reference', {
+				processId: processDefinition.id,
+				name: processDefinition.name,
+				start: processDefinition.start
+			});
+		}
+
+		// Validate and normalize the incoming process definition
+		const validation = ProcessNormalizer.validate(processDefinition);
+		if (!validation.valid) {
+			// ProcessNormalizer already logs individual AJV schema diagnostics at ERROR.
+			logger.error('ProcessEngine: Process definition validation failed', { errors: validation.errors });
+			throw new Error(`Process definition validation failed: ${validation.errors.join('; ')}`);
+		}
+		if (validation.warnings && validation.warnings.length) {
+			logger.warn('ProcessEngine: Process definition validation warnings', { warnings: validation.warnings });
+		}
+		ProcessNormalizer.normalize(processDefinition);
+
+		await this.processDefinitionRepo.save(processDefinition);
+		logger.info(`ProcessEngine: Process definition '${processDefinition.id}' loaded successfully`);
+	}
+}
+
+
+
+/**
+ * Result of activity continuation logic
+ */
+interface ContinuationResult {
+	nextActivityId?: string;
+	parentId?: string;
+	position?: number;
+	completed?: boolean; // If true, the parent activity is complete
+}
+
+/**
+ * Strategy interface for handling activity continuation
+ */
+interface ActivityContinuationStrategy {
+	continue(
+		activity: ActivityInstance,
+		completedFrame: ExecutionFrame,
+		processEngine: ProcessEngine,
+		instanceId: string
+	): Promise<ContinuationResult | null>;
+}
+
+/**
+ * Continuation strategy for sequence activities
+ */
+class SequenceContinuationStrategy implements ActivityContinuationStrategy {
+	async continue(
+		activity: ActivityInstance,
+		completedFrame: ExecutionFrame,
+		processEngine: ProcessEngine,
+		instanceId: string
+	): Promise<ContinuationResult | null> {
+		const sequence = activity as SequenceActivityInstance;
+		const currentPosition = completedFrame.position || 0;
+		const nextPosition = currentPosition + 1;
+
+		// Check if there are more activities in the sequence
+		if (nextPosition < sequence.activities.length) {
+			// Execute next activity in sequence
+			const nextActivityRef = sequence.activities[nextPosition];
+			const nextActivityId = processEngine.extractActivityId(nextActivityRef);
+			
+			return {
+				nextActivityId,
+				parentId: sequence.id!,
+				position: nextPosition
+			};
+		} else {
+			// Sequence completed
+			return { completed: true };
+		}
+	}
+}
+
+/**
+ * Continuation strategy for switch activities
+ */
+class SwitchContinuationStrategy implements ActivityContinuationStrategy {
+	async continue(
+		activity: ActivityInstance,
+		completedFrame: ExecutionFrame,
+		processEngine: ProcessEngine,
+		instanceId: string
+	): Promise<ContinuationResult | null> {
+		// Switch activities complete when their selected branch completes
+		return { completed: true };
+	}
+}
+
+/**
+ * Continuation strategy for branch activities
+ */
+class BranchContinuationStrategy implements ActivityContinuationStrategy {
+	async continue(
+		activity: ActivityInstance,
+		completedFrame: ExecutionFrame,
+		processEngine: ProcessEngine,
+		instanceId: string
+	): Promise<ContinuationResult | null> {
+		// Branch activities complete when their path completes
+		return { completed: true };
+	}
+}
+
+/**
+ * Default continuation strategy for simple activities (Human, Compute, API, Terminate)
+ */
+class DefaultContinuationStrategy implements ActivityContinuationStrategy {
+	async continue(
+		activity: ActivityInstance,
+		completedFrame: ExecutionFrame,
+		processEngine: ProcessEngine,
+		instanceId: string
+	): Promise<ContinuationResult | null> {
+		// Simple activities complete when their child completes
+		return { completed: true };
 	}
 }

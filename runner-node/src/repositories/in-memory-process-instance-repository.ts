@@ -68,7 +68,7 @@ export class InMemoryProcessInstanceRepository implements ProcessInstanceReposit
 		});
 	}
 
-	async findById(instanceId: string): Promise<ProcessInstance | null> {
+	async findById(instanceId: string): Promise<ProcessInstance > {
 		logger.debug(`Looking up process instance by ID: '${instanceId}'`);
 
 		const instance = this.instances.get(instanceId);
@@ -82,9 +82,10 @@ export class InMemoryProcessInstanceRepository implements ProcessInstanceReposit
 				currentActivity: result.executionContext.currentActivity
 			});
 		} else {
-			logger.warn(`Process instance not found for ID: '${instanceId}'`, {
+			logger.error(`Process instance not found for ID: '${instanceId}'`, {
 				availableInstanceIds: Array.from(this.instances.keys()).slice(0, 10) // Limit output for readability
 			});
+			throw new Error(`Process instance with ID '${instanceId}' not found`);
 		}
 
 		return result;

@@ -7,7 +7,7 @@ import { ProcessDefinition, ProcessTemplateFlyweight } from '../models/process-t
 export interface ProcessDefinitionRepository {
 	// Basic CRUD operations
 	save(processDefinition: ProcessDefinition): Promise<void>;
-	findById(processId: string): Promise<ProcessDefinition | null>;
+	findById(processId: string): Promise<ProcessDefinition>;
 	findAll(): Promise<ProcessDefinition[]>;
 	delete(processId: string): Promise<boolean>;
 	exists(processId: string): Promise<boolean>;
