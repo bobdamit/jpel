@@ -36,18 +36,19 @@ describe('Process Navigation Tests', () => {
         const create = await engine.createInstance('navigation-test');
         const instanceId = create.instanceId;
 
-        // Navigation to start should work
+        // Navigation to start should work and execute the start activity
         const navigateResult = await engine.navigateToStart(instanceId);
         
-        expect(navigateResult.status).toBe(ProcessStatus.Running);
-        expect(navigateResult.currentActivity).toBe('step1');
-        expect(navigateResult.message).toContain('Navigated to start activity');
+        // Since step1 is a compute activity that completes immediately, 
+        // the process completes after navigating to start and executing
+        expect(navigateResult.status).toBe(ProcessStatus.Completed);
+        expect(navigateResult.message).toContain('Process complete');
 
-        // Verify the instance was updated
+        // Verify the instance was updated (should be completed now)
         const instance = await engine.getInstance(instanceId);
         expect(instance).not.toBeNull();
         if (instance) {
-            expect(instance.executionContext.currentActivity).toBe('step1');
+            expect(instance.status).toBe(ProcessStatus.Completed);
         }
     });
 

@@ -503,36 +503,6 @@ function updateInstanceProcessSelect() {
     });
 }
 
-async function viewInstance(instanceId) {
-    try {
-        showStatus('Loading instance details...', 'info');
-
-        const response = await fetch(`${API_BASE}/instances/${instanceId}`);
-        const result = await response.json();
-
-        if (result.success) {
-            const instance = result.data;
-            const details = `
-                <h4>Instance Details</h4>
-                <pre>${JSON.stringify(instance, null, 2)}</pre>
-            `;
-            showStatus(details, 'info');
-            // Render variables and running activities for the instance
-            renderInstanceVariables(instance);
-            renderRunningActivities(instance);
-            // Also render simplified versions for the right column
-            renderInstanceStatusSimple(instance);
-            renderProcessVariablesSimple(instance);
-            renderCurrentActivitiesSimple(instance);
-                detectAndRenderFinishedActivities(instance);
-        } else {
-            showStatus(`Failed to load instance: ${result.error}`, 'error');
-        }
-    } catch (error) {
-        console.error('Error loading instance', error);
-        showStatus(`Error loading instance: ${error.message}`, 'error');
-    }
-}
 
 async function rerunInstance(instanceId) {
     try {
@@ -560,6 +530,37 @@ async function rerunInstance(instanceId) {
     } catch (error) {
         console.error('Error re-running instance', error);
         showStatus(`❌ Error re-running instance: ${error.message}`, 'error');
+    }
+}
+
+async function viewInstance(instanceId) {
+    try {
+        showStatus('Loading instance details...', 'info');
+
+        const response = await fetch(`${API_BASE}/instances/${instanceId}`);
+        const result = await response.json();
+
+        if (result.success) {
+            const instance = result.data;
+            const details = `
+                <h4>Instance Details</h4>
+                <pre style="background: #f5f5f5; padding: 10px; border-radius: 4px; overflow-x: auto; white-space: pre-wrap;">${JSON.stringify(instance, null, 2)}</pre>
+            `;
+            showStatus(details, 'info');
+            // Render variables and running activities for the instance
+            renderInstanceVariables(instance);
+            renderRunningActivities(instance);
+            // Also render simplified versions for the right column
+            renderInstanceStatusSimple(instance);
+            renderProcessVariablesSimple(instance);
+            renderCurrentActivitiesSimple(instance);
+            detectAndRenderFinishedActivities(instance);
+        } else {
+            showStatus(`Failed to load instance: ${result.error}`, 'error');
+        }
+    } catch (error) {
+        console.error('Error loading instance', error);
+        showStatus(`Error loading instance: ${error.message}`, 'error');
     }
 }
 
@@ -592,8 +593,7 @@ async function navigateToStart() {
                 renderCurrentActivitiesSimple(instanceResult.data);
                 detectAndRenderFinishedActivities(instanceResult.data);
                 
-                // Check if the current activity is a human task and show the interface
-                await checkAndShowHumanTask();
+                // Navigation to start executes automatically - execution happens in the backend
             }
         } else {
             showExecutionStatus(`❌ Navigation failed: ${result.error}`, 'error');
@@ -637,8 +637,8 @@ async function navigateToNextPending() {
                 renderCurrentActivitiesSimple(instanceResult.data);
                 detectAndRenderFinishedActivities(instanceResult.data);
                 
-                // Check if the current activity is a human task and show the interface
-                await checkAndShowHumanTask();
+                // After navigation, trigger execution to start the flow
+                await executeCurrentStep();
             }
         } else {
             showExecutionStatus(`❌ Navigation failed: ${result.error}`, 'error');
@@ -671,6 +671,35 @@ async function checkAndShowHumanTask() {
         }
     } catch (error) {
         console.error('Error checking for human task', error);
+    }
+}
+
+async function executeCurrentStep() {
+    if (!currentInstanceId) return;
+    
+    try {
+        const response = await fetch(`${API_BASE}/instances/${currentInstanceId}/step`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({})
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            // Update the UI with the execution result
+            if (result.data.instance) {
+                renderInstanceStatusSimple(result.data.instance);
+                renderProcessVariablesSimple(result.data.instance);
+                renderCurrentActivitiesSimple(result.data.instance);
+                detectAndRenderFinishedActivities(result.data.instance);
+            }
+            
+            // Check if the current activity is a human task and show the interface
+            await checkAndShowHumanTask();
+        }
+    } catch (error) {
+        console.error('Error executing current step', error);
     }
 }
 
@@ -920,10 +949,10 @@ async function submitHumanTask(event) {
                 renderInstanceStatusSimple(result.data.instance);
                 renderProcessVariablesSimple(result.data.instance);
                 renderCurrentActivitiesSimple(result.data.instance);
-                    detectAndRenderFinishedActivities(result.data.instance);
+                detectAndRenderFinishedActivities(result.data.instance);
             }
 
-            // Continue execution
+            // Continue execution after task submission
             setTimeout(() => continueExecution(), 1000);
         } else {
             console.error('Human task submission failed', result);
@@ -1007,9 +1036,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 break;
             case 'rerun-instance':
                 if (instance) rerunInstance(instance);
-                break;
-            case 'continue-execution':
-                continueExecution();
                 break;
             case 'navigate-start':
                 navigateToStart();
