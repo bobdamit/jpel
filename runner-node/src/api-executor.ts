@@ -37,6 +37,8 @@ export class APIExecutor {
 		}
 	}
 
+	// TODO: isnt this what the expression evaluator is for? Can it not
+	// be refactored or extended to be used for this?
 	private substituteVariables(text: string, instance: ProcessInstance): string {
 		let result = text;
 
@@ -94,6 +96,7 @@ export class APIExecutor {
 		return {};
 	}
 
+	// TODO: is the better done in the expression evaluator? Or at least in another class with a test
 	private substituteObjectVariables(obj: { [key: string]: string }, instance: ProcessInstance): { [key: string]: string } {
 		const result: { [key: string]: string } = {};
 

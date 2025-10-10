@@ -1,6 +1,11 @@
 import { ProcessInstance } from './models/instance-types';
 import { logger } from './logger';
 
+
+/**
+ * Class for Evaluating and processing JPEL expressions
+ * @author Bob D and AI
+ */
 export class ExpressionEvaluator {
 
 	evaluateCondition(condition: string, instance: ProcessInstance): boolean {
@@ -19,15 +24,20 @@ export class ExpressionEvaluator {
 		}
 	}
 
+
+	/**
+	 * Execute the javascript code associated with an activity.  
+	 * @param codeLines Lines o' code
+	 * @param instance The ProcessInstance
+	 * @param currentActivityId The activity ID
+	 * @returns 
+	 */
 	executeCode(codeLines: string[], instance: ProcessInstance, currentActivityId: string): any {
 		try {
 			const context = this.createEvaluationContext(instance, currentActivityId);
 
 			// Translate all lines to a single JavaScript code block so declarations
-			// (const/let/var) persist across lines. Previously each line was
-			// evaluated in its own function which meant local variables were not
-			// preserved and assignments like `v:x = a && b;` failed when relying
-			// on previously-declared temps.
+			// (const/let/var) persist across lines. 
 			const jsCodeBlock = codeLines.map(line => this.translateJPELToJS(line, instance)).join('\n');
 
 			// (debug output removed)
@@ -38,7 +48,9 @@ export class ExpressionEvaluator {
 			const thisProps = new Set<string>();
 			for (const line of codeLines) {
 				const m = line.match(/this\.([a-zA-Z0-9_]+)\s*=/);
-				if (m) thisProps.add(m[1]);
+				if (m) { 
+					thisProps.add(m[1]);
+				}
 			}
 
 			// Execute the entire block. safeEval will try expression first then
@@ -75,10 +87,13 @@ export class ExpressionEvaluator {
 		}
 	}
 
+
 	/**
-	 * Extracts data from typed activity instances for expression evaluation
+	 * Extract a map of variables from an activity.
+	 * @param activity The activity to extract variables from
+	 * @returns A map of variable names to values
 	 */
-	private getActivityData(activity: any): any {
+	private getActivityVariableState(activity: any): any {
 		if (!activity) return {};
 		
 		// Use the consistent variables array approach
@@ -93,6 +108,7 @@ export class ExpressionEvaluator {
 		return {};
 	}
 
+	// TODO: this seems like too important of a thing to be an "any"
 	private createEvaluationContext(instance: ProcessInstance, currentActivityId?: string): any {
 		const context: any = {
 			// Process variables
@@ -102,7 +118,7 @@ export class ExpressionEvaluator {
 			instance: instance,
 
 			// Current activity context
-			currentActivity: currentActivityId ? this.getActivityData(instance.activities[currentActivityId]) : {},
+			currentActivity: currentActivityId ? this.getActivityVariableState(instance.activities[currentActivityId]) : {},
 
 			// Helper functions
 			Math,
@@ -118,7 +134,7 @@ export class ExpressionEvaluator {
 		context.activities = {};
 		Object.keys(instance.activities).forEach(activityId => {
 			const activity = instance.activities[activityId];
-			const activityData = this.getActivityData(activity);
+			const activityData = this.getActivityVariableState(activity);
 
 			// Ensure the runtime activity instance exposes a v property that maps
 			// to variables for the a:activity.v:variable syntax
@@ -145,6 +161,14 @@ export class ExpressionEvaluator {
 		return context;
 	}
 
+
+	/**
+	 * Translate a code expression from jpel into eval-able javascript giving
+	 * access to the process variables and current activity variables.
+	 * @param expression 
+	 * @param instance 
+	 * @returns 
+	 */
 	private translateJPELToJS(expression: string, instance: ProcessInstance): string {
 		// Split by quotes to avoid replacing inside string literals
 		const parts = expression.split(/(".*?")/);
