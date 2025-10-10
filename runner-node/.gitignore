@@ -62,6 +62,8 @@ jspm_packages/
 .nuxt
 dist
 
+testresult.txt
+
 # Gatsby files
 .cache/
 

@@ -59,13 +59,6 @@ export class InMemoryProcessInstanceRepository implements ProcessInstanceReposit
 
 		this.instances.set(instance.instanceId, { ...instance });
 
-		logger.info(`Process instance ${operation}d successfully`, {
-			instanceId: instance.instanceId,
-			processId: instance.processId,
-			status: instance.status,
-			currentActivity: instance.executionContext.currentActivity || null,
-			totalInstances: this.instances.size
-		});
 	}
 
 	async findById(instanceId: string): Promise<ProcessInstance > {

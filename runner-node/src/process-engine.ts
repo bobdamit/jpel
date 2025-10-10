@@ -28,8 +28,8 @@ import ProcessNormalizer from './process-normalizer';
 import { ActivityInstance, APIActivityInstance, BranchActivityInstance, ProcessExecutionResult,
 	FieldValue, ComputeActivityInstance, HumanActivityInstance, HumanTaskData, 
 	ProcessInstance, ProcessInstanceFlyweight, SequenceActivityInstance, 
-	SwitchActivityInstance, AggregatePassFail, 
-	ExecutionContext, ExecutionFrame} from './models/instance-types';
+	SwitchActivityInstance, AggregatePassFail} from './models/instance-types';
+import { ExecutionContext, ExecutionFrame } from './execution-context';
 
 
 
@@ -711,6 +711,7 @@ export class ProcessEngine {
 			const nextActivity = conditionResult ? activity.then : activity.else;
 			if (nextActivity) {
 				const nextActivityId = this.extractActivityId(nextActivity);
+				logger.info(`ProcessEngine: Branch condition met, Pushing Frame: '${nextActivityId}'`);
 				executionContext.pushFrame(nextActivityId);
 
 				activityInstance.status = ActivityStatus.Completed;
@@ -889,7 +890,10 @@ export class ProcessEngine {
 								// Continue with next activity in sequence
 								seqInst.sequenceIndex = nextIndex;
 								const nextActivity = this.extractActivityId(seqInst.sequenceActivities![nextIndex]);
+
+								logger.info(`ProcessEngine: Pushing Frame sequence '${activityId}' - moving to activity '${nextActivity}' (index ${nextIndex})`);
 								executionContext.pushFrame(nextActivity, activityId, nextIndex);
+								
 								logger.info(`ProcessEngine: Continuing sequence '${activityId}' - moving to activity '${nextActivity}' (index ${nextIndex})`);
 								await this.processInstanceRepo.save(instance);
 								return await this.executeNextStep(instanceId);
@@ -964,8 +968,11 @@ export class ProcessEngine {
 								// Continue to next activity in parent sequence
 								parentInstance.sequenceIndex = nextIndex;
 								const nextActivity = this.extractActivityId(parentInstance.sequenceActivities[nextIndex]);
+
+
+								logger.info(`ProcessEngine: Pushing Frame Parent sequence '${parentId}' continuing to activity '${nextActivity}' (index ${nextIndex})`);
 								executionContext.pushFrame(nextActivity, parentId, nextIndex);
-								logger.info(`ProcessEngine: Parent sequence '${parentId}' continuing to activity '${nextActivity}' (index ${nextIndex})`);
+								
 								await this.processInstanceRepo.save(instance);
 								// Clear the completed sequence marker
 								delete (instance as any).__lastCompletedSequenceId;
@@ -1297,6 +1304,7 @@ export class ProcessEngine {
 		// Always start from the beginning - the execution engine will naturally
 		// skip completed activities and find the first incomplete one while
 		// building the proper call stack structure
+		
 		instance.executionContext.pushFrame(startActivityId);
 		logger.info(`ProcessEngine: Re-run will start from beginning '${startActivityId}' and skip completed activities`);
 		
@@ -1758,16 +1766,24 @@ export class ProcessEngine {
 	 * Navigate to the start activity of a process instance using ExecutionContext breadcrumbs
 	 */
 	async navigateToStart(instanceId: string): Promise<ProcessExecutionResult> {
+		logger.info(`ProcessEngine: Navigate to start - instance '${instanceId}'`);
+
 		const instance = await this.processInstanceRepo.findById(instanceId);
 
-		logger.info(`ProcessEngine: Navigate to start - NO-OP for instance '${instanceId}'`);
-		
-		// Just return current state without doing anything
-		return {
-			instanceId,
-			status: instance.status,
-			message: 'Navigation to start is disabled (no-op)'
-		};
+		const process = await this.processDefinitionRepo.findById(instance.processId);
+
+		const executionContext = this.initExecutionContextAtStart(process);
+
+		// init all activity states to Pending (or undefined?)
+		for (const activityId in instance.activities) {
+			let activity = instance.activities[activityId];
+			activity.status = ActivityStatus.Pending;
+		}
+
+		instance.executionContext = executionContext;
+		await this.processInstanceRepo.save(instance);
+
+		return await this.executeNextStep(instanceId);
 	}
 
 	/**
