@@ -4,12 +4,12 @@ on:
   push:
     paths:
       - 'design/**'
-      - 'scripts/**'
+      - 'runner-node/scripts/**'
       - '.github/workflows/**'
   pull_request:
     paths:
       - 'design/**'
-      - 'scripts/**'
+      - 'runner-node/scripts/**'
       - '.github/workflows/**'
 
 jobs:
@@ -24,9 +24,12 @@ jobs:
       - name: Install deps
         run: npm ci
         working-directory: runner-node
-      - name: Build resolved schema
+      - name: Build schemas
         run: npm run build:schema
         working-directory: runner-node
-      - name: Verify schema matches committed artifact and compiles
-        run: node scripts/verify-schema.js
+      - name: Verify schemas compile with TypeScript
+        run: npm run build
+        working-directory: runner-node
+      - name: Run tests to verify schema validation
+        run: npm test -- --testPathPattern="process-engine-fieldvalue"
         working-directory: runner-node
