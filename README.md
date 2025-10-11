@@ -68,13 +68,14 @@ Here's a simple employee onboarding process:
 			"type": "sequence",
 			"activities": [
 				"a:getUserName",
-				"a:generateGreeting"
+				"a:generateGreeting",
+				"a:end"
 			]
 		},
 		"getUserName": {
 			"name": "Get User Name",
 			"type": "human",
-			"prompt": "Welcome! Please tell us your name:",
+			"prompt": "Welcome! Please tell us your name and optionally upload a profile picture:",
 			"inputs": [
 				{
 					"name": "userName",
@@ -82,6 +83,16 @@ Here's a simple employee onboarding process:
 					"label": "Your Name",
 					"required": true,
 					"placeholder": "Enter your full name"
+				},
+				{
+					"name": "profilePicture",
+					"type": "file",
+					"label": "Profile Picture (Optional)",
+					"required": false,
+					"hint": "Upload a profile picture if you'd like",
+					"fileSpec": {
+						"extensions": [".jpg", ".jpeg", ".png", ".gif", "webp"]
+					}
 				}
 			]
 		},
@@ -96,6 +107,11 @@ Here's a simple employee onboarding process:
 				"// Store the greeting",
 				"v:greeting = greeting;"
 			]
+		},
+		"end": {
+			"name": "Process Complete",
+			"type": "terminate",
+			"reason": "Process completed successfully"
 		}
 	}
 }

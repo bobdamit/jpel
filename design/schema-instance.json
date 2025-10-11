@@ -1,0 +1,378 @@
+{
+  "type": "object",
+  "required": [
+    "instanceId",
+    "processId",
+    "status"
+  ],
+  "properties": {
+    "instanceId": {
+      "type": "string",
+      "description": "Unique instance identifier"
+    },
+    "processId": {
+      "type": "string",
+      "description": "Reference to process definition"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "running",
+        "completed",
+        "failed",
+        "cancelled"
+      ],
+      "description": "Instance execution status"
+    },
+    "startedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Instance start time"
+    },
+    "completedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Instance completion time"
+    },
+    "currentActivity": {
+      "type": "string",
+      "description": "Currently executing activity"
+    },
+    "variables": {
+      "type": "object",
+      "description": "Process variable values",
+      "additionalProperties": true
+    },
+    "activities": {
+      "type": "object",
+      "description": "Activity instance states",
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "status"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Activity identifier"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "human",
+              "compute",
+              "api",
+              "sequence",
+              "parallel",
+              "branch",
+              "switch",
+              "terminate"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "running",
+              "completed",
+              "failed",
+              "cancelled",
+              "timeout"
+            ]
+          },
+          "passFail": {
+            "type": "string",
+            "enum": [
+              "pass",
+              "fail"
+            ],
+            "description": "Quality check result"
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "completedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "variables": {
+            "type": "array",
+            "description": "Activity variable storage (unified across all activity types)",
+            "items": {
+              "type": "object",
+              "required": [
+                "name",
+                "type"
+              ],
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "Variable name"
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "text",
+                    "number",
+                    "boolean",
+                    "select",
+                    "date",
+                    "file",
+                    "string"
+                  ],
+                  "description": "Variable type"
+                },
+                "value": {
+                  "description": "Runtime variable value"
+                },
+                "defaultValue": {
+                  "description": "Default value"
+                },
+                "description": {
+                  "type": "string",
+                  "description": "Variable description"
+                },
+                "required": {
+                  "type": "boolean",
+                  "description": "Whether variable is required"
+                },
+                "options": {
+                  "type": "array",
+                  "description": "Options for select fields",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "min": {
+                  "type": "number",
+                  "description": "Minimum value (for numbers)"
+                },
+                "max": {
+                  "type": "number",
+                  "description": "Maximum value (for numbers)"
+                },
+                "units": {
+                  "type": "string",
+                  "description": "Units of measurement"
+                },
+                "pattern": {
+                  "type": "string",
+                  "description": "Regular expression pattern for validation"
+                },
+                "patternDescription": {
+                  "type": "string",
+                  "description": "Human-readable description of pattern requirements"
+                }
+              }
+            }
+          },
+          "error": {
+            "type": "string",
+            "description": "Error message if failed"
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "ActivityInstance": {
+      "type": "object",
+      "required": [
+        "id",
+        "type",
+        "status"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Activity identifier"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "human",
+            "compute",
+            "api",
+            "sequence",
+            "parallel",
+            "branch",
+            "switch",
+            "terminate"
+          ]
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "pending",
+            "running",
+            "completed",
+            "failed",
+            "cancelled",
+            "timeout"
+          ]
+        },
+        "passFail": {
+          "type": "string",
+          "enum": [
+            "pass",
+            "fail"
+          ],
+          "description": "Quality check result"
+        },
+        "startedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "completedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "variables": {
+          "type": "array",
+          "description": "Activity variable storage (unified across all activity types)",
+          "items": {
+            "type": "object",
+            "required": [
+              "name",
+              "type"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Variable name"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "text",
+                  "number",
+                  "boolean",
+                  "select",
+                  "date",
+                  "file",
+                  "string"
+                ],
+                "description": "Variable type"
+              },
+              "value": {
+                "description": "Runtime variable value"
+              },
+              "defaultValue": {
+                "description": "Default value"
+              },
+              "description": {
+                "type": "string",
+                "description": "Variable description"
+              },
+              "required": {
+                "type": "boolean",
+                "description": "Whether variable is required"
+              },
+              "options": {
+                "type": "array",
+                "description": "Options for select fields",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "min": {
+                "type": "number",
+                "description": "Minimum value (for numbers)"
+              },
+              "max": {
+                "type": "number",
+                "description": "Maximum value (for numbers)"
+              },
+              "units": {
+                "type": "string",
+                "description": "Units of measurement"
+              },
+              "pattern": {
+                "type": "string",
+                "description": "Regular expression pattern for validation"
+              },
+              "patternDescription": {
+                "type": "string",
+                "description": "Human-readable description of pattern requirements"
+              }
+            }
+          }
+        },
+        "error": {
+          "type": "string",
+          "description": "Error message if failed"
+        }
+      }
+    },
+    "Variable": {
+      "type": "object",
+      "required": [
+        "name",
+        "type"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Variable name"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "text",
+            "number",
+            "boolean",
+            "select",
+            "date",
+            "file",
+            "string"
+          ],
+          "description": "Variable type"
+        },
+        "value": {
+          "description": "Runtime variable value"
+        },
+        "defaultValue": {
+          "description": "Default value"
+        },
+        "description": {
+          "type": "string",
+          "description": "Variable description"
+        },
+        "required": {
+          "type": "boolean",
+          "description": "Whether variable is required"
+        },
+        "options": {
+          "type": "array",
+          "description": "Options for select fields",
+          "items": {
+            "type": "string"
+          }
+        },
+        "min": {
+          "type": "number",
+          "description": "Minimum value (for numbers)"
+        },
+        "max": {
+          "type": "number",
+          "description": "Maximum value (for numbers)"
+        },
+        "units": {
+          "type": "string",
+          "description": "Units of measurement"
+        },
+        "pattern": {
+          "type": "string",
+          "description": "Regular expression pattern for validation"
+        },
+        "patternDescription": {
+          "type": "string",
+          "description": "Human-readable description of pattern requirements"
+        }
+      }
+    }
+  }
+}

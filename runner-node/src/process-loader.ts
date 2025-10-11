@@ -24,25 +24,15 @@ export class ProcessLoader {
 	private schemaLoadError: string | null = null;
 
 	/**
-	 * Load and compile the JSON Schema from design/schema.yaml (cached)
+	 * Load and compile the JSON Schema for process validation (cached)
 	 */
 	private getSchemaValidator(): ValidateFunction | null {
 		if (this.validator || this.schemaLoadError) return this.validator;
 
 		try {
-			// Prefer a pre-bundled resolved JSON Schema artifact if available. Projects
-			// may split the design into a focused process/template schema and a
-			// separate runtime/instance schema. To support that without breaking
-			// existing repos, prefer a process-only artifact when present:
-			// - design/schema-process-resolved.json
-			// - design/schema-process.yaml
-			// Otherwise fall back to the historical combined files:
-			// - design/schema-resolved.json
-			// - design/schema.yaml
-			const resolvedProcessJson = path.resolve(__dirname, '../../design/schema-process-resolved.json');
+			// Use separated schema files only - prefer JSON, fallback to YAML
+			const resolvedProcessJson = path.resolve(__dirname, '../../design/schema-process.json');
 			const processYamlPath = path.resolve(__dirname, '../../design/schema-process.yaml');
-			const resolvedJsonPath = path.resolve(__dirname, '../../design/schema-resolved.json');
-			const combinedYamlPath = path.resolve(__dirname, '../../design/schema.yaml');
 			let doc: any = null;
 
 			if (fs.existsSync(resolvedProcessJson)) {
@@ -51,17 +41,11 @@ export class ProcessLoader {
 			} else if (fs.existsSync(processYamlPath)) {
 				const file = fs.readFileSync(processYamlPath, 'utf8');
 				doc = yaml.load(file) as any;
-			} else if (fs.existsSync(resolvedJsonPath)) {
-				const file = fs.readFileSync(resolvedJsonPath, 'utf8');
-				doc = JSON.parse(file);
-			} else if (fs.existsSync(combinedYamlPath)) {
-				const file = fs.readFileSync(combinedYamlPath, 'utf8');
-				doc = yaml.load(file) as any;
 			} else {
-				throw new Error('No schema file found (looked for schema-process-resolved.json/schema-process.yaml/schema-resolved.json/schema.yaml)');
+				throw new Error('No process schema file found (looked for schema-process.json/schema-process.yaml)');
 			}
 
-			// Prefer the `process` schema node as the schema root (this matches
+			// Use the process schema node as the schema root (this matches
 			// expected JSON Schema structure). If the YAML also has `components`
 			// (like OpenAPI-style components), copy them onto the schema so
 			// internal $refs (e.g. #/components/schemas/Variable) resolve.
@@ -131,9 +115,9 @@ export class ProcessLoader {
 			this.validator = this.ajv.compile(schema);
 			return this.validator;
 		} catch (err: any) {
-			this.schemaLoadError = `Failed to load/compile schema.yaml: ${err && err.message ? err.message : String(err)}`;
+			this.schemaLoadError = `Failed to load/compile process schema: ${err && err.message ? err.message : String(err)}`;
 			// Log schema load/compile failures at ERROR level so they are visible in CI/diagnostics
-			logger.error('ProcessNormalizer: could not load design/schema.yaml for schema validation', { error: this.schemaLoadError });
+			logger.error('ProcessNormalizer: could not load process schema for validation', { error: this.schemaLoadError });
 			return null;
 		}
 	}
