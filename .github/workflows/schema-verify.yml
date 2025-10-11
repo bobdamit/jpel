@@ -31,5 +31,5 @@ jobs:
         run: npm run build
         working-directory: runner-node
       - name: Run tests to verify schema validation
-        run: npm test -- --testPathPattern="process-engine-fieldvalue"
+        run: npm test -- --testPathPatterns="process-engine-fieldvalue"
         working-directory: runner-node
