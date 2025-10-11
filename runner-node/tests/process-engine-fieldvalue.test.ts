@@ -182,7 +182,7 @@ describe('ProcessEngine FieldValue Architecture', () => {
             );
             
             // Re-run the instance (should reuse the same instance, not create a new one)
-            const rerunResult = await processEngine.reRunInstance(originalInstanceId);
+            const rerunResult = await processEngine.resumeInstance(originalInstanceId);
             expect(rerunResult.status).not.toBe(ProcessStatus.Failed);
             
             // The instance ID should be the SAME (re-run reuses the instance)
@@ -219,7 +219,7 @@ describe('ProcessEngine FieldValue Architecture', () => {
             );
             
             // Re-run the instance
-            const rerunResult = await processEngine.reRunInstance(originalInstanceId);
+            const rerunResult = await processEngine.resumeInstance(originalInstanceId);
             const fields = rerunResult.humanTask!.fields;
             
             const userNameField = fields.find(f => f.name === 'userName');
@@ -263,7 +263,7 @@ describe('ProcessEngine FieldValue Architecture', () => {
             });
             
             // Re-run the instance (should reset to beginning but keep data)
-            const reRunResult = await processEngine.reRunInstance(instanceId);
+            const reRunResult = await processEngine.resumeInstance(instanceId);
             
             expect(reRunResult.humanTask).toBeDefined();
             const fields = reRunResult.humanTask!.fields;

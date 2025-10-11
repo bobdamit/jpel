@@ -1,0 +1,238 @@
+{
+  "id": "file-processing-demo",
+  "name": "File Processing Demonstration",
+  "description": "Demonstrates file handling across human, compute, and API activities",
+  "version": "1.0.0",
+  "start": "a:mainSequence",
+  "variables": [
+    {
+      "name": "processName",
+      "type": "text",
+      "defaultValue": "File Processing Demo",
+      "description": "Name of this process instance"
+    },
+    {
+      "name": "totalFileSize",
+      "type": "number",
+      "defaultValue": 0,
+      "description": "Total size of all processed files"
+    }
+  ],
+  "activities": {
+
+	"mainSequence": {
+		"name": "Main Sequence",
+		"type": "sequence",
+		"activities": [
+			"a:uploadDocuments",
+			"a:analyzeFiles",
+			"a:generateReport",
+			"a:reviewResults"
+		]
+	},
+
+    "uploadDocuments": {
+      "id": "uploadDocuments",
+      "name": "Upload Documents",
+      "description": "Upload documents for processing",
+      "type": "human",
+      "prompt": "Please upload one or more documents to process",
+      "inputs": [
+        {
+          "name": "description",
+          "label": "Processing Description",
+          "type": "text",
+          "required": true,
+          "description": "Describe what you want to do with these files"
+        },
+        {
+          "name": "priority",
+          "label": "Priority Level",
+          "type": "select",
+          "required": true,
+          "options": [
+            { "label": "Low", "value": "low" },
+            { "label": "Medium", "value": "medium" },
+            { "label": "High", "value": "high" }
+          ],
+          "defaultValue": "medium"
+        },
+        {
+          "name": "document1",
+          "label": "Document 1",
+          "type": "file",
+          "required": true,
+          "hint": "Upload the primary document (PDF, image, or text file)",
+          "fileSpec": {
+            "extensions": [".pdf", ".jpg", ".jpeg", ".png", ".gif", ".webp", ".txt", ".doc", ".docx"]
+          }
+        },
+        {
+          "name": "document2",
+          "label": "Document 2 (Optional)",
+          "type": "file",
+          "required": false,
+          "hint": "Upload a second document if needed",
+          "fileSpec": {
+            "extensions": [".pdf", ".jpg", ".jpeg", ".png", ".gif", ".webp", ".txt", ".doc", ".docx"]
+          }
+        },
+        {
+          "name": "document3",
+          "label": "Document 3 (Optional)",
+          "type": "file",
+          "required": false,
+          "hint": "Upload a third document if needed",
+          "fileSpec": {
+            "extensions": [".pdf", ".jpg", ".jpeg", ".png", ".gif", ".webp", ".txt", ".doc", ".docx"]
+          }
+        }
+      ]
+    },
+    "analyzeFiles": {
+      "id": "analyzeFiles",
+      "name": "Analyze Uploaded Files",
+      "description": "Compute activity that analyzes the uploaded files",
+      "type": "compute",
+      "code": [
+        "// Get uploaded files from the human activity",
+        "const document1 = a:uploadDocuments.v:document1;",
+        "const document2 = a:uploadDocuments.v:document2;",
+        "const document3 = a:uploadDocuments.v:document3;",
+        "",
+        "console.log('Analyzing uploaded files...');",
+        "",
+        "let totalSize = 0;",
+        "const fileAnalysis = [];",
+        "const files = [document1, document2, document3].filter(f => f != null);",
+        "",
+        "// Analyze each file",
+        "for (const fileRef of files) {",
+        "  if (fileRef && fileRef.metadata) {",
+        "    totalSize += fileRef.metadata.size;",
+        "    ",
+        "    const analysis = {",
+        "      filename: fileRef.metadata.filename,",
+        "      mimeType: fileRef.metadata.mimeType,",
+        "      size: fileRef.metadata.size,",
+        "      category: fileRef.metadata.mimeType.startsWith('image/') ? 'Image' : ",
+        "                 fileRef.metadata.mimeType.includes('pdf') ? 'PDF' : ",
+        "                 fileRef.metadata.mimeType.includes('text') ? 'Text' : 'Other',",
+        "      sizeCategory: fileRef.metadata.size < 1000 ? 'Small' : ",
+        "                    fileRef.metadata.size < 100000 ? 'Medium' : 'Large'",
+        "    };",
+        "    ",
+        "    fileAnalysis.push(analysis);",
+        "  }",
+        "}",
+        "",
+        "// Store results in variables",
+        "v:totalFileSize = totalSize;",
+        "",
+        "// Return analysis results",
+        "return {",
+        "  totalFiles: files.length,",
+        "  totalSize: totalSize,",
+        "  analysis: fileAnalysis,",
+        "  averageSize: files.length > 0 ? Math.round(totalSize / files.length) : 0,",
+        "  hasImages: fileAnalysis.some(f => f.category === 'Image'),",
+        "  hasPDFs: fileAnalysis.some(f => f.category === 'PDF'),",
+        "  largestFile: fileAnalysis.length > 0 ? fileAnalysis.reduce((max, f) => f.size > max.size ? f : max, {size: 0}) : null",
+        "};"
+      ]
+    },
+    "generateReport": {
+      "id": "generateReport",
+      "name": "Generate Analysis Report",
+      "description": "Generate a text report based on file analysis",
+      "type": "compute",
+      "code": [
+        "// Get analysis results from previous activity",
+        "const analysis = activities.analyzeFiles.v;",
+        "const uploadInfo = activities.uploadDocuments.v;",
+        "",
+        "// Generate a comprehensive report",
+        "const reportLines = [",
+        "  '=== FILE PROCESSING REPORT ===',",
+        "  'Generated: ' + new Date().toISOString(),",
+        "  'Process: ' + process.processName,",
+        "  'Description: ' + uploadInfo.description,",
+        "  'Priority: ' + uploadInfo.priority,",
+        "  '',",
+        "  '=== SUMMARY ===',",
+        "  'Total Files: ' + analysis.totalFiles,",
+        "  'Total Size: ' + analysis.totalSize + ' bytes',",
+        "  'Average Size: ' + analysis.averageSize + ' bytes',",
+        "  'Contains Images: ' + (analysis.hasImages ? 'Yes' : 'No'),",
+        "  'Contains PDFs: ' + (analysis.hasPDFs ? 'Yes' : 'No'),",
+        "  '',",
+        "  '=== DETAILED ANALYSIS ===',",
+        "];",
+        "",
+        "// Add details for each file",
+        "analysis.analysis.forEach((file, index) => {",
+        "  reportLines.push(`File ${index + 1}: ${file.filename}`);",
+        "  reportLines.push(`  Type: ${file.mimeType} (${file.category})`);",
+        "  reportLines.push(`  Size: ${file.size} bytes (${file.sizeCategory})`);",
+        "  reportLines.push('');",
+        "});",
+        "",
+        "const reportContent = reportLines.join('\\n');",
+        "",
+        "// Store the report as a generated file",
+        "// In a real implementation, this would create an actual file",
+        "// For this demo, we'll store it as a text variable",
+        "return {",
+        "  reportContent: reportContent,",
+        "  reportGenerated: true,",
+        "  reportLength: reportContent.length",
+        "};"
+      ]
+    },
+    "reviewResults": {
+      "id": "reviewResults",
+      "name": "Review Processing Results",
+      "description": "Human review of the file processing results",
+      "type": "human",
+      "prompt": "Please review the file processing results and provide feedback",
+      "inputs": [
+        {
+          "name": "approved",
+          "label": "Approve Results",
+          "type": "boolean",
+          "required": true,
+          "description": "Do you approve these processing results?"
+        },
+        {
+          "name": "feedback",
+          "label": "Feedback",
+          "type": "text",
+          "required": false,
+          "description": "Any comments or feedback about the processing"
+        },
+        {
+          "name": "rating",
+          "label": "Quality Rating",
+          "type": "select",
+          "required": true,
+          "options": [
+            { "label": "Excellent", "value": 5 },
+            { "label": "Good", "value": 4 },
+            { "label": "Average", "value": 3 },
+            { "label": "Poor", "value": 2 },
+            { "label": "Very Poor", "value": 1 }
+          ],
+          "defaultValue": 3
+        }
+      ]
+    },
+    "completeProcess": {
+      "id": "completeProcess",
+      "name": "Complete File Processing",
+      "description": "Mark the file processing as complete",
+      "type": "terminate",
+      "reason": "File processing workflow completed successfully",
+      "result": "success"
+    }
+  }
+}

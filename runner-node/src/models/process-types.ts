@@ -71,8 +71,6 @@ export interface HumanActivity extends Activity {
 	type: ActivityType.Human;
 	prompt?: string;
 	inputs?: Field[]; // Definition-time: field schemas
-	fileUploads?: FileUpload[];
-	attachments?: Attachment[];
 }
 
 
@@ -94,6 +92,12 @@ export interface Field {
 	description?: string;
 	pattern?: string; // Regex pattern for validation
 	patternDescription?: string; // Description of the pattern for UI display
+	fileSpec? : FileSpec; // For file fields, specify allowed types and extensions
+}
+
+export interface FileSpec extends Field {
+	extensions: string[] | ['*'];
+	fileType?: string;
 }
 
 export interface ValueOption {
@@ -108,22 +112,6 @@ export enum FieldType {
 	Select = "select",
 	Date = "date",
 	File = "file",
-}
-
-export interface FileUpload {
-	name: string;
-	description?: string;
-	allowedTypes: string[];
-	maxBytes: number;
-	minCount?: number;
-	maxCount?: number;
-}
-
-export interface Attachment {
-	name: string;
-	url: string;
-	mediaType: string;
-	bytes?: number;
 }
 
 export interface APIActivity extends Activity {
@@ -200,5 +188,6 @@ export interface Variable {
 	units?: string;
 	pattern?: string; // Regex pattern for validation
 	patternDescription?: string; // Description of the pattern for UI display
+	fileSpec? : FileSpec; // For file fields, specify allowed types and extensions
 }
 

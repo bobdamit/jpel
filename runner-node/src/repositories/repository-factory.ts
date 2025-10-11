@@ -1,8 +1,11 @@
 import { ProcessDefinitionRepository } from './process-definition-repository';
 import { ProcessInstanceRepository } from './process-instance-repository';
+import { FileRepository } from './file-repository';
 import { InMemoryProcessDefinitionRepository } from './in-memory-process-definition-repository';
 import { InMemoryProcessInstanceRepository } from './in-memory-process-instance-repository';
+
 import { logger } from '../logger';
+import { InMemoryFileRepository } from './in-memory-file-repository';
 
 /**
  * Configuration for repository implementations
@@ -20,6 +23,7 @@ export interface RepositoryConfig {
 export class RepositoryFactory {
 	private static processDefinitionRepo: ProcessDefinitionRepository | null = null;
 	private static processInstanceRepo: ProcessInstanceRepository | null = null;
+	private static fileRepo: FileRepository | null = null;
 	private static config: RepositoryConfig | null = null;
 
 	/**
@@ -40,6 +44,7 @@ export class RepositoryFactory {
 					logger.debug('Creating in-memory repositories');
 					this.processDefinitionRepo = new InMemoryProcessDefinitionRepository();
 					this.processInstanceRepo = new InMemoryProcessInstanceRepository();
+					this.fileRepo = new InMemoryFileRepository();
 					break;
 
 				case 'mongodb':
@@ -98,6 +103,18 @@ export class RepositoryFactory {
 	}
 
 	/**
+	 * Get the file repository instance
+	 */
+	static getFileRepository(): FileRepository {
+		logger.debug('Retrieving file repository');
+		if (!this.fileRepo) {
+			logger.error('File repository not available - not initialized');
+			throw new Error('Repository not initialized. Call RepositoryFactory.initialize() first.');
+		}
+		return this.fileRepo;
+	}
+
+	/**
 	 * Get current configuration
 	 */
 	static getConfig(): RepositoryConfig | null {
@@ -108,7 +125,9 @@ export class RepositoryFactory {
 	 * Check if repositories are initialized
 	 */
 	static isInitialized(): boolean {
-		return this.processDefinitionRepo !== null && this.processInstanceRepo !== null;
+		return this.processDefinitionRepo !== null && 
+		       this.processInstanceRepo !== null && 
+		       this.fileRepo !== null;
 	}
 
 	/**
@@ -118,6 +137,7 @@ export class RepositoryFactory {
 		logger.info('Resetting repositories');
 		this.processDefinitionRepo = null;
 		this.processInstanceRepo = null;
+		this.fileRepo = null;
 		this.config = null;
 		logger.debug('Repositories reset completed');
 	}
@@ -154,7 +174,8 @@ export class RepositoryFactory {
 
 		const health = {
 			processDefinitionRepo: false,
-			processInstanceRepo: false
+			processInstanceRepo: false,
+			fileRepo: false
 		};
 
 		try {
@@ -181,6 +202,21 @@ export class RepositoryFactory {
 			}
 		} catch (error) {
 			logger.error('Process instance repository health check failed', {
+				error: error instanceof Error ? error.message : String(error)
+			});
+		}
+
+		try {
+			if (this.fileRepo) {
+				// Simple health check - just verify the repository responds
+				await this.fileRepo.list({ limit: 1 });
+				health.fileRepo = true;
+				logger.debug('File repository health check passed');
+			} else {
+				logger.warn('File repository not initialized for health check');
+			}
+		} catch (error) {
+			logger.error('File repository health check failed', {
 				error: error instanceof Error ? error.message : String(error)
 			});
 		}

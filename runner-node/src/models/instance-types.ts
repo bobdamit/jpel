@@ -4,10 +4,8 @@ import {
 	ActivityStatus,
 	ActivityType,
 	APIActivity,
-	Attachment,
 	BranchActivity,
 	ComputeActivity,
-	FileUpload,
 	HumanActivity,
 	ParallelActivity,
 	PassFail,
@@ -72,7 +70,6 @@ export interface HumanActivityInstance extends ActivityInstance, HumanActivity {
 	type: ActivityType.Human;
 	// Note: variables are now stored in base ActivityInstance.variables
 	// inputs from HumanActivity definition are converted to variables at runtime
-	_files?: any[]; // Uploaded files
 	// Runtime form data collected from users
 	formData?: { [key: string]: any };
 }
@@ -150,8 +147,6 @@ export interface HumanTaskData {
 	activityId: string;
 	prompt?: string;
 	fields: FieldValue[]; // UI needs FieldValue with all presentation properties
-	fileUploads?: FileUpload[];
-	attachments?: Attachment[];
 	context?: { [key: string]: any }; // Additional context data, e.g., previous run data
 }
 

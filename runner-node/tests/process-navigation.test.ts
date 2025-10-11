@@ -37,7 +37,7 @@ describe('Process Navigation Tests', () => {
         const instanceId = create.instanceId;
 
         // Navigation to start should work and execute the start activity
-        const navigateResult = await engine.navigateToStart(instanceId);
+        const navigateResult = await engine.restartInstance(instanceId);
         
         // Since step1 is a compute activity that completes immediately, 
         // the process completes after navigating to start and executing
@@ -100,7 +100,7 @@ describe('Process Navigation Tests', () => {
             const create = await engine.createInstance('no-start-test');
             const instanceId = create.instanceId;
 
-            const navigateResult = await engine.navigateToStart(instanceId);
+            const navigateResult = await engine.restartInstance(instanceId);
             expect(navigateResult.status).toBe(ProcessStatus.Failed);
             expect(navigateResult.message).toContain('No start activity defined');
         } catch (error) {

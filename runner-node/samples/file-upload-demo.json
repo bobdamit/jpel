@@ -1,0 +1,67 @@
+{
+	"id": "file-upload-demo",
+	"name": "File Upload Demo",
+	"description": "A process demonstrating file upload functionality",
+	"version": "1.0.0",
+	"start": "a:mainSequence",
+	"activities": {
+
+		"mainSequence": {
+			"name": "Main Sequence",
+			"type": "sequence",
+			"activities": [
+				"a:uploadForm",
+				"a:processComplete"
+			]
+		},
+
+		"uploadForm": {
+			"name": "File Upload Form",
+			"type": "human",
+			"prompt": "Please fill out the form and upload an image:",
+			"inputs": [
+				{
+					"name": "title",
+					"type": "text",
+					"label": "Document Title",
+					"required": true,
+					"placeholder": "Enter a title for your document"
+				},
+				{
+					"name": "description",
+					"type": "textarea",
+					"label": "Description",
+					"required": false,
+					"placeholder": "Enter a description (optional)"
+				},
+				{
+					"name": "attachedImage",
+					"type": "file",
+					"label": "Upload Image",
+					"required": true,
+					"hint": "Please upload an image file (JPG, PNG, GIF, etc.)",
+					"fileSpec": {
+						"extensions": [".jpg", ".jpeg", ".png", ".gif", ".webp"]
+					}
+				},
+				{
+					"name": "category",
+					"type": "select",
+					"label": "Category",
+					"required": true,
+					"options": [
+						{"value": "personal", "label": "Personal"},
+						{"value": "work", "label": "Work"},
+						{"value": "project", "label": "Project"}
+					]
+				}
+			]
+		},
+		"processComplete": {
+			"name": "Processing Complete",
+			"type": "terminate",
+			"status": "success",
+			"message": "File uploaded successfully!"
+		}
+	}
+}

@@ -23,7 +23,7 @@
 		"getUserName": {
 			"name": "Get User Name",
 			"type": "human",
-			"prompt": "Welcome! Please tell us your name:",
+			"prompt": "Welcome! Please tell us your name and optionally upload a profile picture:",
 			"inputs": [
 				{
 					"name": "userName",
@@ -31,6 +31,16 @@
 					"label": "Your Name",
 					"required": true,
 					"placeholder": "Enter your full name"
+				},
+				{
+					"name": "profilePicture",
+					"type": "file",
+					"label": "Profile Picture (Optional)",
+					"required": false,
+					"hint": "Upload a profile picture if you'd like",
+					"fileSpec": {
+						"extensions": [".jpg", ".jpeg", ".png", ".gif", "webp"]
+					}
 				}
 			]
 		},

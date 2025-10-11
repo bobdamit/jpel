@@ -210,29 +210,107 @@ app.post(
 	upload.array("files"),
 	asyncHandler(async (req: Request, res: Response) => {
 		const { instanceId, activityId } = req.params;
-		const data = req.body;
-		const files = req.files as Express.Multer.File[];
+		const { _fileUploads, ...data } = req.body;
+		let files = req.files as Express.Multer.File[];
 
-		// Process uploaded files
-		const processedFiles = files?.map((file) => ({
-			originalName: file.originalname,
-			filename: file.filename,
-			path: file.path,
-			size: file.size,
-			mimetype: file.mimetype,
-		}));
+		// Debug logging
+		console.log('Submit request received:', {
+			instanceId,
+			activityId,
+			data: Object.keys(data),
+			hasFileUploads: !!_fileUploads,
+			fileUploadCount: _fileUploads?.length || 0,
+			fileUploads: _fileUploads
+		});
+
+		// Handle base64 file uploads from JSON payload
+		if (_fileUploads && Array.isArray(_fileUploads)) {
+			const base64Files = _fileUploads.map((upload: any) => {
+				const buffer = Buffer.from(upload.content, 'base64');
+				return {
+					fieldname: upload.fieldName || 'file', // Use the fieldName from frontend
+					originalname: upload.filename,
+					encoding: '7bit',
+					mimetype: upload.mimeType,
+					buffer: buffer,
+					size: buffer.length,
+					destination: '',
+					filename: upload.filename,
+					path: '',
+					stream: null as any
+				} as Express.Multer.File;
+			});
+			
+			// Combine with any multipart files
+			files = [...(files || []), ...base64Files];
+			console.log('Processed files:', files.map(f => ({ fieldname: f.fieldname, originalname: f.originalname, size: f.size })));
+		}
 
 		const result: ProcessExecutionResult = await processEngine.submitHumanTask(
 			instanceId,
 			activityId,
 			data,
-			processedFiles
+			files
 		);
 
 		// Include the current instance state for UI rendering
 		const instance = await processEngine.getInstance(instanceId);
 
 		res.json(createResponse(true, { ...result, instance }));
+	})
+);
+
+// Get file reference (returns FileReference with URL and thumbnail URL)
+app.get(
+	"/api/files/:fileId",
+	asyncHandler(async (req: Request, res: Response): Promise<void> => {
+		const { fileId } = req.params;
+		const fileService = processEngine.getFileService();
+		
+		try {
+			const fileReference = await fileService.getRepository().retrieve(fileId);
+			if (!fileReference) {
+				res.status(404).json(createResponse(false, null, "File not found"));
+				return;
+			}
+			
+			res.json(createResponse(true, fileReference));
+		} catch (error) {
+			logger.error("Error retrieving file reference:", error);
+			res.status(500).json(createResponse(false, null, "Failed to retrieve file reference"));
+		}
+	})
+);
+
+// Download file content (only for non-image files that need download links)
+app.get(
+	"/api/files/:fileId/download",
+	asyncHandler(async (req: Request, res: Response): Promise<void> => {
+		const { fileId } = req.params;
+		const fileRepository = processEngine.getFileService().getRepository() as any;
+		
+		try {
+			const fileData = fileRepository.files?.get(fileId);
+			if (!fileData) {
+				res.status(404).json(createResponse(false, null, "File not found"));
+				return;
+			}
+			
+			// Only serve non-image files for download
+			if (fileData.metadata.mimeType.startsWith('image/')) {
+				res.status(400).json(createResponse(false, null, "Images should use data URLs"));
+				return;
+			}
+			
+			res.setHeader('Content-Type', fileData.metadata.mimeType);
+			res.setHeader('Content-Disposition', `attachment; filename="${fileData.metadata.filename}"`);
+			res.setHeader('Content-Length', fileData.content.length);
+			
+			res.send(fileData.content);
+		} catch (error) {
+			logger.error("Error downloading file:", error);
+			res.status(500).json(createResponse(false, null, "Failed to download file"));
+		}
 	})
 );
 
@@ -312,7 +390,7 @@ app.post(
 	asyncHandler(async (req: Request, res: Response): Promise<void> => {
 		const { instanceId } = req.params;
 
-		const result: ProcessExecutionResult = await processEngine.reRunInstance(instanceId);
+		const result: ProcessExecutionResult = await processEngine.resumeInstance(instanceId);
 
 		if (result.status === "failed") {
 			res.status(400).json(createResponse(false, null, result.message));
@@ -329,7 +407,7 @@ app.post(
 	asyncHandler(async (req: Request, res: Response): Promise<void> => {
 		const { instanceId } = req.params;
 
-		const result: ProcessExecutionResult = await processEngine.navigateToStart(instanceId);
+		const result: ProcessExecutionResult = await processEngine.restartInstance(instanceId);
 
 		if (result.status === "failed") {
 			res.status(400).json(createResponse(false, null, result.message));
@@ -337,6 +415,139 @@ app.post(
 		}
 
 		res.json(createResponse(true, result));
+	})
+);
+
+// File Management API Endpoints
+
+// Get file by ID
+app.get(
+	"/api/files/:fileId",
+	asyncHandler(async (req: Request, res: Response) => {
+		const { fileId } = req.params;
+		const fileRepo = processEngine.getFileService().getRepository();
+		
+		const fileReference = await fileRepo.retrieve(fileId);
+		if (!fileReference) {
+			res.status(404).json(createResponse(false, null, "File not found"));
+			return;
+		}
+
+		res.json(createResponse(true, fileReference));
+	})
+);
+
+// Download file content by ID
+app.get(
+	"/api/files/:fileId/download",
+	asyncHandler(async (req: Request, res: Response) => {
+		const { fileId } = req.params;
+		const fileRepo = processEngine.getFileService().getRepository() as any; // Cast to access getContent
+		
+		// Get file metadata first
+		const fileMetadata = await fileRepo.getMetadata(fileId);
+		if (!fileMetadata) {
+			res.status(404).json(createResponse(false, null, "File not found"));
+			return;
+		}
+
+		// Get file content
+		const fileContent = await fileRepo.getContent(fileId);
+		if (!fileContent) {
+			res.status(404).json(createResponse(false, null, "File content not found"));
+			return;
+		}
+
+		// Set appropriate headers for file download
+		res.setHeader('Content-Type', fileMetadata.mimeType);
+		res.setHeader('Content-Disposition', `attachment; filename="${fileMetadata.filename}"`);
+		res.setHeader('Content-Length', fileMetadata.size.toString());
+		
+		res.send(fileContent);
+	})
+);
+
+// Get file metadata by ID
+app.get(
+	"/api/files/:fileId/metadata",
+	asyncHandler(async (req: Request, res: Response) => {
+		const { fileId } = req.params;
+		const fileRepo = processEngine.getFileService().getRepository();
+		
+		const metadata = await fileRepo.getMetadata(fileId);
+		if (!metadata) {
+			res.status(404).json(createResponse(false, null, "File not found"));
+			return;
+		}
+
+		res.json(createResponse(true, metadata));
+	})
+);
+
+// List files with optional filtering
+app.get(
+	"/api/files",
+	asyncHandler(async (req: Request, res: Response) => {
+		const fileRepo = processEngine.getFileService().getRepository();
+		
+		const options = {
+			tags: req.query.tags ? (req.query.tags as string).split(',') : undefined,
+			mimeTypePattern: req.query.mimeType as string,
+			createdBy: req.query.createdBy as string,
+			limit: req.query.limit ? parseInt(req.query.limit as string) : undefined,
+			offset: req.query.offset ? parseInt(req.query.offset as string) : undefined,
+			sortBy: req.query.sortBy as 'filename' | 'createdAt' | 'size',
+			sortOrder: req.query.sortOrder as 'asc' | 'desc'
+		};
+
+		const files = await fileRepo.list(options);
+
+		res.json(createResponse(true, { files }));
+	})
+);
+
+// Get file variables for a specific activity
+app.get(
+	"/api/instances/:instanceId/activities/:activityId/files",
+	asyncHandler(async (req: Request, res: Response) => {
+		const { instanceId, activityId } = req.params;
+		
+		const instance = await processEngine.getInstance(instanceId);
+		if (!instance) {
+			res.status(404).json(createResponse(false, null, "Instance not found"));
+			return;
+		}
+
+		const activity = instance.activities[activityId];
+		if (!activity) {
+			res.status(404).json(createResponse(false, null, "Activity not found"));
+			return;
+		}
+
+		const fileVariables = activity.variables?.filter(v => v.type === 'file') || [];
+		
+		res.json(createResponse(true, {
+			activityId,
+			fileVariables,
+			fileCount: fileVariables.length
+		}));
+	})
+);
+
+// Download file from activity variable
+app.get(
+	"/api/instances/:instanceId/activities/:activityId/files/:variableName",
+	asyncHandler(async (req: Request, res: Response) => {
+		const { instanceId, activityId, variableName } = req.params;
+		
+		const fileReference = await processEngine.getFileFromActivityVariable(instanceId, activityId, variableName);
+		if (!fileReference) {
+			res.status(404).json(createResponse(false, null, "File variable not found"));
+			return;
+		}
+
+		// Redirect to the file's download URL
+		res.redirect(fileReference.url);
 	})
 );
 
