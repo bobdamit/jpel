@@ -15,9 +15,8 @@ export interface ValidationResult {
 /**
  * Loads, validates and prepares a Process for instantiation
  * into a process Instance
- * TODO: rename this ProcessLoader ?
  */
-export class ProcessNormalizer {
+export class ProcessLoader {
 
 	// cached schema validator
 	private validator: ValidateFunction | null = null;
@@ -365,4 +364,4 @@ export class ProcessNormalizer {
 	}
 }
 
-export default new ProcessNormalizer();
+export default new ProcessLoader();

@@ -1,11 +1,11 @@
-import ProcessNormalizer from '../src/process-normalizer';
+import ProcessLoader from '../src/process-loader';
 import { ProcessDefinition, ActivityType } from '../src/models/process-types';
 
 describe('ProcessNormalizer Field Reference Validation', () => {
-    let normalizer: typeof ProcessNormalizer;
+    let normalizer: typeof ProcessLoader;
 
     beforeEach(() => {
-        normalizer = ProcessNormalizer;
+        normalizer = ProcessLoader;
     });
 
     test('should detect invalid field reference in compute activity', () => {

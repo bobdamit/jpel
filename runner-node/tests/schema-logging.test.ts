@@ -1,4 +1,4 @@
-import ProcessNormalizer from '../src/process-normalizer';
+import ProcessLoader from '../src/process-loader';
 import { logger } from '../src/logger';
 import { ProcessEngine } from '../src/process-engine';
 import { RepositoryFactory } from '../src/repositories/repository-factory';
@@ -27,7 +27,7 @@ describe('Schema diagnostics and logging', () => {
             foobar: 'this-should-not-be-here'
         };
 
-        const validation = ProcessNormalizer.validate(pd);
+        const validation = ProcessLoader.validate(pd);
 
         expect(validation.valid).toBe(false);
         // At least one schema message should be present

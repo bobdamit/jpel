@@ -24,12 +24,15 @@ import { RepositoryFactory } from './repositories/repository-factory';
 import { ProcessDefinitionRepository } from './repositories/process-definition-repository';
 import { ProcessInstanceRepository } from './repositories/process-instance-repository';
 import { logger } from './logger';
-import ProcessNormalizer from './process-normalizer';
+import ProcessLoader from './process-loader';
 import { ActivityInstance, APIActivityInstance, BranchActivityInstance, ProcessExecutionResult,
 	FieldValue, ComputeActivityInstance, HumanActivityInstance, HumanTaskData, 
 	ProcessInstance, ProcessInstanceFlyweight, SequenceActivityInstance, 
 	SwitchActivityInstance, AggregatePassFail} from './models/instance-types';
 import { ExecutionContext, ExecutionFrame } from './execution-context';
+import { extractActivityId } from './utils/activity-ref';
+import { updateActivityVariables } from './utils/variable-updater';
+
 
 
 
@@ -121,7 +124,7 @@ export class ProcessEngine {
 		});
 
 		// Normalize any process data coming from repositories
-		ProcessNormalizer.normalize(processDefinition);
+		ProcessLoader.normalize(processDefinition);
 
 		if (!processDefinition.start) {
 			logger.error(`ProcessEngine: Process definition '${processId}' has no start activity defined`);
@@ -136,7 +139,7 @@ export class ProcessEngine {
 
 		let startActivityId: string;
 		try {
-			startActivityId = this.extractActivityId(processDefinition.start);
+			startActivityId = extractActivityId(processDefinition.start);
 			logger.info(`ProcessEngine: Extracted start activity ID '${startActivityId}' from '${processDefinition.start}'`);
 		} catch (error) {
 			logger.error(`ProcessEngine: Failed to extract start activity ID from '${processDefinition.start}'`, error);
@@ -182,7 +185,7 @@ export class ProcessEngine {
 		let executionContext = new ExecutionContext();
 
 		// determine the start activity ID
-		const startActivityId = this.extractActivityId(processDefinition.start);
+		const startActivityId = extractActivityId(processDefinition.start);
 		if (!startActivityId) {
 			throw new Error(`Invalid start activity reference: ${processDefinition.start}`);
 		}
@@ -321,23 +324,8 @@ export class ProcessEngine {
 			}
 		}
 
-		// Update variables array with submitted data
-		// TODO: move this into a class with a unit test
-		Object.keys(data).forEach(key => {
-			let variable = activityInstance.variables!.find(v => v.name === key);
-			if (variable) {
-				variable.value = data[key];
-			} else {
-				// Create new variable if it doesn't exist
-				variable = {
-					name: key,
-					type: typeof data[key] === 'boolean' ? FieldType.Boolean : 
-						  typeof data[key] === 'number' ? FieldType.Number : FieldType.Text,
-					value: data[key]
-				};
-				activityInstance.variables!.push(variable);
-			}
-		});
+		// Update variables array with submitted data (moved to util)
+		updateActivityVariables(activityInstance, data);
 
 		if (files) {
 			activityInstance._files = files;
@@ -674,7 +662,7 @@ export class ProcessEngine {
 		// Execute the first activity in the sequence if any
 		if (activity.activities.length > 0) {
 			const firstActivityRef = activity.activities[0];
-			const firstActivityId = this.extractActivityId(firstActivityRef);
+			const firstActivityId = extractActivityId(firstActivityRef);
 			
 			logger.info(`ProcessEngine: Starting sequence '${activity.id}' with first activity '${firstActivityId}'`);
 			return await this.executeActivityInFrame(instanceId, firstActivityId, activity.id, 0);
@@ -709,7 +697,7 @@ export class ProcessEngine {
 
 			const nextActivity = conditionResult ? activity.then : activity.else;
 			if (nextActivity) {
-				const nextActivityId = this.extractActivityId(nextActivity);
+				const nextActivityId = extractActivityId(nextActivity);
 				logger.info(`ProcessEngine: Branch condition met, Pushing Frame: '${nextActivityId}'`);
 				executionContext.pushFrame(nextActivityId);
 
@@ -789,7 +777,7 @@ export class ProcessEngine {
 			await this.processInstanceRepo.save(instance);
 
 			// Execute the selected branch using proper call stack frame management
-			const selectedActivityId = this.extractActivityId(nextActivity);
+			const selectedActivityId = extractActivityId(nextActivity);
 			return await this.executeActivityInFrame(instanceId, selectedActivityId, activity.id, undefined);
 		} catch (error) {
 			activityInstance.status = ActivityStatus.Failed;
@@ -867,12 +855,12 @@ export class ProcessEngine {
 						// Determine whether this sequence contains our current activity directly
 						// or indirectly via a child activity that redirected execution (e.g. switch -> branch)
 						const containsCurrent = sequenceActivity.activities.some(a => {
-							const aid = this.extractActivityId(a);
+							const aid = extractActivityId(a);
 							if (aid === executionContext.currentActivity) return true;
 							const childInst = instance.activities[aid] as ActivityInstance | undefined;
 							if (childInst && (childInst as any).nextActivity) {
 								try {
-									const redirected = this.extractActivityId((childInst as any).nextActivity);
+									const redirected = extractActivityId((childInst as any).nextActivity);
 									if (redirected === executionContext.currentActivity) return true;
 								} catch (e) {
 									// ignore malformed nextActivity
@@ -888,7 +876,7 @@ export class ProcessEngine {
 							if (nextIndex < seqInst.sequenceActivities!.length) {
 								// Continue with next activity in sequence
 								seqInst.sequenceIndex = nextIndex;
-								const nextActivity = this.extractActivityId(seqInst.sequenceActivities![nextIndex]);
+								const nextActivity = extractActivityId(seqInst.sequenceActivities![nextIndex]);
 
 								logger.info(`ProcessEngine: Pushing Frame sequence '${activityId}' - moving to activity '${nextActivity}' (index ${nextIndex})`);
 								executionContext.pushFrame(nextActivity, activityId, nextIndex);
@@ -925,12 +913,12 @@ export class ProcessEngine {
 									// Determine whether parent sequence references the completed sequence directly
 									// or indirectly via a child activity that redirected execution (e.g. switch -> nested sequence)
 									const referencesCompleted = parentActivity.activities.some(a => {
-										const aid = this.extractActivityId(a);
+										const aid = extractActivityId(a);
 										if (aid === completedSeqId) return true;
 										const childInst = instance.activities[aid] as ActivityInstance | undefined;
 										if (childInst && (childInst as any).nextActivity) {
 											try {
-												const redirected = this.extractActivityId((childInst as any).nextActivity);
+												const redirected = extractActivityId((childInst as any).nextActivity);
 												if (redirected === completedSeqId) return true;
 											} catch (e) {
 												// ignore malformed nextActivity
@@ -943,7 +931,7 @@ export class ProcessEngine {
 									let completedIndex = -1;
 									for (let i = 0; i < parentInstance.sequenceActivities.length; i++) {
 										const ref = parentInstance.sequenceActivities[i];
-										const refId = this.extractActivityId(ref);
+										const refId = extractActivityId(ref);
 										if (refId === completedSeqId) {
 											completedIndex = i;
 											break;
@@ -951,7 +939,7 @@ export class ProcessEngine {
 										const childInst = instance.activities[refId] as ActivityInstance | undefined;
 										if (childInst && (childInst as any).nextActivity) {
 											try {
-												const redirected = this.extractActivityId((childInst as any).nextActivity);
+												const redirected = extractActivityId((childInst as any).nextActivity);
 												if (redirected === completedSeqId) {
 													completedIndex = i;
 													break;
@@ -966,7 +954,7 @@ export class ProcessEngine {
 							if (nextIndex < parentInstance.sequenceActivities.length) {
 								// Continue to next activity in parent sequence
 								parentInstance.sequenceIndex = nextIndex;
-								const nextActivity = this.extractActivityId(parentInstance.sequenceActivities[nextIndex]);
+								const nextActivity = extractActivityId(parentInstance.sequenceActivities[nextIndex]);
 
 
 								logger.info(`ProcessEngine: Pushing Frame Parent sequence '${parentId}' continuing to activity '${nextActivity}' (index ${nextIndex})`);
@@ -1173,25 +1161,7 @@ export class ProcessEngine {
 		};
 	}
 
-	/**
-	 * Extracts the activity ID from a given activity reference string.
-	 * TODO: Move to utility class if needed elsewhere.
-	 * @param activityRef The activity reference string (e.g., "a:123").
-	 * @returns The extracted activity ID (e.g., "123").
-	 */
-	public extractActivityId(activityRef: string | undefined): string {
-		logger.debug(`ProcessEngine: Extracting activity ID from reference '${activityRef}'`);
 
-		if (!activityRef) {
-			logger.error('ProcessEngine: Activity reference is undefined or null');
-			throw new Error('Activity reference is undefined or null');
-		}
-
-		// Remove 'a:' prefix if present
-		const result = activityRef.startsWith('a:') ? activityRef.substring(2) : activityRef;
-		logger.debug(`ProcessEngine: Extracted activity ID '${result}' from '${activityRef}'`);
-		return result;
-	}
 
 	private initializeVariables(variables: Variable[]): { [key: string]: any } {
 		const result: { [key: string]: any } = {};
@@ -1271,7 +1241,7 @@ export class ProcessEngine {
 			throw new Error(`Process definition '${instance.processId}' not found`);
 		}
 
-		const startActivityId = this.extractActivityId(processDefinition.start);
+		const startActivityId = extractActivityId(processDefinition.start);
 
 		// Reset the instance state to re-run from the beginning
 		// Keep all activity data (including field values) - just reset statuses
@@ -1461,7 +1431,7 @@ export class ProcessEngine {
 		}
 
 		// Validate and normalize the incoming process definition
-		const validation = ProcessNormalizer.validate(processDefinition);
+		const validation = ProcessLoader.validate(processDefinition);
 		if (!validation.valid) {
 			// ProcessNormalizer already logs individual AJV schema diagnostics at ERROR.
 			logger.error('ProcessEngine: Process definition validation failed', { errors: validation.errors });
@@ -1470,7 +1440,7 @@ export class ProcessEngine {
 		if (validation.warnings && validation.warnings.length) {
 			logger.warn('ProcessEngine: Process definition validation warnings', { warnings: validation.warnings });
 		}
-		ProcessNormalizer.normalize(processDefinition);
+		ProcessLoader.normalize(processDefinition);
 
 		await this.processDefinitionRepo.save(processDefinition);
 		logger.info(`ProcessEngine: Process definition '${processDefinition.id}' loaded successfully`);
@@ -1519,7 +1489,7 @@ class SequenceContinuationStrategy implements ActivityContinuationStrategy {
 		if (nextPosition < sequence.activities.length) {
 			// Execute next activity in sequence
 			const nextActivityRef = sequence.activities[nextPosition];
-			const nextActivityId = processEngine.extractActivityId(nextActivityRef);
+			const nextActivityId = extractActivityId(nextActivityRef);
 			
 			return {
 				nextActivityId,

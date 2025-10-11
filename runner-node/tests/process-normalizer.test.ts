@@ -1,4 +1,4 @@
-import ProcessNormalizer from '../src/process-normalizer';
+import ProcessLoader from '../src/process-loader';
 
 describe('ProcessNormalizer', () => {
     test('validates and normalizes a correct process definition', () => {
@@ -12,18 +12,18 @@ describe('ProcessNormalizer', () => {
             }
         };
 
-        const validation = ProcessNormalizer.validate(pd);
+        const validation = ProcessLoader.validate(pd);
         expect(validation.valid).toBe(true);
         expect(validation.errors.length).toBe(0);
 
-        ProcessNormalizer.normalize(pd);
+        ProcessLoader.normalize(pd);
         expect(pd.activities.start.id).toBe('start');
         expect(pd.activities.a1.id).toBe('a1');
     });
 
     test('reports errors for missing required fields', () => {
         const pd: any = { activities: {} };
-        const validation = ProcessNormalizer.validate(pd);
+        const validation = ProcessLoader.validate(pd);
         expect(validation.valid).toBe(false);
         expect(validation.errors).toContain('Missing required field: id');
         expect(validation.errors).toContain('Missing required field: name');
@@ -39,11 +39,11 @@ describe('ProcessNormalizer', () => {
             }
         };
 
-        const validation = ProcessNormalizer.validate(pd);
+        const validation = ProcessLoader.validate(pd);
         expect(validation.valid).toBe(true);
         expect(validation.warnings.length).toBeGreaterThan(0);
 
-        ProcessNormalizer.normalize(pd);
+        ProcessLoader.normalize(pd);
         expect(pd.activities.start.inputs[0].type).toBe('boolean');
     });
 
@@ -56,7 +56,7 @@ describe('ProcessNormalizer', () => {
                 start: { }
             }
         };
-        const validation = ProcessNormalizer.validate(pd);
+        const validation = ProcessLoader.validate(pd);
         expect(validation.valid).toBe(false);
         expect(validation.errors.some(e => e.includes("Activity 'start' missing required field: type"))).toBe(true);
     });
@@ -71,7 +71,7 @@ describe('ProcessNormalizer', () => {
             }
         };
 
-        const validation = ProcessNormalizer.validate(pd);
+        const validation = ProcessLoader.validate(pd);
         expect(validation.valid).toBe(false);
         expect(validation.errors.some(e => e.includes("Start activity reference"))).toBe(true);
     });
@@ -87,7 +87,7 @@ describe('ProcessNormalizer', () => {
             }
         };
 
-        const validation = ProcessNormalizer.validate(pd);
+        const validation = ProcessLoader.validate(pd);
         expect(validation.valid).toBe(false);
         expect(validation.errors.some(e => e.includes("references unknown activity"))).toBe(true);
     });
