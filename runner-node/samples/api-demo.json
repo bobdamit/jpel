@@ -1,0 +1,201 @@
+{
+  "id": "api-demo",
+  "name": "Country Information API Demo",
+  "description": "Demonstrates API activities using the free REST Countries API with data processing",
+  "version": "1.0.0",
+  "start": "a:mainSequence",
+  "variables": [
+    {
+      "name": "countryData",
+      "type": "text",
+      "description": "Country information from the REST Countries API"
+    },
+    {
+      "name": "countryReport",
+      "type": "text", 
+      "description": "Formatted country report"
+    }
+  ],
+  "activities": {
+    "mainSequence": {
+      "name": "Country Information Demo Sequence",
+      "type": "sequence",
+      "activities": [
+        "a:getUserInput",
+        "a:fetchCountryInfo",
+        "a:processResponse",
+        "a:showResults"
+      ]
+    },
+    
+    "getUserInput": {
+      "name": "Get Country Input",
+      "type": "human",
+      "prompt": "Let's explore country information using the REST Countries API!",
+      "inputs": [
+        {
+          "name": "country",
+          "type": "text",
+          "label": "Country Name",
+          "required": true,
+          "placeholder": "Enter a country name (e.g., Japan, Germany, Brazil)",
+          "description": "The country to get information about"
+        },
+        {
+          "name": "infoType",
+          "type": "select",
+          "label": "Information Focus",
+          "required": true,
+          "options": [
+            { "label": "General Overview", "value": "general" },
+            { "label": "Geographic Details", "value": "geography" },
+            { "label": "Cultural Information", "value": "culture" }
+          ],
+          "defaultValue": "general"
+        }
+      ]
+    },
+
+    "fetchCountryInfo": {
+      "name": "Fetch Country Information",
+      "type": "api",
+      "method": "GET",
+      "url": "https://restcountries.com/v3.1/name/a:getUserInput.v:country",
+      "queryParams": {
+        "fullText": "false",
+        "fields": "name,capital,population,area,region,subregion,languages,currencies,timezones,borders,flags,coatOfArms,maps"
+      },
+      "headers": {
+        "Accept": "application/json",
+        "User-Agent": "JPEL-Process-Engine/1.0"
+      },
+      "timeout": 10,
+      "retries": 3,
+      "expectedStatus": [200],
+      "code": [
+        "// Process the REST Countries API response",
+        "console.log('Countries API Response:', response.data);",
+        "",
+        "// The API returns an array, get the first country match",
+        "const countries = response.data;",
+        "if (!countries || countries.length === 0) {",
+        "  throw new Error('No country found with that name');",
+        "}",
+        "",
+        "const country = countries[0];",
+        "",
+        "// Extract comprehensive country information",
+        "const result = {",
+        "  name: country.name.common,",
+        "  officialName: country.name.official,",
+        "  capital: country.capital ? country.capital[0] : 'N/A',",
+        "  population: country.population,",
+        "  area: country.area,",
+        "  region: country.region,",
+        "  subregion: country.subregion,",
+        "  languages: country.languages ? Object.values(country.languages) : [],",
+        "  currencies: country.currencies ? Object.keys(country.currencies) : [],",
+        "  timezones: country.timezones || [],",
+        "  borders: country.borders || [],",
+        "  flag: country.flags?.png || '',",
+        "  maps: country.maps?.googleMaps || '',",
+        "  fetchedAt: new Date().toISOString()",
+        "};",
+        "",
+        "// Store in process variable",
+        "v:countryData = JSON.stringify(result);",
+        "",
+        "console.log('Processed country data:', result.name);",
+        "return result;"
+      ]
+    },
+
+    "processResponse": {
+      "name": "Generate Country Report",
+      "type": "compute",
+      "code": [
+        "// Get the country data from the API call",
+        "const countryData = JSON.parse(process.countryData);",
+        "const infoType = activities.getUserInput.v.infoType;",
+        "",
+        "// Generate different reports based on user selection",
+        "let report = [];",
+        "",
+        "if (infoType === 'general') {",
+        "  report = [",
+        "    `📍 COUNTRY OVERVIEW: ${countryData.name}`,",
+        "    `Official Name: ${countryData.officialName}`,",
+        "    `Capital: ${countryData.capital}`,",
+        "    `Population: ${countryData.population.toLocaleString()} people`,",
+        "    `Area: ${countryData.area.toLocaleString()} km²`,",
+        "    `Region: ${countryData.region} (${countryData.subregion})`,",
+        "    `Languages: ${countryData.languages.join(', ')}`,",
+        "    `Currencies: ${countryData.currencies.join(', ')}`,",
+        "  ];",
+        "} else if (infoType === 'geography') {",
+        "  const density = (countryData.population / countryData.area).toFixed(1);",
+        "  report = [",
+        "    `🌍 GEOGRAPHIC DETAILS: ${countryData.name}`,",
+        "    `Total Area: ${countryData.area.toLocaleString()} km²`,",
+        "    `Population Density: ${density} people/km²`,",
+        "    `Time Zones: ${countryData.timezones.join(', ')}`,",
+        "    `Bordering Countries: ${countryData.borders.length > 0 ? countryData.borders.join(', ') : 'None (island or isolated)'}`,",
+        "    `Map: ${countryData.maps}`,",
+        "  ];",
+        "} else if (infoType === 'culture') {",
+        "  report = [",
+        "    `🎭 CULTURAL INFORMATION: ${countryData.name}`,",
+        "    `Official Languages: ${countryData.languages.join(', ')}`,",
+        "    `Currency: ${countryData.currencies.join(', ')}`,",
+        "    `Region: ${countryData.region}`,",
+        "    `Subregion: ${countryData.subregion}`,",
+        "    `Flag: ${countryData.flag}`,",
+        "  ];",
+        "}",
+        "",
+        "const reportText = report.join('\\n');",
+        "",
+        "// Store the formatted report",
+        "v:countryReport = reportText;",
+        "",
+        "console.log('Generated report type:', infoType);",
+        "return { reportType: infoType, reportText };"
+      ]
+    },
+
+    "showResults": {
+      "name": "Show Country Information",
+      "type": "human",
+      "prompt": "Here's the country information from the REST Countries API. Please review and provide feedback:",
+      "inputs": [
+        {
+          "name": "feedback",
+          "type": "text",
+          "label": "Feedback",
+          "required": false,
+          "description": "Any comments about the country data or API integration"
+        },
+        {
+          "name": "rating",
+          "type": "select",
+          "label": "Data Quality Rating",
+          "required": true,
+          "options": [
+            { "label": "Excellent", "value": "excellent" },
+            { "label": "Good", "value": "good" },
+            { "label": "Average", "value": "average" },
+            { "label": "Poor", "value": "poor" }
+          ],
+          "defaultValue": "good"
+        },
+        {
+          "name": "requestMore",
+          "type": "boolean",
+          "label": "Research Another Country",
+          "required": false,
+          "description": "Would you like to look up information for another country?"
+        }
+      ]
+    }
+  }
+}

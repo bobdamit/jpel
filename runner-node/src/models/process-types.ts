@@ -121,6 +121,9 @@ export interface APIActivity extends Activity {
 	headers?: { [key: string]: string };
 	queryParams?: { [key: string]: string };
 	body?: any;
+	timeout?: number; // Timeout in seconds, defaults to 30
+	retries?: number; // Number of retries on failure, defaults to 0
+	expectedStatus?: number[]; // Expected HTTP status codes, defaults to [200]
 	code?: string[]; // Optional code to process the response
 }
 

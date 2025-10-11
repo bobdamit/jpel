@@ -1,0 +1,103 @@
+{
+  "id": "simple-api-demo",
+  "name": "Simple API Demo",
+  "description": "Basic API activity demonstration using public APIs",
+  "version": "1.0.0",
+  "start": "a:mainSequence",
+  "variables": [
+    {
+      "name": "quoteData",
+      "type": "text",
+      "description": "Post data from API"
+    }
+  ],
+  "activities": {
+    "mainSequence": {
+      "name": "Simple API Demo Sequence",
+      "type": "sequence",
+      "activities": [
+        "a:getUserPrefs",
+        "a:fetchQuote",
+        "a:showQuote"
+      ]
+    },
+    
+    "getUserPrefs": {
+      "name": "Get User Preferences", 
+      "type": "human",
+      "prompt": "Let's fetch a sample blog post for you!",
+      "inputs": [
+        {
+          "name": "postId",
+          "type": "select",
+          "label": "Post ID",
+          "required": true,
+          "options": [
+            { "label": "Post #1", "value": "1" },
+            { "label": "Post #2", "value": "2" },
+            { "label": "Post #3", "value": "3" },
+            { "label": "Post #4", "value": "4" },
+            { "label": "Post #5", "value": "5" }
+          ],
+          "defaultValue": "1"
+        }
+      ]
+    },
+
+    "fetchQuote": {
+      "name": "Fetch Random Post",
+      "type": "api", 
+      "method": "GET",
+      "url": "https://jsonplaceholder.typicode.com/posts/a:getUserPrefs.v:postId",
+      "headers": {
+        "Accept": "application/json",
+        "User-Agent": "JPEL-Demo/1.0"
+      },
+      "timeout": 10,
+      "retries": 2,
+      "expectedStatus": [200],
+      "code": [
+        "// Process the API response",
+        "console.log('API Response:', response.data);",
+        "",
+        "const post = response.data;",
+        "",
+        "// Format the data",
+        "const formattedData = {",
+        "  title: post.title,",
+        "  body: post.body,",
+        "  userId: post.userId,",
+        "  id: post.id,",
+        "  fetchedAt: new Date().toISOString()",
+        "};",
+        "",
+        "// Store in process variable",
+        "v:quoteData = JSON.stringify(formattedData);",
+        "",
+        "return formattedData;"
+      ]
+    },
+
+    "showQuote": {
+      "name": "Display Post",
+      "type": "human",
+      "prompt": "Here's the blog post from the API:",
+      "inputs": [
+        {
+          "name": "liked",
+          "type": "boolean",
+          "label": "Did you like this post?",
+          "required": true,
+          "description": "Let us know if you found this post interesting"
+        },
+        {
+          "name": "comments",
+          "type": "text",
+          "label": "Comments",
+          "required": false,
+          "description": "Any thoughts about this post?"
+        }
+      ]
+    }
+  }
+}
