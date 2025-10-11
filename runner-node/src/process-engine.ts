@@ -683,7 +683,54 @@ export class ProcessEngine {
 		try {
 			const response = await this.apiExecutor.execute(activity, instance);
 
+			// Store response data in the activity instance
 			activityInstance.responseData = response;
+
+			// Initialize variables array if it doesn't exist
+			if (!activityInstance.variables) {
+				activityInstance.variables = [];
+			}
+
+			// Execute optional code section if present
+			if (activity.code && Array.isArray(activity.code) && activity.code.length > 0) {
+				logger.info(`ProcessEngine: Executing post-API code for activity '${activity.id}'`);
+				
+				// Temporarily store response in a global context for the code execution
+				// This allows the code to access the response via 'response' variable
+				const originalGlobal = (global as any).response;
+				(global as any).response = response;
+				
+				try {
+					const result = this.expressionEvaluator.executeCode(activity.code, instance, activity.id);
+
+					// Store code execution results in activity variables
+					if (result && typeof result === 'object') {
+						Object.keys(result).forEach(key => {
+							let variable = activityInstance.variables!.find(v => v.name === key);
+							if (variable) {
+								variable.value = result[key];
+							} else {
+								// Create new variable
+								variable = {
+									name: key,
+									type: typeof result[key] === 'boolean' ? FieldType.Boolean : 
+										  typeof result[key] === 'number' ? FieldType.Number : FieldType.Text,
+									value: result[key]
+								};
+								activityInstance.variables!.push(variable);
+							}
+						});
+					}
+				} finally {
+					// Clean up the global response
+					if (originalGlobal !== undefined) {
+						(global as any).response = originalGlobal;
+					} else {
+						delete (global as any).response;
+					}
+				}
+			}
+
 			activityInstance.status = ActivityStatus.Completed;
 			activityInstance.completedAt = new Date();
 

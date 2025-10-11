@@ -1,8 +1,8 @@
 import { ProcessInstance } from '../models/instance-types';
-import { ACTIVITY_VAR_PATTERN, ACTIVITY_FIELD_PATTERN, PROCESS_VAR_PATTERN, mapVariablesArray } from './patterns';
+import { ACTIVITY_VAR_PATTERN, ACTIVITY_FIELD_PATTERN, PROCESS_VAR_PATTERN, ENV_VAR_PATTERN, mapVariablesArray } from './patterns';
 
 /**
- * Resolve inline template tokens inside a string, e.g. "a:act.v:var" or "process.name".
+ * Resolve inline template tokens inside a string, e.g. "a:act.v:var" or "process.name" or "env:API_KEY".
  * Pure helper that does not depend on ExpressionEvaluator state.
  */
 export function resolveInlineTemplate(text: string, instance: ProcessInstance): string {
@@ -25,6 +25,14 @@ export function resolveInlineTemplate(text: string, instance: ProcessInstance): 
 
     result = result.replace(PROCESS_VAR_PATTERN, (match, variableName) => {
         if (instance.variables && instance.variables[variableName] !== undefined) return String(instance.variables[variableName]);
+        return match;
+    });
+
+    result = result.replace(ENV_VAR_PATTERN, (match, envVarName) => {
+        const envValue = process.env[envVarName];
+        if (envValue !== undefined) return envValue;
+        // Log warning for missing environment variables but don't fail
+        console.warn(`Environment variable '${envVarName}' not found, keeping placeholder: ${match}`);
         return match;
     });
 
