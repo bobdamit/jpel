@@ -1,5 +1,22 @@
-import { ProcessInstance } from './models/instance-types';
+import { ActivityInstance, ProcessInstance } from './models/instance-types';
+import { ACTIVITY_VAR_PATTERN, ACTIVITY_FIELD_PATTERN, ACTIVITY_PROP_PATTERN, PROCESS_VAR_PATTERN, mapVariablesArray } from './utils/patterns';
 import { logger } from './logger';
+
+/**
+ * Strongly-typed evaluation context exposed to JPEL/JS execution.
+ * Keep this permissive enough to allow dynamically-added activity ids
+ * while providing useful intellisense and avoiding blanket `any`.
+ */
+export interface EvaluationContext {
+	process: { [key: string]: any };
+	instance: ProcessInstance;
+	currentActivity: { [key: string]: any };
+	activities: { [activityId: string]: any };
+	Math: typeof Math;
+	console: { log: (...args: any[]) => void };
+	// allow dynamic top-level entries for activity shortcuts (e.g. myAct)
+	[key: string]: any;
+}
 
 
 /**
@@ -93,13 +110,14 @@ export class ExpressionEvaluator {
 	 * @param activity The activity to extract variables from
 	 * @returns A map of variable names to values
 	 */
-	private getActivityVariableState(activity: any): any {
+	// Make this public so other modules (e.g. APIExecutor) can reuse the same
+	// variables-array extraction logic and avoid duplication.
+	public getActivityVariableState(activity?: ActivityInstance): Record<string, any> {
 		if (!activity) return {};
-		
+
 		// Use the consistent variables array approach
 		if (activity.variables && Array.isArray(activity.variables)) {
-			// Convert variables array to key-value object for compatibility
-			const data: any = {};
+			const data: Record<string, any> = {};
 			activity.variables.forEach((variable: any) => {
 				data[variable.name] = variable.value;
 			});
@@ -108,9 +126,17 @@ export class ExpressionEvaluator {
 		return {};
 	}
 
-	// TODO: this seems like too important of a thing to be an "any"
-	private createEvaluationContext(instance: ProcessInstance, currentActivityId?: string): any {
-		const context: any = {
+	/**
+	 * Resolve inline template tokens inside a string by delegating to the pure util.
+	 */
+	public resolveInlineTemplate(text: string, instance: ProcessInstance): string {
+		const { resolveInlineTemplate } = require('./utils/substitution');
+		return resolveInlineTemplate(text, instance);
+	}
+
+	// Create a typed evaluation context to avoid using a blanket `any`
+	private createEvaluationContext(instance: ProcessInstance, currentActivityId?: string): EvaluationContext {
+		const context: EvaluationContext = {
 			// Process variables
 			process: instance.variables,
 
@@ -128,6 +154,9 @@ export class ExpressionEvaluator {
 					process.stdout.write(`[Process ${instance.instanceId}] ${args.join(' ')}\n`);
 				}
 			}
+			,
+			// activities map will be populated below
+			activities: {}
 		};
 
 		// Add activity data accessors
@@ -177,17 +206,17 @@ export class ExpressionEvaluator {
 			if (!part.startsWith('"') && !part.endsWith('"')) {
 				// Replace a:activityId.v:variableName with activities["activityId"].v["variableName"]
 				// Allow word characters and hyphens for both activity IDs and variable names
-				part = part.replace(/a:([a-zA-Z0-9_-]+)\.v:([a-zA-Z0-9_-]+)/g, (m, activityId, variableName) => {
+				part = part.replace(ACTIVITY_VAR_PATTERN, (m, activityId, variableName) => {
 					return `activities[${JSON.stringify(activityId)}].v[${JSON.stringify(variableName)}]`;
 				});
 
 				// Reject legacy f: syntax - throw error instead of translating
-				if (/a:[a-zA-Z0-9_-]+\.f:[a-zA-Z0-9_-]+/.test(part)) {
+				if (ACTIVITY_FIELD_PATTERN.test(part)) {
 					throw new Error(`Legacy field syntax 'a:activity.f:field' is no longer supported. Use 'a:activity.v:variable' instead.`);
 				}
 
 				// Replace a:activityId.property with activities["activityId"].property
-				part = part.replace(/a:([a-zA-Z0-9_-]+)\.(\w+)/g, (m, activityId, prop) => {
+				part = part.replace(ACTIVITY_PROP_PATTERN, (m, activityId, prop) => {
 					return `activities[${JSON.stringify(activityId)}].${prop}`;
 				});
 
@@ -224,7 +253,7 @@ export class ExpressionEvaluator {
 		return translatedParts.join('');
 	}
 
-	private safeEval(expression: string, context: any): any {
+	private safeEval(expression: string, context: EvaluationContext): any {
 		// Create a function with the context as parameters
 		const paramNames = Object.keys(context);
 		const paramValues = Object.values(context);

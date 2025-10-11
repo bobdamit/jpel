@@ -341,8 +341,7 @@ export class ProcessEngine {
 
 		if (files) {
 			activityInstance._files = files;
-			// TODO - need a whole definition framework for what to do with these files
-			// maybe a file handler plugin or someething
+
 		}
 
 		// Complete the human task

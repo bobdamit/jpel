@@ -73,6 +73,8 @@ export interface HumanActivityInstance extends ActivityInstance, HumanActivity {
 	// Note: variables are now stored in base ActivityInstance.variables
 	// inputs from HumanActivity definition are converted to variables at runtime
 	_files?: any[]; // Uploaded files
+	// Runtime form data collected from users
+	formData?: { [key: string]: any };
 }
 
 /**
@@ -90,6 +92,8 @@ export interface ComputeActivityInstance
 	extends ActivityInstance,
 		ComputeActivity {
 	type: ActivityType.Compute;
+	// Results produced by the compute activity (keyed values)
+	computedValues?: { [key: string]: any };
 }
 
 /**

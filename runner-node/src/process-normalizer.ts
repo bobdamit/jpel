@@ -286,9 +286,10 @@ export class ProcessNormalizer {
 	 */
 	private extractFieldReferences(codeLine: string): string[] {
 		// New syntax: a:activityId.v:variableName
-		const variableRefPattern = /a:([a-zA-Z0-9_-]+)\.v:([a-zA-Z0-9_-]+)/g;
-		// Legacy syntax: a:activityId.f:fieldName
-		const fieldRefPattern = /a:([a-zA-Z0-9_-]+)\.f:([a-zA-Z0-9_-]+)/g;
+	const { ACTIVITY_VAR_PATTERN, ACTIVITY_FIELD_PATTERN } = require('./utils/patterns');
+	const variableRefPattern = ACTIVITY_VAR_PATTERN;
+	// Legacy syntax: a:activityId.f:fieldName
+	const fieldRefPattern = ACTIVITY_FIELD_PATTERN;
 		const references: string[] = [];
 		let match;
 
@@ -312,7 +313,7 @@ export class ProcessNormalizer {
 	 */
 	private validateFieldReference(fieldRef: string, processDefinition: ProcessDefinition): string | null {
 		// Handle variable syntax: a:activityId.v:variableName
-		const variableMatch = fieldRef.match(/^a:([a-zA-Z0-9_-]+)\.v:([a-zA-Z0-9_-]+)$/);
+	const variableMatch = fieldRef.match(/^a:([a-zA-Z0-9_-]+)\.v:([a-zA-Z0-9_-]+)$/);
 		if (variableMatch) {
 			const [, activityId, variableName] = variableMatch;
 			return this.validateActivityVariableReference(activityId, variableName, processDefinition, fieldRef);

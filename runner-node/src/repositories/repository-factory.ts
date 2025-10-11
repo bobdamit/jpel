@@ -48,34 +48,13 @@ export class RepositoryFactory {
 						throw new Error('MongoDB connection string is required');
 					}
 
-					// TODO: Implement MongoDB repositories
 					// const mongoDb = await MongoConnectionFactory.createConnection(config.connectionString);
 					// this.processDefinitionRepo = new MongoProcessDefinitionRepository(mongoDb);
 					// this.processInstanceRepo = new MongoProcessInstanceRepository(mongoDb);
 
 					logger.warn('MongoDB implementation not yet available - using in-memory fallback');
 					throw new Error('MongoDB implementation not yet available - using in-memory fallback');
-
-				case 'postgresql':
-					logger.debug('Attempting PostgreSQL repository initialization');
-					if (!config.connectionString) {
-						throw new Error('PostgreSQL connection string is required');
-					}
-
-					// TODO: Implement PostgreSQL repositories
-					logger.warn('PostgreSQL implementation not yet available - using in-memory fallback');
-					throw new Error('PostgreSQL implementation not yet available - using in-memory fallback');
-
-				case 'custom':
-					logger.debug('Using custom repository implementations');
-					if (!config.options?.processDefinitionRepo || !config.options?.processInstanceRepo) {
-						throw new Error('Custom repository implementations must be provided in options');
-					}
-
-					this.processDefinitionRepo = config.options.processDefinitionRepo;
-					this.processInstanceRepo = config.options.processInstanceRepo;
-					break;
-
+					
 				default:
 					throw new Error(`Unsupported repository type: ${config.type}`);
 			}
