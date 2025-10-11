@@ -32,6 +32,7 @@ import { ActivityInstance, APIActivityInstance, BranchActivityInstance, ProcessE
 import { ExecutionContext, ExecutionFrame } from './execution-context';
 import { extractActivityId } from './utils/activity-ref';
 import { updateActivityVariables } from './utils/variable-updater';
+import { FileService } from './services/file-service';
 
 
 
@@ -44,6 +45,7 @@ export class ProcessEngine {
 	private processInstanceRepo: ProcessInstanceRepository;
 	private expressionEvaluator: ExpressionEvaluator;
 	private apiExecutor: APIExecutor;
+	private fileService: FileService;
 	private continuationStrategies: Map<ActivityType, ActivityContinuationStrategy>;
 
 	constructor() {
@@ -52,6 +54,7 @@ export class ProcessEngine {
 		this.processInstanceRepo = RepositoryFactory.getProcessInstanceRepository();
 		this.expressionEvaluator = new ExpressionEvaluator();
 		this.apiExecutor = new APIExecutor();
+		this.fileService = new FileService();
 		
 		// Initialize continuation strategies
 		this.continuationStrategies = new Map();
@@ -327,9 +330,65 @@ export class ProcessEngine {
 		// Update variables array with submitted data (moved to util)
 		updateActivityVariables(activityInstance, data);
 
-		if (files) {
-			activityInstance._files = files;
-
+		// Handle uploaded files by mapping them to specific field names
+		if (files && files.length > 0) {
+			logger.info(`ProcessEngine: Processing ${files.length} uploaded files for activity '${activityId}'`);
+			
+			try {
+				// Get the activity definition to check which fields are file types
+				const processDef = await this.processDefinitionRepo.findById(instance.processId);
+				const activityDef = processDef?.activities[activityId];
+				
+				if (activityDef && activityDef.type === 'human') {
+					const humanActivityDef = activityDef as any; // HumanActivity type
+					const fileFields = humanActivityDef.inputs?.filter((field: any) => field.type === 'file') || [];
+					
+					// Map files to their corresponding field names
+					for (let i = 0; i < files.length && i < fileFields.length; i++) {
+						const file = files[i];
+						const fieldName = fileFields[i].name;
+						
+						logger.info(`ProcessEngine: Mapping file to field '${fieldName}'`, {
+							filename: file.originalname,
+							fieldName
+						});
+						
+						// Create file upload request
+						const uploadRequest = {
+							filename: file.originalname || file.filename || 'unknown',
+							mimeType: file.mimetype || 'application/octet-stream',
+							content: file.buffer || Buffer.alloc(0),
+							description: `File uploaded for field ${fieldName}`
+						};
+						
+						// Create file variable with the specific field name
+						const fileVariable = await this.fileService.uploadAndCreateVariable(
+							uploadRequest,
+							fieldName,
+							instanceId,
+							activityId,
+							instance.processId
+						);
+						
+						// Add or update the variable in the activity's variables array
+						const existingVarIndex = activityInstance.variables.findIndex(v => v.name === fieldName);
+						if (existingVarIndex >= 0) {
+							activityInstance.variables[existingVarIndex] = fileVariable;
+						} else {
+							activityInstance.variables.push(fileVariable);
+						}
+					}
+					
+					logger.info(`ProcessEngine: Created ${Math.min(files.length, fileFields.length)} file variables for activity '${activityId}'`);
+				}
+			} catch (error) {
+				logger.error(`ProcessEngine: Failed to process uploaded files for activity '${activityId}'`, error);
+				return {
+					instanceId,
+					status: ProcessStatus.Failed,
+					message: `File processing failed: ${error instanceof Error ? error.message : String(error)}`
+				};
+			}
 		}
 
 		// Complete the human task
@@ -481,7 +540,7 @@ export class ProcessEngine {
 			activityInstance.variables = [];
 		}
 
-		// If variables array is empty, initialize from activity definition
+		// If variables array is empty, initialize from inputs in activity definition
 		if (activity.inputs && Array.isArray(activity.inputs) && activityInstance.variables.length === 0) {
 			activityInstance.variables = activity.inputs.map(field => ({
 				name: field.name,
@@ -497,7 +556,8 @@ export class ProcessEngine {
 				max: field.max,
 				units: field.units,
 				pattern: field.pattern,
-				patternDescription: field.patternDescription
+				patternDescription: field.patternDescription,
+				fileSpec: field.fileSpec
 			}));
 			
 			// Remove inputs from runtime instance to prevent redundant state
@@ -524,15 +584,14 @@ export class ProcessEngine {
 			max: variable.max,
 			units: variable.units,
 			pattern: variable.pattern,
-			patternDescription: variable.patternDescription
+			patternDescription: variable.patternDescription,
+			fileSpec: (variable as any).fileSpec
 		}));
 
 		const humanTaskData: HumanTaskData = {
 			activityId: activity.id,
 			prompt: activity.prompt,
-			fields: fieldsForUI,
-			fileUploads: activity.fileUploads,
-			attachments: activity.attachments
+			fields: fieldsForUI
 		};
 
 		return {
@@ -1204,7 +1263,8 @@ export class ProcessEngine {
 					max: field.max,
 					units: field.units,
 					pattern: field.pattern,
-					patternDescription: field.patternDescription
+					patternDescription: field.patternDescription,
+					fileSpec: field.fileSpec
 				}));
 				
 				// Remove inputs from runtime instance to prevent redundant state
@@ -1227,7 +1287,14 @@ export class ProcessEngine {
 	}
 
 
-	async reRunInstance(instanceId: string): Promise<ProcessExecutionResult> {
+	/**
+	 * Run An instance picking up at the first incomplete activity
+	 * Completed activities are left as-is
+	 * Failed or Incomplete activities are reset to Pending
+	 * @param instanceId 
+	 * @returns 
+	 */
+	async resumeInstance(instanceId: string): Promise<ProcessExecutionResult> {
 		// Get the existing instance
 		const instance = await this.processInstanceRepo.findById(instanceId);
 		logger.info(`ProcessEngine: Re-running instance '${instanceId}'`, {
@@ -1309,15 +1376,14 @@ export class ProcessEngine {
 					max: variable.max,
 					units: variable.units,
 					pattern: variable.pattern,
-					patternDescription: variable.patternDescription
+					patternDescription: variable.patternDescription,
+					fileSpec: variable.fileSpec
 				})) || [];
 
 				const humanTaskData: HumanTaskData = {
 					activityId: currentActivity,
 					prompt: humanActivity.prompt,
-					fields: fieldsForUI,
-					fileUploads: humanActivity.fileUploads,
-					attachments: humanActivity.attachments
+					fields: fieldsForUI
 				};
 				
 				return {
@@ -1341,12 +1407,15 @@ export class ProcessEngine {
 	 * callstack and sets all activities as status Pending
 	 * Existing values are retained for all Activities
 	 */
-	async navigateToStart(instanceId: string): Promise<ProcessExecutionResult> {
+	async restartInstance(instanceId: string): Promise<ProcessExecutionResult> {
 		logger.info(`ProcessEngine: Navigate to start - instance '${instanceId}'`);
 
 		const instance = await this.processInstanceRepo.findById(instanceId);
 
 		const process = await this.processDefinitionRepo.findById(instance.processId);
+
+		instance.status = ProcessStatus.Running;
+		instance.completedAt = undefined;
 
 		// Init a brand new execution context
 		const executionContext = this.initExecutionContextAtStart(process);
@@ -1444,6 +1513,95 @@ export class ProcessEngine {
 
 		await this.processDefinitionRepo.save(processDefinition);
 		logger.info(`ProcessEngine: Process definition '${processDefinition.id}' loaded successfully`);
+	}
+
+	/**
+	 * Get the FileService instance for direct file operations
+	 * @returns FileService instance
+	 */
+	getFileService(): FileService {
+		return this.fileService;
+	}
+
+	/**
+	 * Create file variables for an activity (useful for compute activities generating files)
+	 * @param instanceId Process instance ID
+	 * @param activityId Activity ID
+	 * @param files Array of file data to create variables for
+	 * @param baseVariableName Base name for the file variables
+	 * @returns Array of created file variables
+	 */
+	async createFileVariablesForActivity(
+		instanceId: string,
+		activityId: string,
+		files: { filename: string; mimeType: string; content: Buffer; description?: string }[],
+		baseVariableName: string = 'generatedFile'
+	): Promise<{ [key: string]: any }> {
+		logger.info(`ProcessEngine: Creating file variables for activity '${activityId}' in instance '${instanceId}'`, {
+			fileCount: files.length,
+			baseVariableName
+		});
+
+		const instance = await this.processInstanceRepo.findById(instanceId);
+		const activityInstance = instance.activities[activityId];
+		
+		if (!activityInstance) {
+			throw new Error(`Activity '${activityId}' not found in instance '${instanceId}'`);
+		}
+
+		if (!activityInstance.variables) {
+			activityInstance.variables = [];
+		}
+
+		// Create file variables using the file service
+		const fileVariables = await this.fileService.createVariablesFromUploads(
+			files, 
+			baseVariableName,
+			instanceId,
+			activityId,
+			instance.processId
+		);
+		
+		// Add to activity's variables
+		this.fileService.updateVariablesWithFiles(activityInstance.variables, fileVariables);
+
+		// Save the updated instance
+		await this.processInstanceRepo.save(instance);
+
+		// Return a simplified object for use in compute activities
+		const result: { [key: string]: any } = {};
+		fileVariables.forEach((variable: Variable) => {
+			result[variable.name] = variable.value;
+		});
+
+		logger.info(`ProcessEngine: Created ${fileVariables.length} file variables for activity '${activityId}'`, {
+			variableNames: fileVariables.map((v: Variable) => v.name)
+		});
+
+		return result;
+	}
+
+	/**
+	 * Get file data from a variable in an activity
+	 * @param instanceId Process instance ID
+	 * @param activityId Activity ID
+	 * @param variableName Name of the file variable
+	 * @returns File data or null if not found
+	 */
+	async getFileFromActivityVariable(instanceId: string, activityId: string, variableName: string) {
+		const instance = await this.processInstanceRepo.findById(instanceId);
+		const activityInstance = instance.activities[activityId];
+		
+		if (!activityInstance || !activityInstance.variables) {
+			return null;
+		}
+
+		const variable = activityInstance.variables.find(v => v.name === variableName);
+		if (!variable) {
+			return null;
+		}
+
+		return await this.fileService.downloadFromVariable(variable);
 	}
 }
 

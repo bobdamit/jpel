@@ -799,6 +799,67 @@ function showHumanTask(humanTask) {
                     ${field.hint ? `<small class="field-hint">${field.hint}</small>` : ''}
                 </div>
             `;
+        } else if (field.type === 'file') {
+            // Handle file upload field
+            let existingFileHtml = '';
+            if (fieldValue && typeof fieldValue === 'object' && fieldValue.metadata) {
+                // Existing file - show thumbnail and info
+                const metadata = fieldValue.metadata;
+                const thumbnailHtml = fieldValue.thumbnailUrl ? 
+                    `<img src="${fieldValue.thumbnailUrl}" alt="Thumbnail" class="file-thumbnail">` : 
+                    '<div class="file-icon">📁</div>';
+                existingFileHtml = `
+                    <div class="existing-file">
+                        <div class="file-preview">
+                            ${thumbnailHtml}
+                            <div class="file-info">
+                                <strong>${metadata.filename}</strong><br>
+                                <small>${(metadata.size / 1024).toFixed(1)} KB • ${metadata.mimeType}</small>
+                            </div>
+                        </div>
+                        <small class="file-replace-hint">Choose a new file to replace this one</small>
+                    </div>
+                `;
+            }
+            // Determine accept string from fileSpec
+            let acceptStr = '';
+            let allowedDesc = 'Images only.';
+
+				
+            if (field.fileSpec) {
+                const fs = field.fileSpec;
+                if (fs.fileType) {
+						acceptStr = fs.fileType;
+					 }
+                if ((!acceptStr || acceptStr === '*/*') && Array.isArray(fs.extensions)) {
+                    // Convert extensions array to accept list (.jpg,.png)
+                    acceptStr = fs.extensions.join(',');
+                }
+
+					 
+                if (Array.isArray(fs.extensions) && fs.extensions.length > 0) {
+                    allowedDesc = `Allowed: ${fs.extensions.join(', ')}`;
+                } else if (fs.fileType) {
+                    allowedDesc = `Allowed type: ${fs.fileType}`;
+                }
+            }
+
+            return `
+                <div class="form-group">
+                    <label for="field-${field.name}" title="${field.hint || ''}">${field.label || field.name}:</label>
+                    ${existingFileHtml}
+                    <input 
+                        type="file" 
+                        id="field-${field.name}" 
+                        name="${field.name}"
+                        ${acceptStr ? `accept="${acceptStr}"` : ''}
+                        ${field.required && !existingFileHtml ? 'required' : ''}
+                        data-max-size="1048576"
+                    >
+                    <small class="field-hint">Max size: 1MB. ${allowedDesc}</small>
+                    ${field.hint ? `<small class="field-hint">${field.hint}</small>` : ''}
+                </div>
+            `;
         } else {
             // Add pattern attributes and description for text fields
             const patternAttr = field.pattern ? `pattern="${field.pattern}"` : '';
@@ -833,6 +894,8 @@ function showHumanTask(humanTask) {
             `;
         }
     }).join('');
+    // Expose fields for submit-time validation (fileSpec checks)
+    window.currentHumanFields = fields;
     
     document.getElementById('human-task-interface').classList.remove('hidden');
     showTaskStatus('Please complete the human task above and click Submit.', 'info');
@@ -857,6 +920,7 @@ async function submitHumanTask(event) {
         // Collect form data
         const formData = new FormData(event.target);
         const taskData = {};
+        const fileUploads = [];
         
         for (const [key, value] of formData.entries()) {
             const input = document.getElementById(`field-${key}`);
@@ -868,6 +932,71 @@ async function submitHumanTask(event) {
                     if (value === 'true') taskData[key] = true;
                     else if (value === 'false') taskData[key] = false;
                     else taskData[key] = undefined;
+                } else if (input.tagName === 'INPUT' && input.type === 'file') {
+                    // Handle file upload
+                    if (value && value.size > 0) {
+                        // Check file size (1MB limit)
+                        const maxSize = parseInt(input.dataset.maxSize) || 1048576;
+                        if (value.size > maxSize) {
+                            showTaskStatus(`❌ File "${value.name}" is too large. Max size: ${(maxSize/1024/1024).toFixed(1)}MB`, 'error');
+                            return;
+                        }
+
+                        // Client-side fileSpec validation (extensions or mime)
+                        const field = (window.currentHumanFields || []).find(f => f.name === key) || {};
+                        if (field.fileSpec) {
+                            const fs = field.fileSpec;
+                            // Check extensions if provided
+                            if (Array.isArray(fs.extensions) && fs.extensions.length > 0) {
+                                const lower = value.name.toLowerCase();
+                                const matches = fs.extensions.some(ext => lower.endsWith(ext.toLowerCase()));
+                                if (!matches) {
+                                    showTaskStatus(`❌ File "${value.name}" does not match allowed extensions: ${fs.extensions.join(', ')}`, 'error');
+                                    return;
+                                }
+                            }
+                            // Check mime type pattern if provided
+                            if (fs.fileType && fs.fileType !== '*/*') {
+                                // support patterns like image/*
+                                const pattern = fs.fileType;
+                                if (pattern.endsWith('/*')) {
+                                    const prefix = pattern.slice(0, -2);
+                                    if (!value.type.startsWith(prefix)) {
+                                        showTaskStatus(`❌ File "${value.name}" must be of type ${pattern}`, 'error');
+                                        return;
+                                    }
+                                } else if (pattern.indexOf(',') >= 0) {
+                                    // comma-separated list
+                                    const parts = pattern.split(',').map(p => p.trim());
+                                    if (!parts.includes(value.type)) {
+                                        showTaskStatus(`❌ File "${value.name}" must be one of: ${parts.join(', ')}`, 'error');
+                                        return;
+                                    }
+                                } else {
+                                    if (value.type !== pattern && pattern !== '*/*') {
+                                        // allow generic match
+                                        // continue
+                                    }
+                                }
+                            }
+                        }
+
+                        // Convert file to base64 for JSON submission
+                        const base64 = await fileToBase64(value);
+                        fileUploads.push({
+                            fieldName: key,
+                            filename: value.name,
+                            mimeType: value.type,
+                            size: value.size,
+                            content: base64
+                        });
+                        
+                        // Add placeholder to taskData for validation (will be replaced by backend with actual FileReference)
+                        taskData[key] = `__FILE_UPLOAD_${key}__`;
+                    } else {
+                        // No file selected - include empty value for validation
+                        taskData[key] = null;
+                    }
                 } else {
                     taskData[key] = value;
                 }
@@ -876,10 +1005,16 @@ async function submitHumanTask(event) {
             }
         }
         
+        // Prepare submission payload
+        const payload = {
+            ...taskData,
+            _fileUploads: fileUploads
+        };
+        
         const response = await fetch(`${API_BASE}/instances/${currentInstanceId}/activities/${currentActivityId}/submit`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(taskData)
+            body: JSON.stringify(payload)
         });
         
         const result = await response.json();
@@ -986,3 +1121,17 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 });
+
+// Helper function to convert file to base64
+function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => {
+            // Remove the data:type/subtype;base64, prefix
+            const base64 = reader.result.split(',')[1];
+            resolve(base64);
+        };
+        reader.onerror = error => reject(error);
+    });
+}

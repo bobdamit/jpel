@@ -119,7 +119,7 @@ const createTestApp = (processEngine: ProcessEngine) => {
     app.post('/api/instances/:instanceId/rerun', async (req, res) => {
         try {
             const { instanceId } = req.params;
-            const result = await processEngine.reRunInstance(instanceId);
+            const result = await processEngine.resumeInstance(instanceId);
             res.json(createResponse(true, result));
         } catch (error) {
             res.status(500).json(createResponse(false, null, error instanceof Error ? error.message : String(error)));
