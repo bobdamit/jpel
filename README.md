@@ -147,7 +147,145 @@ npm start
 2. Visit localhost:3000 in a browser to open the Runner Demo UI
 3. Choose one of the sample processes and start a new Instance
 
-## 📚 Documentation
+## � Activity examples (lifted from /runner-node/samples)
+
+Below are short, focused examples of common activity definitions used in JPEL processes, taken from the repository `runner-node/samples` and annotated with what each field does. These are *snippets* (not full process files) intended to illustrate typical usage.
+
+### 1) Human activity (form input)
+From `employee-onboarding.json` — collects structured user input with validation and options.
+
+```json
+{
+	"name": "Collect Employee Information",
+	"type": "human",
+	"prompt": "Please provide new employee details:",
+	"inputs": [
+		{
+			"name": "employeeName",
+			"type": "text",
+			"label": "Employee Name",
+			"required": true,
+			"placeholder": "Full name",
+			"pattern": "^['.\\-a-zA-Z\\s]{3,50}$",
+			"patternDescription": "Name must be 3-50 characters"
+		},
+		{
+			"name": "department",
+			"type": "select",
+			"label": "Department",
+			"required": true,
+			"options": [
+				{ "value": "Engineering", "label": "Engineering" },
+				{ "value": "Sales", "label": "Sales" }
+			]
+		}
+	]
+}
+```
+
+Explanation:
+- `type: human` - marks the activity as a user-facing task that waits for input.
+- `prompt` - text shown to the user.
+- `inputs` - an array of `Variable`-like definitions describing fields to collect (name, type, label, validation).
+- `pattern` and `patternDescription` provide client-side validation guidance.
+
+### 2) API activity (external call)
+From `api-demo.json` — calls a third-party REST API and processes the response in `code`.
+
+```json
+{
+	"name": "Fetch Country Information",
+	"type": "api",
+	"method": "GET",
+	"url": "https://restcountries.com/v3.1/name/a:getUserInput.v:country",
+	"queryParams": { "fields": "name,capital,population,area" },
+	"expectedStatus": [200],
+	"retries": 3,
+	"code": [
+		"// response.data is available",
+		"const countries = response.data;",
+		"if (!countries || countries.length === 0) throw new Error('No country found');",
+		"v:countryData = JSON.stringify(countries[0]);",
+		"return countries[0];"
+	]
+}
+```
+
+Explanation:
+- `type: api` - performs an HTTP request.
+- `url` and `method` - request details; URL may reference process/activity variables using `a:...` or `v:...` syntax.
+- `expectedStatus` - list of acceptable HTTP status codes.
+- `retries` and `timeout` control resilience.
+- `code` (optional) - post-processing script that runs after a successful response; it can store values in process variables (`v:`) or return a structured result.
+
+### 3) Compute activity (inline transformation)
+From `api-demo.json` — generates a formatted report from process variables.
+
+```json
+{
+	"name": "Generate Country Report",
+	"type": "compute",
+	"code": [
+		"const countryData = JSON.parse(process.countryData);",
+		"const infoType = activities.getUserInput.v.infoType;",
+		"let report = [];",
+		"if (infoType === 'general') report = [`COUNTRY: ${countryData.name}`, `Capital: ${countryData.capital}`];",
+		"v:countryReport = report.join('\n');",
+		"return { reportType: infoType, reportText: v:countryReport };"
+	]
+}
+```
+
+Explanation:
+- `type: compute` - runs JavaScript on the engine to compute or transform data.
+- Access process variables via `process` or the convenience `activities.<id>.v:<name>` notation.
+- `v:...` assignment persists data into process-scoped variables.
+
+### 4) Sequence and control flow (ordered steps)
+From `approval-workflow.json` — `sequence` groups ordered activities.
+
+```json
+{
+	"name": "Document Approval Sequence",
+	"type": "sequence",
+	"activities": [
+		"a:submitDocument",
+		"a:reviewDocument",
+		"a:processDecision"
+	]
+}
+```
+
+Explanation:
+- `type: sequence` - executes child activities in order.
+- Child entries reference activity IDs (prefixed with `a:` in full process documents).
+
+### 5) Branch / Approval (conditional routing)
+From `approval-workflow.json` — use `branch` or `switch` to route based on decisions.
+
+```json
+{
+	"name": "Process Decision",
+	"type": "branch",
+	"condition": "activities.reviewDocument.v:approved === true",
+	"trueActivity": "a:welcomeEmployee",
+	"falseActivity": "a:requestChanges"
+}
+```
+
+Explanation:
+- `type: branch` - evaluates a boolean `condition` and selects the next activity.
+- `condition` may reference activity variables or process variables.
+- `trueActivity` / `falseActivity` are the next activity IDs to execute.
+
+Where these examples came from
+- `runner-node/samples/employee-onboarding.json` — human, sequence examples
+- `runner-node/samples/api-demo.json` — api + compute examples
+- `runner-node/samples/approval-workflow.json` — branch / approval examples
+
+Use these snippets as reference when authoring your own activities — they show the typical fields and how the engine expects data to be structured. For full process examples, open the sample files listed under `runner-node/samples`.
+
+## �📚 Documentation
 
 - [Process Schema](design/schema.yaml) - Complete JSON schema reference
 - [API Reference](runner-node/README.md) - REST API documentation
