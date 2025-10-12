@@ -268,15 +268,15 @@ From `approval-workflow.json` — use `branch` or `switch` to route based on dec
 	"name": "Process Decision",
 	"type": "branch",
 	"condition": "activities.reviewDocument.v:approved === true",
-	"trueActivity": "a:welcomeEmployee",
-	"falseActivity": "a:requestChanges"
+	"then": "a:welcomeEmployee",
+	"else": "a:requestChanges"
 }
 ```
 
 Explanation:
 - `type: branch` - evaluates a boolean `condition` and selects the next activity.
 - `condition` may reference activity variables or process variables.
-- `trueActivity` / `falseActivity` are the next activity IDs to execute.
+- `then` / `else` are the next activity IDs to execute.
 
 Where these examples came from
 - `runner-node/samples/employee-onboarding.json` — human, sequence examples
