@@ -287,7 +287,7 @@ Use these snippets as reference when authoring your own activities — they show
 
 ## �📚 Documentation
 
-- [Process Schema](design/schema.yaml) - Complete JSON schema reference
+- [Process Schema](design/schema-process.json) - Complete JSON schema reference
 - [API Reference](runner-node/README.md) - REST API documentation
 
 ## 🤝 Contributing
