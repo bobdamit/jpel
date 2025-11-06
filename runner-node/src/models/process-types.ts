@@ -1,4 +1,6 @@
 import { ActivityInstance, HumanTaskData } from "./instance-types";
+import { DataGenerator } from "./data-generator-types";
+import { FieldType, ValueOption, FileSpec, FieldDataGenerator } from "./common-types";
 
 // Core types from the updated JPEL schema
 export interface ProcessDefinition {
@@ -7,8 +9,15 @@ export interface ProcessDefinition {
 	description?: string;
 	version?: string;
 	variables?: Variable[];
+	properties?: PropertyDefinition[]; // Property schemas for instance-level metadata
 	start: string; // Initial activity reference (a:activityId)
 	activities: { [key: string]: Activity };
+	dataGenerators?: DataGenerator[]; // Data generators for auto-generated values
+	ownerUserId?: string;
+	organizationId?: string;
+	visibility?: 'tenant' | 'system';
+	createdAt?: string;
+	updatedAt?: string;
 }
 
 /**
@@ -20,16 +29,9 @@ export interface ProcessTemplateFlyweight {
 	name: string;
 	description?: string;
 	version?: string;
-}
-
-
-
-
-export enum ProcessStatus {
-	Running = "running",
-	Completed = "completed",
-	Failed = "failed",
-	Cancelled = "cancelled"
+	ownerUserId?: string;
+	organizationId?: string;
+	visibility?: 'tenant' | 'system';
 }
 
 export interface Activity {
@@ -52,66 +54,11 @@ export enum ActivityType {
 	Terminate = "terminate"
 }
 
-export enum ActivityStatus {
-	Pending = "pending",
-	Running = "running",
-	Completed = "completed",
-	Failed = "failed",
-	Cancelled = "cancelled",
-	Timeout = "timeout"
-}
-
-export enum PassFail {
-	Pass = "pass",
-	Fail = "fail"
-}
-
 // Specific activity types (DEFINITIONS)
 export interface HumanActivity extends Activity {
 	type: ActivityType.Human;
 	prompt?: string;
-	inputs?: Field[]; // Definition-time: field schemas
-}
-
-
-/**
- * Field definition for activity inputs (definition-time schema)
- * Used in process templates to define expected inputs
- */
-export interface Field {
-	name: string;
-	label?: string;
-	hint?: string;
-	type: FieldType;
-	required?: boolean;
-	options?: ValueOption[]; // For select/enum fields, allows label/value pairs
-	min?: number;
-	max?: number;
-	units?: string;
-	defaultValue?: any;
-	description?: string;
-	pattern?: string; // Regex pattern for validation
-	patternDescription?: string; // Description of the pattern for UI display
-	fileSpec? : FileSpec; // For file fields, specify allowed types and extensions
-}
-
-export interface FileSpec extends Field {
-	extensions: string[] | ['*'];
-	fileType?: string;
-}
-
-export interface ValueOption {
-	label?: string;
-	value: string | number | boolean;
-}
-
-export enum FieldType {
-	Text = "text",
-	Number = "number",
-	Boolean = "boolean",
-	Select = "select",
-	Date = "date",
-	File = "file",
+	inputs?: Variable[]; // Definition-time: field schemas (Variable without value)
 }
 
 export interface APIActivity extends Activity {
@@ -176,21 +123,60 @@ export interface TerminateActivity extends Activity {
 	result?: 'success' | 'failure';
 }
 
+/**
+ * Variable: A typed value holder used throughout the process lifecycle
+ * 
+ * Usage contexts:
+ * 1. DEFINITION TIME - Process-level variable schemas (ProcessDefinition.variables)
+ * 2. DEFINITION TIME - Activity input schemas (HumanActivity.inputs)
+ * 3. RUNTIME - Activity instance values (ActivityInstance.variables with actual values)
+ * 
+ * At definition time: 'value' is undefined, only schema properties are set
+ * At runtime: 'value' contains the actual data, schema properties guide validation/rendering
+ */
 export interface Variable {
 	name: string;
 	label?: string;
 	hint?: string;
+	placeholder?: string;
 	type: FieldType;
-	value?: any; // Runtime value
+	value?: any; // Runtime value (undefined at definition time)
 	defaultValue?: any;
 	description?: string;
 	required?: boolean;
 	options?: ValueOption[]; // For select/enum fields, label/value pairs
-	min?: number;
-	max?: number;
+	min?: number; // for numeric types
+	max?: number; // for numeric types
 	units?: string;
 	pattern?: string; // Regex pattern for validation
 	patternDescription?: string; // Description of the pattern for UI display
-	fileSpec? : FileSpec; // For file fields, specify allowed types and extensions
+	fileSpec?: FileSpec; // For file fields, specify allowed types and extensions
+	dataGenerator?: FieldDataGenerator; // For auto-generated values like serial numbers
 }
+
+/**
+ * Field: Type alias for Variable when used as an input schema in activity definitions
+ * Semantically: Field emphasizes "this is a form field definition"
+ * Functionally: Identical to Variable
+ */
+export type Field = Variable;
+
+/**
+ * PropertyDefinition: Schema for instance-level properties at definition time
+ * 
+ * Similar to Variable but simpler - properties are always strings and used for
+ * instance-level metadata like title, summary data, etc.
+ * 
+ * At runtime, actual property values are stored in ProcessInstance.properties
+ * 
+ * JPEL syntax: p:propertyName (e.g., p:title = "value")
+ */
+export interface PropertyDefinition {
+	id: string; // ID for referencing in JPEL expressions
+	name: string; // Friendly name for display
+	defaultValue?: string; // Optional default value
+	includeInSummary?: boolean; // Whether to show in instance list/summary view
+}
+
+
 

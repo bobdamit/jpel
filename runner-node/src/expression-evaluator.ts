@@ -35,6 +35,8 @@ export class ExpressionEvaluator {
 			// Evaluate the expression
 			const result = this.safeEval(jsExpression, context);
 
+			logger.debug('ExpressionEvaluator.evaluateCondition:', {condition, jsExpression, result});
+
 			return Boolean(result);
 		} catch (error) {
 			throw new Error(`Condition evaluation failed: ${error instanceof Error ? error.message : String(error)}`);
@@ -86,7 +88,7 @@ export class ExpressionEvaluator {
 
 			// If the script returned some specific non-undefined result, surface it,
 			// otherwise return the mutated currentActivity for compatibility.
-			if (execResult !== undefined && execResult !== context.currentActivity) {
+			if (execResult !== undefined ) {
 				return execResult;
 			}
 
@@ -253,7 +255,7 @@ export class ExpressionEvaluator {
 		return translatedParts.join('');
 	}
 
-	private safeEval(expression: string, context: EvaluationContext): any {
+	private safeEval(expression: string, context: EvaluationContext): boolean {
 		// Create a function with the context as parameters
 		const paramNames = Object.keys(context);
 		const paramValues = Object.values(context);
@@ -263,7 +265,7 @@ export class ExpressionEvaluator {
 		try {
 			// If expression contains multiple lines or semicolons, treat it as a
 			// block of statements (so declarations and side-effects persist).
-			let result: any;
+			let result: boolean;
 			if (expression.includes('\n') || expression.includes(';')) {
 				const func = new Function(...paramNames, expression);
 				result = func(...paramValues);

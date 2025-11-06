@@ -1,27 +1,56 @@
 import { ExecutionContext } from "@/execution-context";
 import {
 	Activity,
-	ActivityStatus,
 	ActivityType,
 	APIActivity,
 	BranchActivity,
 	ComputeActivity,
 	HumanActivity,
 	ParallelActivity,
-	PassFail,
-	ProcessStatus,
 	SequenceActivity,
 	SwitchActivity,
-	Variable,
+	Variable
 } from "./process-types";
+
+/**
+ * Runtime status of a process instance
+ */
+export enum ProcessStatus {
+	Running = "running",
+	Completed = "completed",
+	Failed = "failed",
+	Cancelled = "cancelled"
+}
+
+/**
+ * Runtime status of an activity instance
+ */
+export enum ActivityStatus {
+	Pending = "pending",
+	Running = "running",
+	Completed = "completed",
+	Failed = "failed",
+	Cancelled = "cancelled",
+	Timeout = "timeout"
+}
+
+/**
+ * Pass/Fail result for validation activities
+ */
+export enum PassFail {
+	Pass = "pass",
+	Fail = "fail"
+}
 
 /**
  * Lightweight Instance reference for returning lists of instances
  */
 export interface ProcessInstanceFlyweight {
 	instanceId: string;
+	processName: string;
 	processId: string;
 	title?: string;
+	properties?: { [key: string]: any }; // Plain object map like variables (p: syntax)
 	status: ProcessStatus;
 	startedAt: Date;
 	completedAt?: Date;
@@ -34,14 +63,16 @@ export interface ProcessInstanceFlyweight {
 export interface ProcessInstance {
 	instanceId: string;
 	processId: string;
-	executionContext: ExecutionContext;
+	processName: string;
 	title?: string;
+	properties?: { [key: string]: any }; // Plain object map like variables (p: syntax)
 	status: ProcessStatus;
 	startedAt: Date;
 	completedAt?: Date;
 	variables: { [key: string]: any };
 	activities: { [key: string]: ActivityInstance };
 	aggregatePassFail?: AggregatePassFail;
+	executionContext: ExecutionContext;
 }
 
 
@@ -145,6 +176,7 @@ export interface SwitchActivityInstance
  */
 export interface HumanTaskData {
 	activityId: string;
+	activityName?: string;
 	prompt?: string;
 	fields: FieldValue[]; // UI needs FieldValue with all presentation properties
 	context?: { [key: string]: any }; // Additional context data, e.g., previous run data
@@ -179,3 +211,4 @@ export interface ProcessExecutionResult {
 	// It's NOT part of the core domain model - just a view helper
 	humanTask?: HumanTaskData;
 }
+

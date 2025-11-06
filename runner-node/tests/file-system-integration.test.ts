@@ -1,9 +1,10 @@
 
 import { RepositoryFactory } from '../src/repositories/repository-factory';
-import { FieldType } from '../src/models/process-types';
+
 import { InMemoryFileRepository } from '../src/repositories/in-memory-file-repository';
 import { FileService } from '../src/services/file-service';
 import { FileReference, FileUploadRequest } from '../src/models/file-types';
+import { FieldType } from '../src/models/common-types';
 
 describe('File System Integration', () => {
 	let fileRepo: InMemoryFileRepository;
@@ -70,7 +71,7 @@ describe('File System Integration', () => {
 		];
 
 		const variables = await fileService.createVariablesFromUploads(
-			files, 
+			files,
 			'upload',
 			'test-process',
 			'test-instance',
@@ -78,7 +79,7 @@ describe('File System Integration', () => {
 		);
 
 		expect(variables).toHaveLength(2);
-		
+
 		// Check first file variable
 		const var1 = variables[0];
 		expect(var1.name).toBe('upload_1');

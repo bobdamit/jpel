@@ -25,7 +25,7 @@ The Node.js runner is the primary implementation of JPEL, offering:
 - **Hot Reload**: Development mode with automatic rebuilding
 - **Linting**: Code quality enforcement with ESLintde.js Runner
 
-The official Node.js implementation of the JPEL (JSON Process Expression Language) process engine. This runner provides a complete development and production environment for executing JPEL processes with an interactive web interface, REST API, and multiple storage backends.
+The official Node.js implementation of the JPEL (JSON Process Execution Language) process engine. This runner provides a complete development and production environment for executing JPEL processes with an interactive web interface, REST API, and multiple storage backends.
 
 ## ✨ Features
 

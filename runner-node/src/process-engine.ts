@@ -2,9 +2,9 @@ import { v4 as uuidv4 } from 'uuid';
 import {
 	ProcessDefinition,
 	ProcessTemplateFlyweight,
-	ProcessStatus,
+
 	Activity,
-	ActivityStatus,
+
 	ActivityType,
 	HumanActivity,
 	ComputeActivity,
@@ -13,9 +13,8 @@ import {
 	BranchActivity,
 	SwitchActivity,
 	TerminateActivity,
-	FieldType,
-	Variable,
-	PassFail
+
+	Variable
 } from './models/process-types';
 import { ExpressionEvaluator } from './expression-evaluator';
 import { APIExecutor } from './api-executor';
@@ -25,14 +24,20 @@ import { ProcessDefinitionRepository } from './repositories/process-definition-r
 import { ProcessInstanceRepository } from './repositories/process-instance-repository';
 import { logger } from './logger';
 import ProcessLoader from './process-loader';
-import { ActivityInstance, APIActivityInstance, BranchActivityInstance, ProcessExecutionResult,
-	FieldValue, ComputeActivityInstance, HumanActivityInstance, HumanTaskData, 
-	ProcessInstance, ProcessInstanceFlyweight, SequenceActivityInstance, 
-	SwitchActivityInstance, AggregatePassFail} from './models/instance-types';
+import {
+	ActivityInstance, APIActivityInstance, BranchActivityInstance, ProcessExecutionResult,
+	FieldValue, ComputeActivityInstance, HumanActivityInstance, HumanTaskData,
+	ProcessInstance, ProcessInstanceFlyweight, SequenceActivityInstance,
+	SwitchActivityInstance, AggregatePassFail,
+	ProcessStatus,
+	ActivityStatus,
+	PassFail
+} from './models/instance-types';
 import { ExecutionContext, ExecutionFrame } from './execution-context';
 import { extractActivityId } from './utils/activity-ref';
 import { updateActivityVariables } from './utils/variable-updater';
 import { FileService } from './services/file-service';
+import { FieldType } from './models/common-types';
 
 
 
@@ -55,13 +60,13 @@ export class ProcessEngine {
 		this.expressionEvaluator = new ExpressionEvaluator();
 		this.apiExecutor = new APIExecutor();
 		this.fileService = new FileService();
-		
+
 		// Initialize continuation strategies
 		this.continuationStrategies = new Map();
 		this.continuationStrategies.set(ActivityType.Sequence, new SequenceContinuationStrategy());
 		this.continuationStrategies.set(ActivityType.Switch, new SwitchContinuationStrategy());
 		this.continuationStrategies.set(ActivityType.Branch, new BranchContinuationStrategy());
-		
+
 		// Default strategy for all other types
 		const defaultStrategy = new DefaultContinuationStrategy();
 		this.continuationStrategies.set(ActivityType.Human, defaultStrategy);
@@ -69,7 +74,7 @@ export class ProcessEngine {
 		this.continuationStrategies.set(ActivityType.API, defaultStrategy);
 		this.continuationStrategies.set(ActivityType.Terminate, defaultStrategy);
 		this.continuationStrategies.set(ActivityType.Parallel, defaultStrategy);
-		
+
 		logger.info('ProcessEngine: ctor complete');
 	}
 
@@ -154,12 +159,13 @@ export class ProcessEngine {
 		}
 
 		// initialize an execution context with the start activity
-		let executionContext =  this.initExecutionContextAtStart(processDefinition);
+		let executionContext = this.initExecutionContextAtStart(processDefinition);
 
 		// materialize a new run instance from the process def
 		const instance: ProcessInstance = {
 			instanceId,
 			processId,
+			processName: processDefinition.name,
 			executionContext,
 			status: ProcessStatus.Running,
 			startedAt: new Date(),
@@ -184,7 +190,7 @@ export class ProcessEngine {
 	 * @param startActivityId 
 	 * @returns 
 	 */
-	private initExecutionContextAtStart(processDefinition: ProcessDefinition) : ExecutionContext {
+	private initExecutionContextAtStart(processDefinition: ProcessDefinition): ExecutionContext {
 		let executionContext = new ExecutionContext();
 
 		// determine the start activity ID
@@ -333,26 +339,26 @@ export class ProcessEngine {
 		// Handle uploaded files by mapping them to specific field names
 		if (files && files.length > 0) {
 			logger.info(`ProcessEngine: Processing ${files.length} uploaded files for activity '${activityId}'`);
-			
+
 			try {
 				// Get the activity definition to check which fields are file types
 				const processDef = await this.processDefinitionRepo.findById(instance.processId);
 				const activityDef = processDef?.activities[activityId];
-				
+
 				if (activityDef && activityDef.type === 'human') {
 					const humanActivityDef = activityDef as any; // HumanActivity type
 					const fileFields = humanActivityDef.inputs?.filter((field: any) => field.type === 'file') || [];
-					
+
 					// Map files to their corresponding field names
 					for (let i = 0; i < files.length && i < fileFields.length; i++) {
 						const file = files[i];
 						const fieldName = fileFields[i].name;
-						
+
 						logger.info(`ProcessEngine: Mapping file to field '${fieldName}'`, {
 							filename: file.originalname,
 							fieldName
 						});
-						
+
 						// Create file upload request
 						const uploadRequest = {
 							filename: file.originalname || file.filename || 'unknown',
@@ -360,7 +366,7 @@ export class ProcessEngine {
 							content: file.buffer || Buffer.alloc(0),
 							description: `File uploaded for field ${fieldName}`
 						};
-						
+
 						// Create file variable with the specific field name
 						const fileVariable = await this.fileService.uploadAndCreateVariable(
 							uploadRequest,
@@ -369,7 +375,7 @@ export class ProcessEngine {
 							activityId,
 							instance.processId
 						);
-						
+
 						// Add or update the variable in the activity's variables array
 						const existingVarIndex = activityInstance.variables.findIndex(v => v.name === fieldName);
 						if (existingVarIndex >= 0) {
@@ -378,7 +384,7 @@ export class ProcessEngine {
 							activityInstance.variables.push(fileVariable);
 						}
 					}
-					
+
 					logger.info(`ProcessEngine: Created ${Math.min(files.length, fileFields.length)} file variables for activity '${activityId}'`);
 				}
 			} catch (error) {
@@ -438,8 +444,8 @@ export class ProcessEngine {
 		// EXCEPT for container activities (sequences) which may need to re-execute
 		// to build proper call stack structure during navigation
 		if (activityInstance.status === ActivityStatus.Completed) {
-			const isContainerActivity = activity.type === ActivityType.Sequence ;
-			
+			const isContainerActivity = activity.type === ActivityType.Sequence;
+
 			if (!isContainerActivity) {
 				logger.info(`ProcessEngine: Activity '${activity.id}' already completed, skipping execution`);
 				return await this.checkForProcessCompletion(instanceId, activity.id);
@@ -559,7 +565,7 @@ export class ProcessEngine {
 				patternDescription: field.patternDescription,
 				fileSpec: field.fileSpec
 			}));
-			
+
 			// Remove inputs from runtime instance to prevent redundant state
 			delete (activityInstance as any).inputs;
 		}
@@ -636,8 +642,8 @@ export class ProcessEngine {
 						// Create new variable
 						variable = {
 							name: key,
-							type: typeof result[key] === 'boolean' ? FieldType.Boolean : 
-								  typeof result[key] === 'number' ? FieldType.Number : FieldType.Text,
+							type: typeof result[key] === 'boolean' ? FieldType.Boolean :
+								typeof result[key] === 'number' ? FieldType.Number : FieldType.Text,
 							value: result[key]
 						};
 						activityInstance.variables!.push(variable);
@@ -694,12 +700,12 @@ export class ProcessEngine {
 			// Execute optional code section if present
 			if (activity.code && Array.isArray(activity.code) && activity.code.length > 0) {
 				logger.info(`ProcessEngine: Executing post-API code for activity '${activity.id}'`);
-				
+
 				// Temporarily store response in a global context for the code execution
 				// This allows the code to access the response via 'response' variable
 				const originalGlobal = (global as any).response;
 				(global as any).response = response;
-				
+
 				try {
 					const result = this.expressionEvaluator.executeCode(activity.code, instance, activity.id);
 
@@ -713,8 +719,8 @@ export class ProcessEngine {
 								// Create new variable
 								variable = {
 									name: key,
-									type: typeof result[key] === 'boolean' ? FieldType.Boolean : 
-										  typeof result[key] === 'number' ? FieldType.Number : FieldType.Text,
+									type: typeof result[key] === 'boolean' ? FieldType.Boolean :
+										typeof result[key] === 'number' ? FieldType.Number : FieldType.Text,
 									value: result[key]
 								};
 								activityInstance.variables!.push(variable);
@@ -753,7 +759,7 @@ export class ProcessEngine {
 
 	private async executeSequenceActivity(instanceId: string, activity: SequenceActivity): Promise<ProcessExecutionResult> {
 		logger.info(`ProcessEngine: Executing sequence activity '${activity.id}'`);
-		
+
 		// Mark sequence as running
 		const instance = await this.processInstanceRepo.findById(instanceId);
 
@@ -769,7 +775,7 @@ export class ProcessEngine {
 		if (activity.activities.length > 0) {
 			const firstActivityRef = activity.activities[0];
 			const firstActivityId = extractActivityId(firstActivityRef);
-			
+
 			logger.info(`ProcessEngine: Starting sequence '${activity.id}' with first activity '${firstActivityId}'`);
 			return await this.executeActivityInFrame(instanceId, firstActivityId, activity.id, 0);
 		} else {
@@ -986,7 +992,7 @@ export class ProcessEngine {
 
 								logger.info(`ProcessEngine: Pushing Frame sequence '${activityId}' - moving to activity '${nextActivity}' (index ${nextIndex})`);
 								executionContext.pushFrame(nextActivity, activityId, nextIndex);
-								
+
 								logger.info(`ProcessEngine: Continuing sequence '${activityId}' - moving to activity '${nextActivity}' (index ${nextIndex})`);
 								await this.processInstanceRepo.save(instance);
 								return await this.executeNextStep(instanceId);
@@ -1013,50 +1019,50 @@ export class ProcessEngine {
 					if (parentDef.type === ActivityType.Sequence) {
 						const parentActivity = parentDef as SequenceActivity;
 						const parentInstance = instance.activities[parentId] as SequenceActivityInstance | undefined;
-						
+
 						// Check if this parent sequence references the completed nested sequence
-								if (parentInstance && parentInstance.sequenceActivities) {
-									// Determine whether parent sequence references the completed sequence directly
-									// or indirectly via a child activity that redirected execution (e.g. switch -> nested sequence)
-									const referencesCompleted = parentActivity.activities.some(a => {
-										const aid = extractActivityId(a);
-										if (aid === completedSeqId) return true;
-										const childInst = instance.activities[aid] as ActivityInstance | undefined;
-										if (childInst && (childInst as any).nextActivity) {
-											try {
-												const redirected = extractActivityId((childInst as any).nextActivity);
-												if (redirected === completedSeqId) return true;
-											} catch (e) {
-												// ignore malformed nextActivity
-											}
-										}
-										return false;
-									});
-									if (!referencesCompleted) continue;
-									// Find the index within the parent's sequence activities that references the completed sequence.
-									let completedIndex = -1;
-									for (let i = 0; i < parentInstance.sequenceActivities.length; i++) {
-										const ref = parentInstance.sequenceActivities[i];
-										const refId = extractActivityId(ref);
-										if (refId === completedSeqId) {
+						if (parentInstance && parentInstance.sequenceActivities) {
+							// Determine whether parent sequence references the completed sequence directly
+							// or indirectly via a child activity that redirected execution (e.g. switch -> nested sequence)
+							const referencesCompleted = parentActivity.activities.some(a => {
+								const aid = extractActivityId(a);
+								if (aid === completedSeqId) return true;
+								const childInst = instance.activities[aid] as ActivityInstance | undefined;
+								if (childInst && (childInst as any).nextActivity) {
+									try {
+										const redirected = extractActivityId((childInst as any).nextActivity);
+										if (redirected === completedSeqId) return true;
+									} catch (e) {
+										// ignore malformed nextActivity
+									}
+								}
+								return false;
+							});
+							if (!referencesCompleted) continue;
+							// Find the index within the parent's sequence activities that references the completed sequence.
+							let completedIndex = -1;
+							for (let i = 0; i < parentInstance.sequenceActivities.length; i++) {
+								const ref = parentInstance.sequenceActivities[i];
+								const refId = extractActivityId(ref);
+								if (refId === completedSeqId) {
+									completedIndex = i;
+									break;
+								}
+								const childInst = instance.activities[refId] as ActivityInstance | undefined;
+								if (childInst && (childInst as any).nextActivity) {
+									try {
+										const redirected = extractActivityId((childInst as any).nextActivity);
+										if (redirected === completedSeqId) {
 											completedIndex = i;
 											break;
 										}
-										const childInst = instance.activities[refId] as ActivityInstance | undefined;
-										if (childInst && (childInst as any).nextActivity) {
-											try {
-												const redirected = extractActivityId((childInst as any).nextActivity);
-												if (redirected === completedSeqId) {
-													completedIndex = i;
-													break;
-												}
-											} catch (e) {
-												// ignore malformed nextActivity
-											}
-										}
+									} catch (e) {
+										// ignore malformed nextActivity
 									}
-									const nextIndex = completedIndex + 1;
-							
+								}
+							}
+							const nextIndex = completedIndex + 1;
+
 							if (nextIndex < parentInstance.sequenceActivities.length) {
 								// Continue to next activity in parent sequence
 								parentInstance.sequenceIndex = nextIndex;
@@ -1065,7 +1071,7 @@ export class ProcessEngine {
 
 								logger.info(`ProcessEngine: Pushing Frame Parent sequence '${parentId}' continuing to activity '${nextActivity}' (index ${nextIndex})`);
 								executionContext.pushFrame(nextActivity, parentId, nextIndex);
-								
+
 								await this.processInstanceRepo.save(instance);
 								// Clear the completed sequence marker
 								delete (instance as any).__lastCompletedSequenceId;
@@ -1098,7 +1104,8 @@ export class ProcessEngine {
 
 		// Pop the completed frame from call stack
 		const completedFrame = instance.executionContext.popFrame();
-		
+		logger.info(`ProcessEngine: Popped completed frame: ${JSON.stringify(completedFrame)}`);
+
 		// If call stack is now empty, process is complete
 		if (instance.executionContext.isAtRoot()) {
 			logger.info(`ProcessEngine: Call stack empty after completing '${completedActivityId}', process complete for instance '${instanceId}'`);
@@ -1107,8 +1114,22 @@ export class ProcessEngine {
 
 		// There's still a parent frame, so continue execution from there
 		const parentFrame = instance.executionContext.getCurrentFrame();
+		logger.info(`ProcessEngine: Current parent frame after pop: ${JSON.stringify(parentFrame)}`);
+
 		if (parentFrame) {
+			// Safety check: ensure we're not in an infinite loop
+			if (completedFrame && parentFrame.activityId === completedFrame.activityId) {
+				logger.error(`ProcessEngine: INFINITE LOOP DETECTED - parentFrame and completedFrame both have activityId '${parentFrame.activityId}'`);
+				return {
+					instanceId,
+					status: ProcessStatus.Failed,
+					message: 'Infinite loop detected in execution context'
+				};
+			}
+
 			logger.info(`ProcessEngine: Returning to parent frame '${parentFrame.activityId}' after completing '${completedActivityId}'`);
+			// Save the updated execution context before continuing
+			await this.processInstanceRepo.save(instance);
 			return await this.continueFromParent(instanceId, completedFrame!);
 		}
 
@@ -1133,7 +1154,7 @@ export class ProcessEngine {
 
 		const parentFrame = instance.executionContext.getCurrentFrame();
 		logger.info(`ProcessEngine: continueFromParent - completedFrame: ${JSON.stringify(completedFrame)}, parentFrame: ${JSON.stringify(parentFrame)}`);
-		
+
 		if (!parentFrame) {
 			// No parent frame, process should complete
 			return await this.completeProcess(instanceId, 'No parent frame found');
@@ -1171,7 +1192,7 @@ export class ProcessEngine {
 		}
 
 		const continuationResult = await strategy.continue(parentActivityInstance, completedFrame, this, instanceId);
-		
+
 		if (!continuationResult) {
 			return {
 				instanceId,
@@ -1186,15 +1207,15 @@ export class ProcessEngine {
 			parentActivityInstance.status = ActivityStatus.Completed;
 			parentActivityInstance.completedAt = new Date();
 			await this.processInstanceRepo.save(instance);
-			
+
 			return await this.checkForProcessCompletion(instanceId, parentActivity.id!);
 		} else if (continuationResult.nextActivityId) {
 			// Execute next activity
 			logger.info(`ProcessEngine: Continuing to next activity '${continuationResult.nextActivityId}'`);
 			return await this.executeActivityInFrame(
-				instanceId, 
-				continuationResult.nextActivityId, 
-				continuationResult.parentId!, 
+				instanceId,
+				continuationResult.nextActivityId,
+				continuationResult.parentId!,
 				continuationResult.position
 			);
 		} else {
@@ -1239,7 +1260,7 @@ export class ProcessEngine {
 		// Calculate aggregate pass/fail when process completes
 		if (instance.status === ProcessStatus.Completed) {
 			const passFailValues: PassFail[] = [];
-			
+
 			// Collect all non-undefined passFail values from activities
 			Object.values(instance.activities).forEach(activity => {
 				if (activity.passFail !== undefined && activity.passFail !== null) {
@@ -1292,33 +1313,33 @@ export class ProcessEngine {
 				status: ActivityStatus.Pending
 			};
 
-		// For human activities, initialize variables from inputs definition
-		if (normalizedActivity.type === ActivityType.Human) {
-			const humanActivity = normalizedActivity as HumanActivity;
-			if (humanActivity.inputs) {
-				activityInstance.variables = humanActivity.inputs.map(field => ({
-					name: field.name,
-					label: field.label,
-					hint: field.hint,
-					type: field.type,
-					value: field.defaultValue,
-					defaultValue: field.defaultValue,
-					description: field.description,
-					required: field.required,
-					options: field.options,
-					min: field.min,
-					max: field.max,
-					units: field.units,
-					pattern: field.pattern,
-					patternDescription: field.patternDescription,
-					fileSpec: field.fileSpec
-				}));
-				
-				// Remove inputs from runtime instance to prevent redundant state
-				// Only variables should exist at runtime
-				delete (activityInstance as any).inputs;
-			}
-		}			result[activityKey] = activityInstance;
+			// For human activities, initialize variables from inputs definition
+			if (normalizedActivity.type === ActivityType.Human) {
+				const humanActivity = normalizedActivity as HumanActivity;
+				if (humanActivity.inputs) {
+					activityInstance.variables = humanActivity.inputs.map(field => ({
+						name: field.name,
+						label: field.label,
+						hint: field.hint,
+						type: field.type,
+						value: field.defaultValue,
+						defaultValue: field.defaultValue,
+						description: field.description,
+						required: field.required,
+						options: field.options,
+						min: field.min,
+						max: field.max,
+						units: field.units,
+						pattern: field.pattern,
+						patternDescription: field.patternDescription,
+						fileSpec: field.fileSpec
+					}));
+
+					// Remove inputs from runtime instance to prevent redundant state
+					// Only variables should exist at runtime
+					delete (activityInstance as any).inputs;
+				}
+			} result[activityKey] = activityInstance;
 		});
 
 		return result;
@@ -1361,7 +1382,7 @@ export class ProcessEngine {
 		// Keep all activity data (including field values) - just reset statuses
 		instance.status = ProcessStatus.Running;
 		instance.completedAt = undefined;
-		
+
 		// First, fix the activity statuses (preserve completed activities)
 		for (const activityId in instance.activities) {
 			const activity = instance.activities[activityId];
@@ -1380,17 +1401,17 @@ export class ProcessEngine {
 			// NOTE: We deliberately keep activity-specific fields with their values
 			// so they can be displayed when re-running
 		}
-		
+
 		// Now clear call stack and start fresh from the beginning
 		instance.executionContext.clearCallStack();
-		
+
 		// Always start from the beginning - the execution engine will naturally
 		// skip completed activities and find the first incomplete one while
 		// building the proper call stack structure
-		
+
 		instance.executionContext.pushFrame(startActivityId);
 		logger.info(`ProcessEngine: Re-run will start from beginning '${startActivityId}' and skip completed activities`);
-		
+
 		// No need to manually find the first incomplete activity - let the
 		// execution engine handle this during normal flow processing
 
@@ -1409,7 +1430,7 @@ export class ProcessEngine {
 			if (activityDef?.type === ActivityType.Human) {
 				const humanActivity = activityDef as HumanActivity;
 				const activityInstance = instance.activities[currentActivity] as HumanActivityInstance;
-				
+
 				// Create fields with preserved values using the activity instance variables
 				const fieldsForUI: FieldValue[] = activityInstance.variables?.map(variable => ({
 					name: variable.name,
@@ -1432,7 +1453,7 @@ export class ProcessEngine {
 					prompt: humanActivity.prompt,
 					fields: fieldsForUI
 				};
-				
+
 				return {
 					instanceId,
 					status: ProcessStatus.Running,
@@ -1591,7 +1612,7 @@ export class ProcessEngine {
 
 		const instance = await this.processInstanceRepo.findById(instanceId);
 		const activityInstance = instance.activities[activityId];
-		
+
 		if (!activityInstance) {
 			throw new Error(`Activity '${activityId}' not found in instance '${instanceId}'`);
 		}
@@ -1602,13 +1623,13 @@ export class ProcessEngine {
 
 		// Create file variables using the file service
 		const fileVariables = await this.fileService.createVariablesFromUploads(
-			files, 
+			files,
 			baseVariableName,
 			instanceId,
 			activityId,
 			instance.processId
 		);
-		
+
 		// Add to activity's variables
 		this.fileService.updateVariablesWithFiles(activityInstance.variables, fileVariables);
 
@@ -1638,7 +1659,7 @@ export class ProcessEngine {
 	async getFileFromActivityVariable(instanceId: string, activityId: string, variableName: string) {
 		const instance = await this.processInstanceRepo.findById(instanceId);
 		const activityInstance = instance.activities[activityId];
-		
+
 		if (!activityInstance || !activityInstance.variables) {
 			return null;
 		}
@@ -1695,7 +1716,7 @@ class SequenceContinuationStrategy implements ActivityContinuationStrategy {
 			// Execute next activity in sequence
 			const nextActivityRef = sequence.activities[nextPosition];
 			const nextActivityId = extractActivityId(nextActivityRef);
-			
+
 			return {
 				nextActivityId,
 				parentId: sequence.id!,

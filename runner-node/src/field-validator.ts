@@ -1,4 +1,5 @@
-import { Field, FieldType } from './models/process-types';
+import { FieldType } from './models/common-types';
+import { Field } from './models/process-types';
 
 export interface ValidationResult {
 	isValid: boolean;

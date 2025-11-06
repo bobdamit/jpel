@@ -25,6 +25,7 @@ export interface FileMetadata {
 	createdBy?: string;
 	/** Hash/checksum for integrity verification */
 	checksum?: string;
+
 }
 
 
@@ -55,7 +56,10 @@ export interface FileAssociation {
 	activityId: string;
 	/** Variable name the file is associated with */
 	variableName: string;
-
+	/** Tenant information for partitioning */
+	tenantUserId?: string;
+	/** Organization ID for partitioning */
+	tenantOrgId?: string;
 }
 
 /**

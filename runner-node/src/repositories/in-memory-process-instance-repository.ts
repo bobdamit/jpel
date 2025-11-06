@@ -1,7 +1,6 @@
-import {  ProcessStatus } from '../models/process-types';
 import { ProcessInstanceRepository } from './process-instance-repository';
 import { logger } from '../logger';
-import { ProcessInstance, ProcessInstanceFlyweight } from '@/models/instance-types';
+import { ProcessInstance, ProcessInstanceFlyweight, ProcessStatus } from '../models/instance-types';
 
 // using centralized logger
 
@@ -157,6 +156,7 @@ export class InMemoryProcessInstanceRepository implements ProcessInstanceReposit
 				result.push({
 					instanceId: instance.instanceId,
 					processId: instance.processId,
+					processName: instance.processName,
 					title: instance.title,
 					status: instance.status,
 					startedAt: instance.startedAt,

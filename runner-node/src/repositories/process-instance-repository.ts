@@ -1,5 +1,4 @@
-import { ProcessInstance, ProcessInstanceFlyweight } from '@/models/instance-types';
-import { ProcessStatus } from '../models/process-types';
+import { ProcessInstance, ProcessInstanceFlyweight, ProcessStatus } from "../models/instance-types";
 
 /**
  * Repository interface for process runtime instances
@@ -8,7 +7,7 @@ import { ProcessStatus } from '../models/process-types';
 export interface ProcessInstanceRepository {
 	// Basic CRUD operations
 	save(instance: ProcessInstance): Promise<void>;
-	findById(instanceId: string): Promise<ProcessInstance >;
+	findById(instanceId: string): Promise<ProcessInstance>;
 	findAll(): Promise<ProcessInstance[]>;
 	delete(instanceId: string): Promise<boolean>;
 	exists(instanceId: string): Promise<boolean>;

@@ -1,10 +1,10 @@
-# JPEL - JSON Process Expression Language
+# JPEL - JSON Process Execution Language
 
 A lightweight, JSON-native business process language for building task lists, data collection workflows, and quality control processes. JPEL makes it easy to define  structured business processes. The schema is fairly simple but powerful.  A Sample (node.js) Runner application is included here along with some sample processes.
 
 ## 🎯 What is JPEL?
 
-JPEL (JSON Process Expression Language) is a modern approach to business process automation that uses simple JSON to define workflows. 
+JPEL (JSON Process Execution Language) is a modern approach to business process automation that uses simple JSON to define workflows. 
 
 ### JPEL Definition/Instance Structure
 JPEL defines process definitions. These definitions define Activities of various types as well as conditions and branching. A Runner materializes a process template into a process *Instance*.  The instance represents a specific *Run* of the process and is where data is collected and processed. Each Activity in the Instance can collect Variables (from UI, API calls or *Compute* Activities).  The process instance itself can also hold Variables which are global to the entire process.

@@ -1,7 +1,8 @@
 import { FileRepository } from '../repositories/file-repository';
 import { RepositoryFactory } from '../repositories/repository-factory';
 import { FileMetadata, FileReference, FileUploadRequest, FileAssociation } from '../models/file-types';
-import { FieldType, Variable } from '../models/process-types';
+import { Variable } from '../models/process-types';
+import { FieldType } from '../models/common-types';
 import { logger } from '../logger';
 
 /**
@@ -35,7 +36,8 @@ export class FileService {
 		variableName: string,
 		processInstanceId: string,
 		activityId: string,
-		processId: string
+		processId: string,
+		userContext: { userId: string; organizationId?: string } = { userId: 'system' }
 	): Promise<Variable> {
 		logger.info('FileService: Uploading file and creating variable', {
 			filename: uploadData.filename,
@@ -49,7 +51,9 @@ export class FileService {
 				processId,
 				processInstanceId,
 				activityId,
-				variableName
+				variableName,
+				tenantUserId: userContext.userId,
+				tenantOrgId: userContext.organizationId
 			},
 			filename: uploadData.filename,
 			mimeType: uploadData.mimeType,
@@ -89,7 +93,8 @@ export class FileService {
 		baseVariableName: string = 'uploadedFile',
 		processInstanceId: string,
 		activityId: string,
-		processId: string
+		processId: string,
+		userContext: { userId: string; organizationId?: string } = { userId: 'system' }
 	): Promise<Variable[]> {
 		logger.info('FileService: Creating variables from multiple uploads', {
 			fileCount: files.length,
@@ -107,7 +112,8 @@ export class FileService {
 				variableName, 
 				processInstanceId,
 				activityId,
-				processId
+				processId,
+				userContext
 			);
 			variables.push(variable);
 		}

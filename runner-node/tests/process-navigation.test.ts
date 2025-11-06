@@ -1,7 +1,7 @@
+import { ProcessStatus } from '../src/models/instance-types';
 import { ProcessEngine } from '../src/process-engine';
 import { RepositoryFactory } from '../src/repositories/repository-factory';
 import { createMockProcessDefinition } from './setup';
-import { ActivityType, ProcessStatus, FieldType } from '../src/models/process-types';
 
 describe('Process Navigation Tests', () => {
     let engine: ProcessEngine;
