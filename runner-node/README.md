@@ -30,7 +30,7 @@ The official Node.js implementation of the JPEL (JSON Process Execution Language
 ## ✨ Features
 
 - **� Human Tasks**: Interactive forms and approvals
-- **🔄 Process Control**: Sequences, parallel execution, conditional branching
+- **🔄 Process Control**: Sequences, execution, conditional branching
 - **� Compute Activities**: Expression evaluation and data transformation
 - **🌐 API Integration**: External service calls and webhooks
 - **📊 Persistence**: Repository pattern with in-memory and MongoDB support
@@ -105,7 +105,7 @@ The web interface provides an intuitive way to explore JPEL processes:
 ### Sample Processes
 - **👋 Hello World** - Simple greeting with user input
 - **📋 Approval Workflow** - Document approval with conditional logic
-- **👨‍💼 Employee Onboarding** - Multi-step process with parallel tasks
+- **👨‍💼 Employee Onboarding** - Multi-step process
 
 ## 📝 JPEL Process Format
 
@@ -152,7 +152,6 @@ JPEL processes use a modern JSON schema with activity references:
 | `compute` | Execute JavaScript code | Calculate values, transform data |
 | `api` | Call external services | Send emails, update databases |
 | `sequence` | Execute activities in order | Orchestrate workflow steps |
-| `parallel` | Execute simultaneously | Concurrent approvals |
 | `branch` | Conditional logic | Route based on decisions |
 | `terminate` | End process | Completion handling |
 

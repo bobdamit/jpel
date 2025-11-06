@@ -6,7 +6,6 @@ import {
 	BranchActivity,
 	ComputeActivity,
 	HumanActivity,
-	ParallelActivity,
 	SequenceActivity,
 	SwitchActivity,
 	Variable
@@ -135,17 +134,6 @@ export interface SequenceActivityInstance
 	sequenceActivities?: string[];
 }
 
-/**
- * Runtime instance of a parallel activity with execution state
- */
-export interface ParallelActivityInstance
-	extends ActivityInstance,
-		ParallelActivity {
-	type: ActivityType.Parallel;
-	parallelState?: "running" | "completed";
-	activeActivities?: string[];
-	completedActivities?: string[];
-}
 
 /**
  * Runtime instance of a branch activity with execution result

@@ -128,7 +128,7 @@ function renderRunningActivities(instance) {
         return;
     }
 
-    // If instance.currentActivity is a sequence/parallel, there may be multiple running
+    // If instance.currentActivity is a sequence, there may be multiple running
     // activities encoded in instance.activities where status === 'running'
     const running = Object.entries(instance.activities || {}).filter(([id, a]) => a.status === 'running').map(([id, a]) => ({ id, a }));
 

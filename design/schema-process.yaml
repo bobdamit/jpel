@@ -87,6 +87,6 @@ components:
           description: Activity description
         type:
           type: string
-          enum: [human, compute, api, sequence, parallel, branch, switch, terminate]
+          enum: [human, compute, api, sequence, branch, switch, terminate]
           description: Activity type
       # Allow subtype-specific fields via allOf in the combined schema

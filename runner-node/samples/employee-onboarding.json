@@ -1,7 +1,7 @@
 {
 	"id": "employee-onboarding",
 	"name": "Employee Onboarding Process",
-	"description": "Complete employee onboarding workflow with parallel tasks and API integration",
+	"description": "Complete employee onboarding workflow with tasks and API integration",
 	"version": "1.0.0",
 	"start": "a:onboardingSequence",
 	"variables": [

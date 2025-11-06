@@ -3,13 +3,6 @@ import { APIActivity, ActivityType } from './models/process-types';
 import {
 	ProcessInstance,
 	ActivityInstance,
-	HumanActivityInstance,
-	APIActivityInstance,
-	ComputeActivityInstance,
-	SequenceActivityInstance,
-	ParallelActivityInstance,
-	BranchActivityInstance,
-	SwitchActivityInstance,
 } from './models/instance-types';
 import { ExpressionEvaluator } from './expression-evaluator';
 import { substituteStringTemplate, substituteObjectVariables } from './utils/substitution';

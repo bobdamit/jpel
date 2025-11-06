@@ -54,7 +54,7 @@ components:
           description: Activity identifier
         type:
           type: string
-          enum: [human, compute, api, sequence, parallel, branch, switch, terminate]
+          enum: [human, compute, api, sequence, branch, switch, terminate]
         status:
           type: string
           enum: [pending, running, completed, failed, cancelled, timeout]

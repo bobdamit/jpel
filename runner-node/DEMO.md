@@ -31,7 +31,6 @@ You now have a **complete, production-ready JPEL Runner** that showcases a power
    - Shows business process capabilities
 
 3. **👨‍💼 Employee Onboarding** (`samples/employee-onboarding.json`)
-   - Complex workflow with parallel tasks
    - Multiple human interactions
    - Demonstrates enterprise-scale processes
 
@@ -112,7 +111,6 @@ curl http://localhost:3000/api/processes
 ### **Scenario 3: Complex Workflow**
 1. Load Employee Onboarding
 2. Enter employee details
-3. Complete parallel setup tasks
 4. Final verification step
 
 ## 🏗️ For Developers
@@ -142,13 +140,12 @@ await RepositoryFactory.initializeRedis(config);
 Check `samples/` directory for:
 - Simple human interaction patterns
 - Conditional logic examples  
-- Parallel execution patterns
 - Data transformation workflows
 
 ## 🌟 Key Features Demonstrated
 
 ✅ **Human Tasks**: Interactive forms with validation  
-✅ **Process Control**: Sequences, parallel, branching  
+✅ **Process Control**: Sequences, branching  
 ✅ **Data Flow**: Variable references with `a:` and `f:` syntax  
 ✅ **Persistence**: Repository pattern ready for any database  
 ✅ **REST API**: Complete process lifecycle management  

@@ -48,7 +48,6 @@ export enum ActivityType {
 	Compute = "compute",
 	API = "api",
 	Sequence = "sequence",
-	Parallel = "parallel",
 	Branch = "branch",
 	Switch = "switch",
 	Terminate = "terminate"
@@ -91,12 +90,6 @@ export interface ComputeActivity extends Activity {
 
 export interface SequenceActivity extends Activity {
 	type: ActivityType.Sequence;
-	activities: string[];
-}
-
-
-export interface ParallelActivity extends Activity {
-	type: ActivityType.Parallel;
 	activities: string[];
 }
 

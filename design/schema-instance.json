@@ -65,7 +65,6 @@
               "compute",
               "api",
               "sequence",
-              "parallel",
               "branch",
               "switch",
               "terminate"
@@ -197,7 +196,6 @@
             "compute",
             "api",
             "sequence",
-            "parallel",
             "branch",
             "switch",
             "terminate"

@@ -7,7 +7,6 @@ import {
 	APIActivity,
 	HttpMethod,
 	SequenceActivity,
-	ParallelActivity,
 	BranchActivity,
 	SwitchActivity,
 	TerminateActivity
@@ -253,43 +252,6 @@ describe('ProcessEngine Extended Coverage', () => {
 		});
 	});
 
-	// Parallel Activity tests are temporarily disabled as parallel activities 
-	// have been removed from the process engine to simplify the call stack implementation.
-	// These will be re-enabled when parallel activity support is added back.
-	describe.skip('Parallel Activity Execution', () => {
-		test('should initialize parallel activities', async () => {
-			const process: ProcessDefinition = {
-				id: 'parallel-test',
-				name: 'Parallel Test',
-				start: 'a:parallel',
-				activities: {
-					parallel: {
-						id: 'parallel',
-						type: ActivityType.Parallel,
-						activities: ['a:task1', 'a:task2']
-					} as ParallelActivity,
-					task1: {
-						id: 'task1',
-						type: ActivityType.Compute,
-						code: ['return { task: 1 };']
-					} as ComputeActivity,
-					task2: {
-						id: 'task2',
-						type: ActivityType.Compute,
-						code: ['return { task: 2 };']
-					} as ComputeActivity
-				}
-			};
-
-			await processEngine.loadProcess(process);
-			const result = await processEngine.createInstance('parallel-test');
-
-			const instance = await processEngine.getInstance(result.instanceId);
-			const parallelActivity = instance!.activities['parallel'];
-
-			expect((parallelActivity as any).parallelState || (parallelActivity as any).activeActivities).toBeDefined();
-		});
-	});
 
 	describe('Branch Activity Execution', () => {
 		test('should execute then branch when condition is true', async () => {

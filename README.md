@@ -41,7 +41,6 @@ Implement approval workflows and validation processes:
 - **Compute Activities**: JavaScript expressions for data transformation
 - **API Integration**: Connect with external systems and services
 - **Conditional Flow**: Branch and switch activities for complex logic
-- **Parallel Execution**: Run multiple activities simultaneously
 - **Re-run Capability**: Execute completed processes again with preserved data
 
 ## 📝 Quick Example
@@ -131,7 +130,6 @@ This example shows:
 | `compute` | JavaScript execution | Calculations, data transformation, email generation |
 | `api` | External API calls | System integration, notifications, data sync |
 | `sequence` | Ordered execution | Step-by-step processes, checklists |
-| `parallel` | Concurrent execution | Independent tasks, bulk operations |
 | `branch` | Conditional routing | Approvals, validation gates |
 | `switch` | Multi-case routing | Status-based routing, category handling |
 | `terminate` | Process completion | Success/failure endpoints |

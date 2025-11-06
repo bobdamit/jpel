@@ -73,7 +73,6 @@ export class ProcessEngine {
 		this.continuationStrategies.set(ActivityType.Compute, defaultStrategy);
 		this.continuationStrategies.set(ActivityType.API, defaultStrategy);
 		this.continuationStrategies.set(ActivityType.Terminate, defaultStrategy);
-		this.continuationStrategies.set(ActivityType.Parallel, defaultStrategy);
 
 		logger.info('ProcessEngine: ctor complete');
 	}

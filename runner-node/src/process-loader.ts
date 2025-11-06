@@ -215,15 +215,16 @@ export class ProcessLoader {
 		for (const [key, activity] of Object.entries(processDefinition.activities || {})) {
 			switch (activity.type) {
 				case 'sequence':
-				case 'parallel':
-					const arr = (activity as any).activities as string[] | undefined;
-					if (!arr || !Array.isArray(arr) || arr.length === 0) {
-						errors.push(`Activity '${key}' of type '${activity.type}' must have a non-empty 'activities' array`);
+					const seqActivities = (activity as any).activities as string[] | undefined;
+					if (!seqActivities || !Array.isArray(seqActivities)) {
+						errors.push(`Activity '${key}' of type 'sequence' must have an 'activities' array`);
+					} else if (seqActivities.length === 0) {
+						errors.push(`Activity '${key}' of type 'sequence' must have at least one activity`);
 					} else {
-						for (const r of arr) {
-							const id = extractRef(r);
+						for (const seqRef of seqActivities) {
+							const id = extractRef(seqRef);
 							if (!id || !activityKeys.has(id)) {
-								errors.push(`Activity '${key}' references unknown activity '${r}'`);
+								errors.push(`Activity '${key}' sequence references unknown activity '${seqRef}'`);
 							}
 						}
 					}
