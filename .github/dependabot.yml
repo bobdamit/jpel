@@ -5,6 +5,16 @@ updates:
     schedule:
       interval: "daily"
     open-pull-requests-limit: 10
+    versioning-strategy: increase
+    ignore:
+      - dependency-name: "@angular/*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@angular-devkit/*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@angular/material"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@angular/cdk"
+        update-types: ["version-update:semver-major"]
     # Create separate PRs for major version updates so you can review them individually
     # Dependabot will create PRs per package by default; you can configure grouping later.
     # Optionally, you can set "allow" or "ignore" rules here to control which packages get updates.
