@@ -1,17 +1,43 @@
 {
-	"name": "jpel",
+	"name": "@rockscience/jpel",
 	"version": "1.0.0",
-	"private": true,
 	"description": "JPEL (JSON Process Execution Language): the specification, its JSON Schemas and sample processes",
+	"keywords": [
+		"jpel",
+		"json-schema",
+		"process",
+		"workflow",
+		"checklist",
+		"quality-control"
+	],
 	"license": "MIT",
-	"repository": "github:bobdamit/jpel",
+	"author": "Rock Science",
+	"homepage": "https://github.com/bobdamit/jpel#readme",
+	"bugs": "https://github.com/bobdamit/jpel/issues",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/bobdamit/jpel.git"
+	},
+	"type": "module",
+	"main": "./index.js",
+	"exports": {
+		".": "./index.js",
+		"./schema/*": "./schema/*",
+		"./samples/*": "./samples/*",
+		"./package.json": "./package.json"
+	},
 	"files": [
-		"schema/",
+		"index.js",
+		"schema/*.json",
 		"samples/"
 	],
+	"publishConfig": {
+		"access": "public"
+	},
 	"scripts": {
 		"build": "node scripts/build.mjs",
-		"test": "node scripts/build.mjs --check && node --test"
+		"test": "node scripts/build.mjs --check && node --test",
+		"prepublishOnly": "npm test"
 	},
 	"devDependencies": {
 		"ajv": "^8.20.0",

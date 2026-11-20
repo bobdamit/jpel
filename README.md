@@ -1,5 +1,7 @@
 # JPEL: JSON Process Execution Language
 
+[![npm](https://img.shields.io/npm/v/@rockscience/jpel)](https://www.npmjs.com/package/@rockscience/jpel)
+
 JPEL describes processes as JSON: checklists, data collection and quality
 control. A process **definition** lists activities (forms for people,
 JavaScript computations, API calls) and how to move between them. An engine
@@ -7,7 +9,10 @@ turns a definition into a **run** (a process instance), which collects the
 data and records what happened.
 
 This repository holds the specification (this file), the JSON Schemas and
-sample processes. Qonfident is the engine that runs it.
+sample processes. Qonfident is the engine that runs it. The schemas and
+samples are published to npm as
+[`@rockscience/jpel`](https://www.npmjs.com/package/@rockscience/jpel)
+(`npm install @rockscience/jpel`); see [Using the schema](#using-the-schema).
 
 - [Quick example](#quick-example)
 - [Process definition](#process-definition)
@@ -336,16 +341,23 @@ and compile with [Ajv](https://ajv.js.org) in strict mode. Activities use
 Ajv's `discriminator` keyword, so enable it to get errors for the right
 activity type:
 
-```js
-import Ajv from 'ajv';
-import schema from 'jpel/schema/process.schema.json' with { type: 'json' };
+The schemas and samples are published to npm as
+[`@rockscience/jpel`](https://www.npmjs.com/package/@rockscience/jpel):
 
-const validate = new Ajv({ allErrors: true, strict: true, discriminator: true }).compile(schema);
+```
+npm install @rockscience/jpel ajv
 ```
 
-To use the schema and samples from another project, install this repository
-as a dependency: `npm install github:bobdamit/jpel`. The lockfile pins the
-commit; `npm update jpel` moves to the latest.
+```js
+import Ajv from 'ajv';
+import { processSchema, instanceSchema } from '@rockscience/jpel';
+
+const validate = new Ajv({ allErrors: true, strict: true, discriminator: true }).compile(processSchema);
+```
+
+The files can also be imported directly, for example
+`@rockscience/jpel/schema/process.schema.json` or
+`@rockscience/jpel/samples/hello-world.json` (with `{ type: 'json' }`).
 
 The schema checks shape only. An engine should also check that every
 activity a definition refers to exists, as `test/samples.test.mjs` does.
@@ -360,6 +372,10 @@ npm test        # check the JSON is current, validate the samples, test the sche
 
 Edit the YAML, never the generated JSON. `samples/` holds example processes;
 `mic-build.json` is a real microphone build process.
+
+To release, bump `version` in `package.json` (`npm version <major|minor|patch>`),
+push the commit and tag, and publish a GitHub release for the tag. The
+Publish workflow tests and publishes it to npm.
 
 ## Changes from the earlier markup
 
