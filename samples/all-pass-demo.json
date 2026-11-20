@@ -1,0 +1,43 @@
+{
+  "id": "all-pass-demo",
+  "name": "All Pass Demo",
+  "description": "Demonstrates aggregate pass calculation when all activities pass",
+  "start": "sequence",
+  "activities": {
+    "sequence": {
+      "type": "sequence",
+      "activities": [
+        "check1",
+        "check2",
+        "check3"
+      ]
+    },
+    "check1": {
+      "name": "Security Check",
+      "type": "compute",
+      "code": [
+        "console.log('Security check: PASS');",
+        "return { result: 'Security validation passed' };"
+      ],
+      "passWhen": "true"
+    },
+    "check2": {
+      "name": "Business Rules Check",
+      "type": "compute",
+      "code": [
+        "console.log('Business rules check: PASS');",
+        "return { result: 'Business rules validation passed' };"
+      ],
+      "passWhen": "true"
+    },
+    "check3": {
+      "name": "Final Approval",
+      "type": "compute",
+      "code": [
+        "console.log('Final approval: PASS');",
+        "return { result: 'Final approval granted' };"
+      ],
+      "passWhen": "true"
+    }
+  }
+}

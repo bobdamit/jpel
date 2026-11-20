@@ -1,0 +1,122 @@
+# JPEL process run (instance) schema (JSON Schema draft-07, written as YAML).
+# This file is the source; `npm run build` writes instance.schema.json.
+# A run is what an engine stores while it executes a definition. Engines may
+# add their own fields (owners, tenancy, revisions), so objects stay open.
+
+$schema: http://json-schema.org/draft-07/schema#
+$id: https://github.com/bobdamit/jpel/schema/instance.schema.json
+title: JPEL process run
+type: object
+required: [instanceId, processId, status, activities]
+properties:
+  instanceId:
+    type: string
+  processId:
+    type: string
+    description: The definition this run was started from
+  processName:
+    type: string
+  title:
+    type: string
+    description: The run's name; the engine keeps it equal to props.title
+  status:
+    type: string
+    enum: [running, completed, failed, cancelled]
+  startedAt:
+    type: string
+    description: ISO 8601 time
+  completedAt:
+    type: string
+    description: ISO 8601 time
+  variables:
+    type: object
+    description: Process variable values (vars in code)
+  properties:
+    type: object
+    description: Run property values (props in code)
+  activities:
+    type: object
+    description: Each activity's state, keyed by activity ID
+    additionalProperties:
+      $ref: "#/definitions/ActivityRun"
+  aggregatePassFail:
+    type: string
+    enum: [all_pass, any_fail]
+    description: "Set when a run completes: any_fail if any activity failed, all_pass if at least one passed and none failed"
+  executionContext:
+    type: object
+    description: Where the run is
+    properties:
+      callStack:
+        type: array
+        items:
+          type: object
+          required: [activityId]
+          properties:
+            activityId:
+              type: string
+            parentId:
+              anyOf:
+                - type: string
+                - type: "null"
+            position:
+              anyOf:
+                - type: integer
+                - type: "null"
+              description: The child's index in its parent sequence
+
+definitions:
+  ActivityRun:
+    type: object
+    description: An activity's definition (copied in when the run starts) plus its state
+    required: [id, type, status]
+    properties:
+      id:
+        type: string
+      name:
+        type: string
+      type:
+        type: string
+        enum: [human, compute, api, sequence, switch, terminate]
+      status:
+        type: string
+        enum: [pending, running, completed, failed, cancelled, timeout]
+      passFail:
+        type: string
+        enum: [pass, fail]
+        description: The result of the activity's passWhen
+      startedAt:
+        type: string
+      completedAt:
+        type: string
+      error:
+        type: string
+        description: Why the activity failed
+      fields:
+        type: array
+        description: "The activity's values: a human activity's form fields, or the object a compute or api activity's code returned (acts.<id> in code)"
+        items:
+          $ref: "#/definitions/FieldValue"
+      expressionValue:
+        type: string
+        description: "switch: the value the expression or condition produced"
+      matchedCase:
+        type: string
+        description: "switch: the case taken (then, else, a case key, or default)"
+      nextActivity:
+        type: string
+        description: "switch: the activity it routed to"
+      responseData:
+        description: "api: the HTTP result (status, headers, data)"
+
+  FieldValue:
+    type: object
+    description: A field with the value the run holds for it
+    required: [name, type]
+    properties:
+      name:
+        type: string
+      type:
+        type: string
+      value:
+        description: For a file field, a file reference (metadata, url, thumbnailUrl)

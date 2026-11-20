@@ -2,25 +2,19 @@ name: CI
 
 on:
   push:
-    branches: ['**']
+    branches: [main]
   pull_request:
-    branches: ['**']
 
 jobs:
-  build-and-test:
+  test:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: runner-node
     steps:
       - uses: actions/checkout@v4
-      - name: Use Node.js 20
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: '20'
-      - name: Install dependencies
-        run: npm ci
-      - name: Build
-        run: npm run build
-      - name: Run tests with coverage
-        run: npm run test:coverage
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      # Fails if schema/*.json is out of date with its YAML source, then
+      # validates the samples and the schema's checks
+      - run: npm test

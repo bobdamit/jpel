@@ -1,0 +1,1338 @@
+{
+  "id": "mic-build",
+  "name": "Microphone Build",
+  "description": "Data Collection, QC and Task Lists for Microphone Builds",
+  "start": "main",
+  "properties": [
+    {
+      "id": "buildConfig",
+      "name": "Build Config Code",
+      "includeInSummary": true
+    }
+  ],
+  "variables": [],
+  "dataGenerators": [
+    {
+      "id": "mic-build-number",
+      "name": "Build Number",
+      "strategy": "serial",
+      "scope": "tenant",
+      "parameters": {
+        "initial": 248,
+        "increment": 1,
+        "length": 4,
+        "zeroPad": "left",
+        "prefix": "",
+        "suffix": ""
+      }
+    }
+  ],
+  "activities": {
+    "main": {
+      "name": "Main Sequence",
+      "description": "Top Level Sequence of Build Process",
+      "type": "sequence",
+      "activities": [
+        "basicFactsSequence",
+        "micTypeDecision",
+        "laserSequence",
+        "inspectionsSequence",
+        "finalChecklistSequence"
+      ]
+    },
+    "basicFactsSequence": {
+      "name": "Basic Facts Sequence",
+      "description": "Collect Basic Facts about the build",
+      "type": "sequence",
+      "activities": [
+        "commonFacts",
+        "generateTitle",
+        "validateCommonFacts"
+      ]
+    },
+    "commonFacts": {
+      "name": "Common Facts Collection",
+      "description": "Collect common facts applicable to all microphone builds",
+      "type": "human",
+      "prompt": "Enter the following common details for the microphone assembly:",
+      "fields": [
+        {
+          "name": "customerName",
+          "type": "text",
+          "label": "Customer Name",
+          "required": true,
+          "placeholder": "Damiano",
+          "min": 3,
+          "description": "The name of the customer"
+        },
+        {
+          "name": "storeOrderNumber",
+          "type": "text",
+          "label": "Store Order Number",
+          "required": true,
+          "description": "The order number from the webstore or retail channel"
+        },
+        {
+          "name": "micBuildNumber",
+          "type": "text",
+          "label": "Build Number",
+          "dataGenerator": {
+            "generatorId": "mic-build-number",
+            "autoPopulate": true,
+            "allowManualEdit": false
+          }
+        },
+        {
+          "name": "engraved",
+          "type": "boolean",
+          "required": true,
+          "label": "Build Engraved on Internal Frame",
+          "options": [
+            {
+              "label": "Yes",
+              "value": true
+            },
+            {
+              "label": "No",
+              "value": false
+            }
+          ]
+        },
+        {
+          "name": "bodySource",
+          "type": "select",
+          "label": "Body Source",
+          "required": true,
+          "options": [
+            {
+              "value": "DONOR",
+              "label": "Donor"
+            },
+            {
+              "value": "CUSTOM",
+              "label": "RS Custom"
+            }
+          ],
+          "description": "Source of this microphone body"
+        },
+        {
+          "name": "bodyOrigin",
+          "type": "select",
+          "label": "Body Origin",
+          "required": true,
+          "options": [
+            {
+              "value": "CUSTOMER_REBUILD",
+              "label": "Customer Rebuild"
+            },
+            {
+              "value": "STOCK",
+              "label": "Stock Donor Body"
+            }
+          ]
+        },
+        {
+          "name": "microphoneCategory",
+          "type": "select",
+          "label": "Microphone Category",
+          "required": true,
+          "options": [
+            {
+              "value": "LDC"
+            },
+            {
+              "value": "SDC"
+            }
+          ],
+          "description": "Category of the microphone"
+        }
+      ]
+    },
+    "intakeInspection": {
+      "name": "Intake Inspection",
+      "description": "Ingress Inspection and Testing",
+      "type": "human",
+      "fields": [
+        {
+          "name": "intakePhoto0",
+          "type": "file",
+          "label": "Intake Photo",
+          "required": true,
+          "fileSpec": {
+            "extensions": [
+              ".jpg",
+              ".jpeg",
+              ".png",
+              ".gif",
+              ".webp"
+            ]
+          }
+        },
+        {
+          "name": "intakePhoto1",
+          "type": "file",
+          "label": "Additional Intake Photo",
+          "required": false,
+          "fileSpec": {
+            "extensions": [
+              ".jpg",
+              ".jpeg",
+              ".png",
+              ".gif",
+              ".webp"
+            ]
+          }
+        },
+        {
+          "name": "intakeNotes",
+          "type": "textarea",
+          "label": "Intake Notes",
+          "required": false,
+          "placeholder": "Enter any notes regarding the intake inspection"
+        }
+      ]
+    },
+    "ldcCircuitryTypeDecision": {
+      "name": "Conditional for LDC Circuitry Type",
+      "description": "Decide between TL and TC circuitry types",
+      "type": "switch",
+      "expression": "acts.ldcFacts.circuitryType",
+      "cases": {
+        "TL": "tlSequence",
+        "TC": "tcSequence"
+      }
+    },
+    "commonTechFacts": {
+      "name": "Common Technical Facts",
+      "description": "Collect common technical facts for all microphone builds",
+      "type": "human",
+      "fields": [
+        {
+          "name": "fetType",
+          "type": "select",
+          "label": "FET Type",
+          "required": true,
+          "options": [
+            {
+              "value": "SXQ305",
+              "label": "Silliconix J305 (Quest)"
+            },
+            {
+              "value": "SX305",
+              "label": "Silliconix J305"
+            },
+            {
+              "value": "IF305",
+              "label": "InterFET J305"
+            },
+            {
+              "value": "OTHER",
+              "label": "Other"
+            }
+          ],
+          "description": "Type of FET used in the microphone"
+        },
+        {
+          "name": "patternSwitch",
+          "type": "select",
+          "label": "Pattern Switch",
+          "required": true,
+          "options": [
+            {
+              "value": "NONE",
+              "label": "None"
+            },
+            {
+              "value": "INTERNAL",
+              "label": "Internal"
+            },
+            {
+              "value": "STOCK",
+              "label": "Stock External"
+            }
+          ]
+        }
+      ]
+    },
+    "laserSequence": {
+      "name": "Laser Engraving Sequence",
+      "description": "Laser Engraving Task Sequence",
+      "type": "sequence",
+      "activities": [
+        "laserTasks"
+      ]
+    },
+    "laserTasks": {
+      "name": "Laser Engraving Tasks",
+      "description": "Tasks for Laser Engraving",
+      "type": "human",
+      "prompt": "Please complete the following laser engraving tasks:",
+      "fields": [
+        {
+          "name": "laserSetup",
+          "type": "boolean",
+          "label": "Verify Lightburn File and Settings for Surface Finish",
+          "required": true,
+          "options": [
+            {
+              "label": "Completed",
+              "value": true
+            },
+            {
+              "label": "Not Completed",
+              "value": false
+            }
+          ]
+        },
+        {
+          "name": "buildCode",
+          "type": "boolean",
+          "label": "Verify Correct Build Code Engraved",
+          "required": true,
+          "options": [
+            {
+              "label": "Verified",
+              "value": true
+            },
+            {
+              "label": "Not Verified",
+              "value": false
+            }
+          ]
+        }
+      ]
+    },
+    "tlSequence": {
+      "name": "TL Circuitry Sequence",
+      "description": "TL Circuitry Sequence",
+      "type": "sequence",
+      "activities": [
+        "tlCircuitryFacts",
+        "testingSequence"
+      ]
+    },
+    "tcSequence": {
+      "name": "TC Circuitry Sequence",
+      "description": "TC Circuitry Sequence",
+      "type": "sequence",
+      "activities": [
+        "transformerFacts",
+        "tcCircuitryFacts",
+        "tcBiasData",
+        "tcValidation",
+        "testingSequence"
+      ]
+    },
+    "micTypeDecision": {
+      "name": "Conditional for LDC/SDC",
+      "description": "Branch between LDC and SDC microphone types",
+      "type": "switch",
+      "expression": "acts.commonFacts.microphoneCategory",
+      "cases": {
+        "LDC": "ldcMic",
+        "SDC": "sdcMic"
+      }
+    },
+    "ldcMic": {
+      "name": "LDC Mic Sequence",
+      "description": "LDC Mic Sequence",
+      "type": "sequence",
+      "activities": [
+        "ldcBodyCondition",
+        "ldcFacts",
+        "commonTechFacts",
+        "ldcCapsuleSequence",
+        "ldcCircuitryTypeDecision",
+        "generateBuildCodeLdc"
+      ]
+    },
+    "ldcCapsuleSequence": {
+      "name": "LDC Capsule Sequence",
+      "description": "LDC Capsule Data Collection Sequence",
+      "type": "sequence",
+      "activities": [
+        "capsuleData",
+        "ldcCapsuleDataValidation"
+      ]
+    },
+    "sdcMic": {
+      "name": "SDC Mic Sequence",
+      "description": "SDC Mic Sequence",
+      "type": "sequence",
+      "activities": [
+        "transformerFacts"
+      ]
+    },
+    "capsuleData": {
+      "name": "Capsule Data",
+      "description": "Capsule Data Collection",
+      "type": "human",
+      "fields": [
+        {
+          "name": "frontCapacitance",
+          "type": "number",
+          "label": "Frontside Capacitance",
+          "required": true,
+          "units": "pF",
+          "min": 50,
+          "max": 110
+        },
+        {
+          "name": "backCapacitance",
+          "type": "number",
+          "label": "Backside Capacitance",
+          "units": "pF",
+          "required": true,
+          "min": 50,
+          "max": 110
+        },
+        {
+          "name": "capsuleImage",
+          "type": "file",
+          "label": "Capsule Photo",
+          "required": true,
+          "fileSpec": {
+            "fileType": "image/*"
+          }
+        },
+        {
+          "name": "capsuleNotes",
+          "type": "textarea",
+          "label": "Additional Notes",
+          "required": false,
+          "placeholder": "Enter any additional notes regarding the capsule"
+        }
+      ]
+    },
+    "ldcCapsuleDataValidation": {
+      "name": "LDC Capsule Data Validation",
+      "description": "LDC Capsule Data Validation",
+      "type": "compute",
+      "passWhen": "Math.abs(acts.capsuleData.frontCapacitance - acts.capsuleData.backCapacitance) <= 10"
+    },
+    "ldcBodyCondition": {
+      "name": "Conditional for LDC Body Source",
+      "description": "Decide between Donor and Custom body sources",
+      "type": "switch",
+      "expression": "acts.commonFacts.bodySource",
+      "cases": {
+        "DONOR": "donorSequence",
+        "CUSTOM": "ldcCustomBodyFacts"
+      }
+    },
+    "bodyOriginCondition": {
+      "name": "Body Source Condition",
+      "description": "Decide if intake inspection is needed based on body origin",
+      "type": "switch",
+      "condition": "acts.commonFacts.bodyOrigin === 'CUSTOMER_REBUILD'",
+      "then": "intakeInspection"
+    },
+    "donorSequence": {
+      "name": "Donor Mic Sequence",
+      "description": "Donor Mic Sequence",
+      "type": "sequence",
+      "activities": [
+        "bodyOriginCondition",
+        "ldcDonorFacts",
+        "990Condition"
+      ]
+    },
+    "ldcDonorFacts": {
+      "name": "LDC Donor Facts",
+      "description": "Collect Data Regarding LDC Donor Type",
+      "type": "human",
+      "fields": [
+        {
+          "name": "donor",
+          "type": "select",
+          "label": "Donor Body Style",
+          "required": true,
+          "options": [
+            {
+              "value": "990",
+              "label": "990"
+            },
+            {
+              "value": "990S",
+              "label": "990S"
+            },
+            {
+              "value": "770",
+              "label": "770"
+            },
+            {
+              "value": "NOVA",
+              "label": "Nova"
+            },
+            {
+              "value": "ST55",
+              "label": "ST55"
+            },
+            {
+              "value": "910",
+              "label": "910"
+            },
+            {
+              "value": "920",
+              "label": "920"
+            },
+            {
+              "value": "OTHER",
+              "label": "Other (800-ish)"
+            }
+          ]
+        }
+      ]
+    },
+    "990Condition": {
+      "name": "990 Donor Condition",
+      "description": "Decide if donor is 990 for additional facts",
+      "type": "switch",
+      "condition": "acts.ldcDonorFacts.donor === '990' || acts.ldcDonorFacts.donor === '990S' || acts.ldcDonorFacts.donor === '770'",
+      "then": "990AdditionalFacts"
+    },
+    "990AdditionalFacts": {
+      "name": "990/770 Additional Facts",
+      "description": "Collect Additional Facts for 990/770 Donor Bodies",
+      "type": "human",
+      "fields": [
+        {
+          "name": "headbasketType",
+          "type": "select",
+          "label": "Choose Option for Headbasket Type",
+          "required": true,
+          "options": [
+            {
+              "label": "Stock",
+              "value": "STOCK"
+            },
+            {
+              "label": "Mic Parts Headbasket",
+              "value": "MICPARTS"
+            }
+          ]
+        }
+      ]
+    },
+    "ldcCustomBodyFacts": {
+      "name": "LDC Custom Body Facts",
+      "description": "Collect Data Regarding LDC Custom Body Type",
+      "type": "human",
+      "fields": [
+        {
+          "name": "body",
+          "type": "select",
+          "label": "Body Style",
+          "required": true,
+          "options": [
+            {
+              "value": "102",
+              "label": "102"
+            },
+            {
+              "value": "TF33",
+              "label": "TF33"
+            },
+            {
+              "value": "OTHER",
+              "label": "Other (800-ish)"
+            }
+          ]
+        }
+      ]
+    },
+    "ldcCustomMicFacts": {
+      "name": "LDC Custom Mic Facts",
+      "description": "Collect Data Regarding LDC Custom Mic Type",
+      "type": "human",
+      "fields": [
+        {
+          "name": "body",
+          "type": "select",
+          "label": "Body Style",
+          "required": true,
+          "options": [
+            {
+              "value": "102",
+              "label": "102"
+            },
+            {
+              "value": "TF33",
+              "label": "TF33"
+            },
+            {
+              "value": "OTHER",
+              "label": "Other (800-ish)"
+            }
+          ]
+        }
+      ]
+    },
+    "tlCircuitryFacts": {
+      "name": "TL Circuit Data",
+      "description": "Transformerless Circuit Data Collection",
+      "type": "human",
+      "fields": [
+        {
+          "name": "vcc",
+          "label": "Vcc Voltage",
+          "type": "number",
+          "required": true,
+          "units": "VDC",
+          "min": 5,
+          "max": 12
+        },
+        {
+          "name": "pol",
+          "label": "Capsule pol+ Voltage",
+          "type": "number",
+          "required": true,
+          "units": "VDC",
+          "min": 55,
+          "max": 65
+        },
+        {
+          "name": "vs",
+          "label": "Vs FET Source Voltage",
+          "type": "number",
+          "required": true,
+          "units": "VDC",
+          "min": 1,
+          "max": 4
+        },
+        {
+          "name": "tlNotes",
+          "label": "Additional Notes",
+          "type": "textarea",
+          "required": false,
+          "placeholder": "Enter any additional notes regarding the TL circuitry"
+        }
+      ]
+    },
+    "tcCircuitryFacts": {
+      "name": "TC Data Collection",
+      "description": "Transformer Coupled Circuit Data Collection",
+      "type": "human",
+      "fields": [
+        {
+          "name": "fixedPadCap",
+          "label": "Fixed Pad Capacitor",
+          "type": "select",
+          "required": true,
+          "options": [
+            {
+              "label": "4pF",
+              "value": 4
+            },
+            {
+              "label": "4.7pF",
+              "value": 4.7
+            },
+            {
+              "label": "10pF",
+              "value": 10
+            },
+            {
+              "label": "15pF",
+              "value": 15
+            },
+            {
+              "label": "None",
+              "value": 0
+            }
+          ]
+        },
+        {
+          "name": "tcNotes",
+          "label": "Additional Notes",
+          "type": "textarea",
+          "required": false,
+          "placeholder": "Enter any additional notes regarding the TC circuitry"
+        }
+      ]
+    },
+    "tcBiasData": {
+      "name": "TC Circuit Bias Data",
+      "description": "Bias Resistor Determination",
+      "type": "human",
+      "fields": [
+        {
+          "name": "r3Pot",
+          "label": "R3 Pot Value (K Ohm)",
+          "hint": "Value of R3 Pot for Minimum THD Biasing",
+          "type": "number",
+          "units": "kOhm",
+          "required": true,
+          "min": 2,
+          "max": 10
+        },
+        {
+          "name": "r3Actual",
+          "label": "R3 Bias Resistor Actual Value (K Ohm)",
+          "hint": "Closest Selected Fixed Resistor for R3",
+          "type": "number",
+          "units": "kOhm",
+          "required": true,
+          "min": 2,
+          "max": 10
+        },
+        {
+          "name": "tcImage",
+          "type": "file",
+          "label": "Biasing Photo",
+          "required": false,
+          "fileSpec": {
+            "extensions": [
+              ".jpg",
+              ".jpeg",
+              ".png",
+              ".gif",
+              ".webp"
+            ]
+          }
+        }
+      ]
+    },
+    "tcValidation": {
+      "name": "TC Data Validation",
+      "description": "Transformer Coupled Data Validation",
+      "type": "compute",
+      "passWhen": "(Math.abs(acts.tcBiasData.r3Actual - acts.tcBiasData.r3Pot)/acts.tcBiasData.r3Pot) < 0.05"
+    },
+    "testingSequence": {
+      "name": "Testing",
+      "description": "Testing Sequence",
+      "type": "sequence",
+      "activities": [
+        "smokeTest",
+        "audioTests",
+        "testingValidation"
+      ]
+    },
+    "smokeTest": {
+      "name": "Smoke Test",
+      "description": "Initial Powerup and listen",
+      "type": "human",
+      "fields": [
+        {
+          "name": "worksAtAll",
+          "label": "Does the microphone power up and produce sound?",
+          "type": "boolean",
+          "required": true,
+          "options": [
+            {
+              "label": "yay!",
+              "value": true
+            },
+            {
+              "label": "Boo",
+              "value": false
+            }
+          ]
+        },
+        {
+          "name": "riceKrispiesTest",
+          "label": "Crank the gain and do the Rice Krispies test",
+          "type": "boolean",
+          "required": true,
+          "options": [
+            {
+              "label": "Clean",
+              "value": true
+            },
+            {
+              "label": "Snap Krackle Pop",
+              "value": false
+            }
+          ]
+        },
+        {
+          "name": "smokeTestNotes",
+          "type": "textarea",
+          "label": "Additional Notes",
+          "required": false,
+          "placeholder": "Enter any additional notes regarding the smoke test"
+        }
+      ]
+    },
+    "audioTests": {
+      "name": "Audio Tests",
+      "description": "Audio Testing Data Collection",
+      "type": "human",
+      "fields": [
+        {
+          "name": "sensitivity",
+          "label": "In the Ballpark Gain/Sensitivity?",
+          "type": "boolean",
+          "required": true,
+          "options": [
+            {
+              "label": "Pass",
+              "value": true
+            },
+            {
+              "label": "Fail",
+              "value": false
+            }
+          ]
+        },
+        {
+          "name": "sweepResponse",
+          "label": "In The Box Frequency Response?",
+          "type": "boolean",
+          "required": true,
+          "options": [
+            {
+              "label": "Pass",
+              "value": true
+            },
+            {
+              "label": "Fail",
+              "value": false
+            }
+          ]
+        },
+        {
+          "name": "testFile",
+          "type": "file",
+          "label": "REW File",
+          "required": true,
+          "placeholder": "Upload the REW test file",
+          "fileSpec": {
+            "extensions": [
+              ".mdat",
+              ".zip"
+            ]
+          }
+        }
+      ]
+    },
+    "testingValidation": {
+      "name": "Testing Validation",
+      "description": "Overall Testing Validation",
+      "type": "compute",
+      "passWhen": "acts.smokeTest.worksAtAll && acts.smokeTest.riceKrispiesTest && acts.audioTests.sensitivity && acts.audioTests.sweepResponse"
+    },
+    "inspectionsSequence": {
+      "name": "Inspections Sequence",
+      "description": "Inspections Sequence",
+      "type": "sequence",
+      "activities": [
+        "mechanicalInspectionSequence",
+        "electricalInspectionSequence",
+        "visualInspectionSequence"
+      ]
+    },
+    "electricalInspectionSequence": {
+      "name": "Electrical Inspection Sequence",
+      "description": "Electrical Inspection Tasks and Validation",
+      "type": "sequence",
+      "activities": [
+        "electricalInspection",
+        "electricalInspectionValidation"
+      ]
+    },
+    "electricalInspection": {
+      "type": "human",
+      "name": "Electrical Inspection",
+      "description": "Electrical Inspection Tasks",
+      "fields": [
+        {
+          "name": "pcb",
+          "label": "PCB Soldering Neat and Clean",
+          "type": "boolean",
+          "required": true,
+          "options": [
+            {
+              "label": "Yes",
+              "value": true
+            },
+            {
+              "label": "No",
+              "value": false
+            }
+          ]
+        },
+        {
+          "name": "capsule",
+          "label": "Capsule Soldering Neat and Clean",
+          "type": "boolean",
+          "required": true,
+          "options": [
+            {
+              "label": "Yes",
+              "value": true
+            },
+            {
+              "label": "No",
+              "value": false
+            }
+          ]
+        },
+        {
+          "name": "xlr",
+          "label": "XLR Wiring and Pins Inspection",
+          "type": "boolean",
+          "required": true,
+          "options": [
+            {
+              "label": "Yes",
+              "value": true
+            },
+            {
+              "label": "No",
+              "value": false
+            }
+          ]
+        },
+        {
+          "name": "mech-image0",
+          "type": "file",
+          "label": "Photo",
+          "required": true,
+          "fileSpec": {
+            "fileType": "image/*"
+          }
+        },
+        {
+          "name": "mech-image1",
+          "type": "file",
+          "label": "Photo",
+          "required": false,
+          "fileSpec": {
+            "fileType": "image/*"
+          }
+        }
+      ]
+    },
+    "electricalInspectionValidation": {
+      "type": "compute",
+      "name": "Electrical Inspection Validation",
+      "description": "Validate Electrical Inspection tasks",
+      "passWhen": "acts.electricalInspection.pcb && acts.electricalInspection.capsule && acts.electricalInspection.xlr"
+    },
+    "visualInspectionSequence": {
+      "name": "Visual Inspection Sequence",
+      "description": "Visual Inspection Steps and Validation",
+      "type": "sequence",
+      "activities": [
+        "visualInspection",
+        "visualInspectionValidation"
+      ]
+    },
+    "visualInspection": {
+      "type": "human",
+      "name": "Visual Inspection",
+      "description": "Visual Inspection Steps",
+      "fields": [
+        {
+          "name": "finish",
+          "label": "Body Finish",
+          "type": "boolean",
+          "required": true,
+          "options": [
+            {
+              "label": "Yes",
+              "value": true
+            },
+            {
+              "label": "No",
+              "value": false
+            }
+          ]
+        },
+        {
+          "name": "engraving",
+          "label": "Engraving Clean and Correct",
+          "type": "boolean",
+          "required": true,
+          "options": [
+            {
+              "label": "Yes",
+              "value": true
+            },
+            {
+              "label": "No",
+              "value": false
+            }
+          ]
+        },
+        {
+          "name": "headbasket",
+          "label": "Headbasket Clean and Neat",
+          "type": "boolean",
+          "required": true,
+          "options": [
+            {
+              "label": "Yes",
+              "value": true
+            },
+            {
+              "label": "No",
+              "value": false
+            }
+          ]
+        },
+        {
+          "name": "vis-image0",
+          "type": "file",
+          "label": "Photo",
+          "required": true,
+          "fileSpec": {
+            "fileType": "image/*"
+          }
+        },
+        {
+          "name": "vis-image1",
+          "type": "file",
+          "label": "Photo",
+          "required": false,
+          "fileSpec": {
+            "fileType": "image/*"
+          }
+        }
+      ]
+    },
+    "visualInspectionValidation": {
+      "type": "compute",
+      "name": "Visual Inspection Validation",
+      "description": "Compute Pass/Fail for Visual Inspection",
+      "passWhen": "acts.visualInspection.finish && acts.visualInspection.engraving && acts.visualInspection.headbasket"
+    },
+    "mechanicalInspectionSequence": {
+      "name": "Mechanical Inspection Sequence",
+      "description": "Mechanical Inspection Steps and Validation",
+      "type": "sequence",
+      "activities": [
+        "mechanicalInspection",
+        "mechanicalInspectionValidation"
+      ]
+    },
+    "mechanicalInspection": {
+      "name": "Mechanical Inspection",
+      "type": "human",
+      "description": "Mountings, Fasteners, Clearance...",
+      "fields": [
+        {
+          "name": "mountings",
+          "label": "Mountings and Fasteners",
+          "type": "boolean",
+          "required": true,
+          "options": [
+            {
+              "label": "Yes",
+              "value": true
+            },
+            {
+              "label": "No",
+              "value": false
+            }
+          ]
+        },
+        {
+          "name": "clearance",
+          "label": "Clearance",
+          "type": "boolean",
+          "required": true,
+          "options": [
+            {
+              "label": "Yes",
+              "value": true
+            },
+            {
+              "label": "No",
+              "value": false
+            }
+          ]
+        },
+        {
+          "name": "mech-image0",
+          "type": "file",
+          "label": "Photo",
+          "required": true,
+          "fileSpec": {
+            "fileType": "image/*"
+          }
+        },
+        {
+          "name": "mech-image1",
+          "type": "file",
+          "label": "Photo",
+          "required": false,
+          "fileSpec": {
+            "fileType": "image/*"
+          }
+        }
+      ]
+    },
+    "mechanicalInspectionValidation": {
+      "type": "compute",
+      "name": "Mechanical Inspection Validation",
+      "description": "Compute Pass/Fail for Mechanical Inspection Steps",
+      "passWhen": "acts.mechanicalInspection.mountings && acts.mechanicalInspection.clearance"
+    },
+    "ldcFacts": {
+      "name": "LDC Facts Sequence",
+      "description": "LDC Facts Sequence Branch",
+      "type": "human",
+      "fields": [
+        {
+          "name": "circuitryType",
+          "type": "select",
+          "label": "Circuitry Type",
+          "required": true,
+          "options": [
+            {
+              "value": "TL",
+              "label": "Transformerless"
+            },
+            {
+              "value": "TC",
+              "label": "Transformer Coupled"
+            }
+          ]
+        },
+        {
+          "name": "capsule",
+          "type": "select",
+          "label": "Capsule",
+          "required": true,
+          "options": [
+            {
+              "value": "K47",
+              "label": "K47-Style (getwin)"
+            },
+            {
+              "value": "CK12",
+              "label": "CK12-Style (getwin)"
+            }
+          ]
+        }
+      ]
+    },
+    "transformerFacts": {
+      "name": "Transformer Facts",
+      "description": "Collect Data Regarding Transformer Type",
+      "type": "human",
+      "fields": [
+        {
+          "name": "transformer",
+          "type": "select",
+          "label": "Transformer",
+          "required": true,
+          "options": [
+            {
+              "label": "Cinemag 5722w",
+              "value": "CINE5722"
+            },
+            {
+              "label": "AMI T12",
+              "value": "AMIT12"
+            },
+            {
+              "label": "3U Audio GZT-84",
+              "value": "GZT84"
+            },
+            {
+              "label": "Neutrik (lo-fi)",
+              "value": "NEUTRIK"
+            },
+            {
+              "label": "Other",
+              "value": "OTHER"
+            }
+          ]
+        }
+      ]
+    },
+    "validateCommonFacts": {
+      "name": "Validate Common Facts",
+      "description": "Ensure all common facts are correctly provided",
+      "type": "compute",
+      "passWhen": "acts.commonFacts.micBuildNumber && acts.commonFacts.engraved === true"
+    },
+    "generateTitle": {
+      "name": "Generate Title",
+      "description": "Generate a title for the build based on common facts",
+      "type": "compute",
+      "code": [
+        "// Retrieve common facts from the previous activity",
+        "const customerName = acts.commonFacts.customerName;",
+        "const buildNumber = acts.commonFacts.micBuildNumber;",
+        "const microphoneCategory = acts.commonFacts.microphoneCategory;",
+        "props.title = `${customerName}-${buildNumber}-${microphoneCategory}`;"
+      ]
+    },
+    "generateBuildCodeLdc": {
+      "name": "Generate Build Code for LDC",
+      "description": "Generate a build code specific to LDC microphones. Format: [Capsule][CircuitryType].[Transformer (if TC)]  Capsule codes are 47 or 12. Circuitry types are TL or TC. Transformer types are Cinemag: C, AMI: A, GZT84: 3, Neutrik: N, Other: O",
+      "type": "compute",
+      "code": [
+        "const capsuleType = acts.ldcFacts.capsule;",
+        "const circuitryType = acts.ldcFacts.circuitryType;",
+        "let buildCode = '';",
+        "// Determine capsule code",
+        "if (capsuleType === 'K47') {",
+        "    buildCode += '47';",
+        "} else if (capsuleType === 'CK12') {",
+        "    buildCode += '12';",
+        "} else {",
+        "    buildCode += 'UNK'; // Unknown capsule type",
+        "}",
+        "// Add circuitry type",
+        "buildCode += circuitryType;",
+        "// Only add transformer code if TC circuitry",
+        "if (circuitryType === 'TC') {",
+        "    const transformer = acts.transformerFacts.transformer;",
+        "    let transformerCode = '';",
+        "    switch (transformer) {",
+        "        case 'CINE5722':",
+        "            transformerCode = 'C';",
+        "            break;",
+        "        case 'AMIT12':",
+        "            transformerCode = 'A';",
+        "            break;",
+        "        case 'GZT84':",
+        "            transformerCode = '3';",
+        "            break;",
+        "        case 'NT4':",
+        "            transformerCode = 'N';",
+        "            break;",
+        "        case 'CNT8':",
+        "            transformerCode = '8';",
+        "            break;",
+        "        default:",
+        "            transformerCode = 'O'; // Other",
+        "    }",
+        "    buildCode += '.' + transformerCode;",
+        "}",
+        "props.buildConfig = buildCode;",
+        "return { buildCode };"
+      ]
+    },
+    "generateBuildCodeSdc": {
+      "name": "Generate Build Code for SDC",
+      "description": "Generate a build code specific to SDC microphones. Format: TFM.[Transformer]  Same Transformer codes as LDC TC microphones",
+      "type": "compute",
+      "code": [
+        "let buildCode = 'TFM';",
+        "const transformer = acts.transformerFacts.transformer;",
+        "let transformerCode = '';",
+        "switch (transformer) {",
+        "    case 'CINE5722':",
+        "        transformerCode = 'C';",
+        "        break;",
+        "    case 'AMIT12':",
+        "        transformerCode = 'A';",
+        "        break;",
+        "    case 'GZT84':",
+        "        transformerCode = '3';",
+        "        break;",
+        "    case 'NEUTRIK':",
+        "        transformerCode = 'N';",
+        "        break;",
+        "    default:",
+        "        transformerCode = 'O'; // Other",
+        "}",
+        "buildCode += '.' + transformerCode;",
+        "vars.buildConfigCode = buildCode;",
+        "return { buildCode };"
+      ]
+    },
+    "finalChecklistSequence": {
+      "name": "Final Checklist Sequence",
+      "description": "Final Checklist Sequence",
+      "type": "sequence",
+      "activities": [
+        "finalChecklist",
+        "finalChecklistValidation"
+      ]
+    },
+    "finalChecklist": {
+      "name": "Final Checklist",
+      "description": "Final Checklist",
+      "type": "human",
+      "fields": [
+        {
+          "name": "burnIn",
+          "label": "Let it cook for a few hours",
+          "type": "boolean",
+          "required": true,
+          "options": [
+            {
+              "label": "Done",
+              "value": true
+            },
+            {
+              "label": "Not Yet",
+              "value": false
+            }
+          ]
+        },
+        {
+          "name": "finalPhoto0",
+          "type": "file",
+          "label": "Final Photo",
+          "required": true,
+          "fileSpec": {
+            "fileType": "image/*"
+          }
+        },
+        {
+          "name": "micSettingsChecked",
+          "description": "Verify Mic settings a t",
+          "type": "boolean",
+          "required": true,
+          "options": [
+            {
+              "label": "Yes",
+              "value": true
+            },
+            {
+              "label": "No",
+              "value": false
+            }
+          ]
+        },
+        {
+          "name": "orderOptionsChecked",
+          "label": "Verify the order options have been met",
+          "type": "boolean",
+          "required": true,
+          "options": [
+            {
+              "label": "Yes",
+              "value": true
+            },
+            {
+              "label": "No",
+              "value": false
+            }
+          ]
+        },
+        {
+          "name": "finalNotes",
+          "type": "textarea",
+          "label": "Final Notes",
+          "required": false,
+          "placeholder": "Enter any final notes regarding the build"
+        },
+        {
+          "name": "finalPhoto1",
+          "type": "file",
+          "label": "Final Photo",
+          "required": false,
+          "fileSpec": {
+            "fileType": "image/*"
+          }
+        }
+      ]
+    },
+    "finalChecklistValidation": {
+      "name": "Final Checklist Validation",
+      "description": "Final Checklist Validation",
+      "type": "compute",
+      "passWhen": "acts.finalChecklist.burnIn && acts.finalChecklist.micSettingsChecked && acts.finalChecklist.orderOptionsChecked"
+    }
+  }
+}
