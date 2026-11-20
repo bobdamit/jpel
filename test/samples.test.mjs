@@ -55,3 +55,29 @@ for (const name of samples) {
 		}
 	});
 }
+
+test('the README examples are valid', () => {
+	const readme = readFileSync(fileURLToPath(new URL('../README.md', import.meta.url)), 'utf8');
+	const blocks = [...readme.matchAll(/```json\n([\s\S]*?)```/g)].map(m => m[1].trim());
+	// Whole processes validate as they are; activity snippets ("id": {...}) inside a minimal process
+	let checked = 0;
+	for (const block of blocks) {
+		let definition;
+		if (block.startsWith('{')) {
+			definition = JSON.parse(block);
+		} else if (/^"[\w-]+": \{/.test(block)) {
+			const activities = JSON.parse(`{${block}}`);
+			const targets = Object.values(activities).flatMap(activity => [
+				...(activity.activities ?? []), ...Object.values(activity.cases ?? {}), activity.default, activity.then, activity.else
+			]).filter(Boolean);
+			for (const id of targets) activities[id] ??= { type: 'terminate' };
+			definition = { id: 'readme', name: 'README', start: Object.keys(activities)[0], activities };
+		} else {
+			// dataGenerators snippet
+			definition = { id: 'readme', name: 'README', start: 'a', activities: { a: { type: 'terminate' } }, ...JSON.parse(`{${block}}`) };
+		}
+		assert.ok(validateProcess(definition), `${block.slice(0, 60)}...\n${ajv.errorsText(validateProcess.errors)}`);
+		checked++;
+	}
+	assert.ok(checked >= 8, `checked ${checked} examples`);
+});
