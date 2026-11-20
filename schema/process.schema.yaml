@@ -1,0 +1,384 @@
+# JPEL process definition schema (JSON Schema draft-07, written as YAML).
+# This file is the source; `npm run build` writes process.schema.json.
+# See README.md for what each part means.
+
+$schema: http://json-schema.org/draft-07/schema#
+$id: https://github.com/bobdamit/jpel/schema/process.schema.json
+title: JPEL process definition
+type: object
+required: [id, name, start, activities]
+additionalProperties: false
+properties:
+  id:
+    type: string
+    pattern: "^[A-Za-z0-9_-]+$"
+    description: Unique process ID
+  name:
+    type: string
+    description: Display name
+  description:
+    type: string
+  start:
+    $ref: "#/definitions/ActivityId"
+    description: The activity a run starts with
+  variables:
+    type: array
+    description: Process variables, read and written in code as vars.<name>
+    items:
+      $ref: "#/definitions/Variable"
+  properties:
+    type: array
+    description: Run properties, read and written in code as props.<id>. Shown with each run; props.title names the run.
+    items:
+      $ref: "#/definitions/Property"
+  dataGenerators:
+    type: array
+    description: Generators for values such as serial numbers, used by a field's dataGenerator
+    items:
+      $ref: "#/definitions/DataGenerator"
+  activities:
+    type: object
+    description: The activities, keyed by activity ID
+    propertyNames:
+      $ref: "#/definitions/ActivityId"
+    additionalProperties:
+      $ref: "#/definitions/Activity"
+
+definitions:
+  ActivityId:
+    type: string
+    pattern: "^[A-Za-z0-9_-]+$"
+    description: An activity ID, as used in the activities map (no prefix)
+
+  Expression:
+    type: string
+    minLength: 1
+    description: A JavaScript expression over vars, acts and props
+
+  Code:
+    description: JavaScript statements, as one string or as an array of lines
+    oneOf:
+      - type: string
+        minLength: 1
+      - type: array
+        minItems: 1
+        items:
+          type: string
+
+  FieldType:
+    type: string
+    enum: [text, textarea, number, boolean, select, date, file]
+
+  Variable:
+    type: object
+    required: [name, type]
+    additionalProperties: false
+    properties:
+      name:
+        type: string
+      type:
+        $ref: "#/definitions/FieldType"
+      description:
+        type: string
+      defaultValue: {}
+
+  Property:
+    type: object
+    required: [id, name]
+    additionalProperties: false
+    properties:
+      id:
+        type: string
+        description: Read and written in code as props.<id>
+      name:
+        type: string
+        description: Display name
+      defaultValue:
+        type: string
+      includeInSummary:
+        type: boolean
+        description: Show this property in lists of runs
+
+  DataGenerator:
+    type: object
+    required: [id, strategy, parameters]
+    additionalProperties: false
+    properties:
+      id:
+        type: string
+      name:
+        type: string
+      strategy:
+        type: string
+        enum: [serial, random, uuid, timestamp]
+      scope:
+        type: string
+        enum: [tenant, process]
+        description: "tenant (default): one sequence shared by all of a tenant's processes; process: one sequence per process"
+      parameters:
+        type: object
+        additionalProperties: false
+        properties:
+          initial:
+            type: number
+            description: "serial: the counter's starting value (the first value issued is initial + increment)"
+          increment:
+            type: number
+          length:
+            type: integer
+            description: "serial: pad to this length; random: number of characters"
+          zeroPad:
+            type: string
+            enum: [left, right, none]
+          prefix:
+            type: string
+          suffix:
+            type: string
+          characterSet:
+            type: string
+            enum: [alphanumeric, numeric, alphabetic, hex]
+          format:
+            type: string
+            description: "timestamp: e.g. YYYYMMDD-HHmmss"
+
+  Field:
+    type: object
+    description: A form field of a human activity
+    required: [name, type]
+    additionalProperties: false
+    properties:
+      name:
+        type: string
+        description: Read in code as acts.<activity>.<name>
+      type:
+        $ref: "#/definitions/FieldType"
+      label:
+        type: string
+      hint:
+        type: string
+      placeholder:
+        type: string
+      description:
+        type: string
+      required:
+        type: boolean
+      defaultValue: {}
+      options:
+        type: array
+        description: Choices for a select field
+        items:
+          type: object
+          required: [value]
+          additionalProperties: false
+          properties:
+            label:
+              type: string
+            value:
+              anyOf:
+                - type: string
+                - type: number
+                - type: boolean
+      min:
+        type: number
+        description: "number: smallest value; text: shortest length"
+      max:
+        type: number
+        description: "number: largest value; text: longest length"
+      units:
+        type: string
+      pattern:
+        type: string
+        description: Regular expression a text value must match
+      patternDescription:
+        type: string
+      fileSpec:
+        type: object
+        additionalProperties: false
+        properties:
+          extensions:
+            type: array
+            items:
+              type: string
+          fileType:
+            type: string
+            description: MIME types or families, comma-separated, e.g. image/*
+      dataGenerator:
+        type: object
+        required: [generatorId]
+        additionalProperties: false
+        properties:
+          generatorId:
+            type: string
+          autoPopulate:
+            type: boolean
+          allowManualEdit:
+            type: boolean
+
+  Activity:
+    type: object
+    required: [type]
+    properties:
+      type:
+        type: string
+        enum: [human, compute, api, sequence, switch, terminate]
+    discriminator:
+      propertyName: type
+    oneOf:
+      - $ref: "#/definitions/HumanActivity"
+      - $ref: "#/definitions/ComputeActivity"
+      - $ref: "#/definitions/ApiActivity"
+      - $ref: "#/definitions/SequenceActivity"
+      - $ref: "#/definitions/SwitchActivity"
+      - $ref: "#/definitions/TerminateActivity"
+
+  HumanActivity:
+    type: object
+    required: [type]
+    additionalProperties: false
+    properties:
+      id: &id
+        type: string
+        description: Optional; always the activity's key in the activities map
+      name: &name
+        type: string
+      description: &description
+        type: string
+      type:
+        const: human
+      prompt:
+        type: string
+      fields:
+        type: array
+        items:
+          $ref: "#/definitions/Field"
+      passWhen: &passWhen
+        $ref: "#/definitions/Expression"
+        description: The activity passes when this is true and fails otherwise
+
+  ComputeActivity:
+    type: object
+    required: [type]
+    anyOf:
+      - required: [code]
+        properties: { code: true }
+      - required: [passWhen]
+        properties: { passWhen: true }
+    additionalProperties: false
+    properties:
+      id: *id
+      name: *name
+      description: *description
+      type:
+        const: compute
+      code:
+        $ref: "#/definitions/Code"
+      passWhen: *passWhen
+
+  ApiActivity:
+    type: object
+    required: [type, method, url]
+    additionalProperties: false
+    properties:
+      id: *id
+      name: *name
+      description: *description
+      type:
+        const: api
+      method:
+        type: string
+        enum: [GET, POST, PUT, DELETE]
+      url:
+        type: string
+        description: May contain {{...}} templates
+      headers: &templates
+        type: object
+        additionalProperties:
+          type: string
+      queryParams: *templates
+      body:
+        description: JSON request body; its strings may contain {{...}} templates
+      timeout:
+        type: number
+        description: Seconds (default 30)
+      retries:
+        type: integer
+        minimum: 0
+      expectedStatus:
+        type: array
+        items:
+          type: integer
+      code:
+        $ref: "#/definitions/Code"
+        description: Runs after the request; sees the result as `response`
+      passWhen: *passWhen
+
+  SequenceActivity:
+    type: object
+    required: [type, activities]
+    additionalProperties: false
+    properties:
+      id: *id
+      name: *name
+      description: *description
+      type:
+        const: sequence
+      activities:
+        type: array
+        minItems: 1
+        items:
+          $ref: "#/definitions/ActivityId"
+
+  SwitchActivity:
+    type: object
+    description: Routes on expression + cases (+ default), or on condition + then (+ else)
+    required: [type]
+    oneOf:
+      - required: [expression, cases]
+        properties: { expression: true, cases: true }
+      - required: [condition, then]
+        properties: { condition: true, then: true }
+    dependencies:
+      cases: [expression]
+      default: [expression]
+      then: [condition]
+      else: [condition]
+    additionalProperties: false
+    properties:
+      id: *id
+      name: *name
+      description: *description
+      type:
+        const: switch
+      expression:
+        $ref: "#/definitions/Expression"
+      cases:
+        type: object
+        minProperties: 1
+        description: Expression value (as a string) -> activity ID
+        additionalProperties:
+          $ref: "#/definitions/ActivityId"
+      default:
+        $ref: "#/definitions/ActivityId"
+      condition:
+        $ref: "#/definitions/Expression"
+      then:
+        $ref: "#/definitions/ActivityId"
+      else:
+        $ref: "#/definitions/ActivityId"
+
+  TerminateActivity:
+    type: object
+    required: [type]
+    additionalProperties: false
+    properties:
+      id: *id
+      name: *name
+      description: *description
+      type:
+        const: terminate
+      reason:
+        type: string
+      result:
+        type: string
+        enum: [success, failure]
+        description: "success (default) completes the run; failure fails it"

@@ -1,301 +1,391 @@
-# JPEL - JSON Process Execution Language
+# JPEL: JSON Process Execution Language
 
-A lightweight, JSON-native business process language for building task lists, data collection workflows, and quality control processes. JPEL makes it easy to define  structured business processes. The schema is fairly simple but powerful.  A Sample (node.js) Runner application is included here along with some sample processes.
+JPEL describes processes as JSON: checklists, data collection and quality
+control. A process **definition** lists activities (forms for people,
+JavaScript computations, API calls) and how to move between them. An engine
+turns a definition into a **run** (a process instance), which collects the
+data and records what happened.
 
-## 🎯 What is JPEL?
+This repository holds the specification (this file), the JSON Schemas and
+sample processes. Qonfident is the engine that runs it.
 
-JPEL (JSON Process Execution Language) is a modern approach to business process automation that uses simple JSON to define workflows. 
+- [Quick example](#quick-example)
+- [Process definition](#process-definition)
+- [Activities](#activities)
+- [Fields](#fields)
+- [Code and expressions](#code-and-expressions)
+- [API templates](#api-templates)
+- [Pass and fail](#pass-and-fail)
+- [Runs](#runs)
+- [Using the schema](#using-the-schema)
+- [Changes from the earlier markup](#changes-from-the-earlier-markup)
 
-### JPEL Definition/Instance Structure
-JPEL defines process definitions. These definitions define Activities of various types as well as conditions and branching. A Runner materializes a process template into a process *Instance*.  The instance represents a specific *Run* of the process and is where data is collected and processed. Each Activity in the Instance can collect Variables (from UI, API calls or *Compute* Activities).  The process instance itself can also hold Variables which are global to the entire process.
-
-Here are a few use-cases for JPEL:
-
-### 📋 Task Lists
-Create structured checklists and task sequences for operational procedures:
-- Employee onboarding checklists
-- Quality control inspection processes
-- Maintenance and compliance workflows
-- Project milestone tracking
-- Unlimited branching to do specific steps based on conditions
-
-### � Data Collection
-Build forms and data capture workflows with validation:
-- Customer intake forms
-- Survey and feedback collection
-- Laboratory Process Data Collection and validation
-- Audit and inspection data
-- Regulatory compliance reporting
-
-### ✅ Quality Control
-Implement approval workflows and validation processes:
-- Document review and approval cycles
-- Multi-step validation procedures
-- Conditional routing based on data values
-- Automated quality gates
-
-## 🚀 Key Features
-
-- **JSON-Native**: Define processes using familiar JSON syntax
-- **Human Tasks**: Interactive forms with validation and conditional logic
-- **Compute Activities**: JavaScript expressions for data transformation
-- **API Integration**: Connect with external systems and services
-- **Conditional Flow**: Branch and switch activities for complex logic
-- **Re-run Capability**: Execute completed processes again with preserved data
-
-## 📝 Quick Example
-
-Here's a simple employee onboarding process:
+## Quick example
 
 ```json
 {
-	"id": "hello-world",
-	"name": "Hello World Process",
-	"description": "A simple greeting process demonstrating human tasks and compute activities",
-	"version": "1.0.0",
-	"start": "a:mainSequence",
-	"variables": [
-		{
-			"name": "greeting",
-			"type": "text",
-			"description": "The generated greeting message"
-		}
-	],
-	"activities": {
-		"mainSequence": {
-			"name": "Main Sequence",
-			"type": "sequence",
-			"activities": [
-				"a:getUserName",
-				"a:generateGreeting",
-				"a:end"
-			]
-		},
-		"getUserName": {
-			"name": "Get User Name",
-			"type": "human",
-			"prompt": "Welcome! Please tell us your name and optionally upload a profile picture:",
-			"inputs": [
-				{
-					"name": "userName",
-					"type": "text",
-					"label": "Your Name",
-					"required": true,
-					"placeholder": "Enter your full name"
-				},
-				{
-					"name": "profilePicture",
-					"type": "file",
-					"label": "Profile Picture (Optional)",
-					"required": false,
-					"hint": "Upload a profile picture if you'd like",
-					"fileSpec": {
-						"extensions": [".jpg", ".jpeg", ".png", ".gif", "webp"]
-					}
-				}
-			]
-		},
-		"generateGreeting": {
-			"name": "Generate Greeting",
-			"type": "compute",
-			"code": [
-				"// Get the user name from the previous activity",
-				"const userName = a:getUserName.v:userName;",
-				"// Generate a greeting",
-				"const greeting = `Hello, ${userName}! Welcome to JPEL!`;",
-				"// Store the greeting",
-				"v:greeting = greeting;"
-			]
-		},
-		"end": {
-			"name": "Process Complete",
-			"type": "terminate",
-			"reason": "Process completed successfully"
-		}
-	}
+  "id": "hello-world",
+  "name": "Hello World",
+  "start": "main",
+  "variables": [
+    { "name": "greeting", "type": "text" }
+  ],
+  "activities": {
+    "main": {
+      "type": "sequence",
+      "activities": ["askName", "greet", "end"]
+    },
+    "askName": {
+      "type": "human",
+      "prompt": "What is your name?",
+      "fields": [
+        { "name": "userName", "type": "text", "label": "Your name", "required": true }
+      ]
+    },
+    "greet": {
+      "type": "compute",
+      "code": "vars.greeting = `Hello, ${acts.askName.userName}!`;"
+    },
+    "end": {
+      "type": "terminate",
+      "reason": "Greeted"
+    }
+  }
 }
 ```
 
-This example shows:
-- **Human tasks** for data collection
-- **Sequence activities** for ordered steps
-- **Compute activities** for data processing
-- **Variable references** using `a:activityId.v:variableName` syntax
+A run starts at `main`, asks for a name, computes a greeting into the process
+variable `greeting`, and ends.
 
-## 🏗️ Activity Types
+## Process definition
 
-| Type | Purpose | Use Case |
-|------|---------|----------|
-| `human` | Interactive user input | Forms, approvals, data entry |
-| `compute` | JavaScript execution | Calculations, data transformation, email generation |
-| `api` | External API calls | System integration, notifications, data sync |
-| `sequence` | Ordered execution | Step-by-step processes, checklists |
-| `branch` | Conditional routing | Approvals, validation gates |
-| `switch` | Multi-case routing | Status-based routing, category handling |
-| `terminate` | Process completion | Success/failure endpoints |
+| Key | Required | Meaning |
+|---|---|---|
+| `id` | yes | Unique ID (letters, digits, `_`, `-`) |
+| `name` | yes | Display name |
+| `description` | | |
+| `start` | yes | ID of the first activity |
+| `activities` | yes | Map of activity ID to activity |
+| `variables` | | Process variables: `{ name, type, description?, defaultValue? }`. Code reads and writes them as `vars.<name>`. |
+| `properties` | | Run properties: `{ id, name, defaultValue?, includeInSummary? }`. Code reads and writes them as `props.<id>`; they are shown with each run. `props.title` names the run. |
+| `dataGenerators` | | Value generators, such as serial numbers, that fields can use ([below](#data-generators)) |
 
+Activity IDs are the keys of `activities` and use the same characters as the
+process ID. Wherever a definition refers to an activity (`start`, a sequence's
+`activities`, a switch's targets) it uses the bare ID.
 
-## 🛠️ Getting Started
-1. **Build and Run the Node.js Runner**
+A definition has no version number. An engine should pin each run to the
+definition it started from (Qonfident stores a content-addressed snapshot), so
+editing a definition never changes runs already under way.
+
+## Activities
+
+Every activity has a `type` and may have a `name` and `description`. An `id`
+key is optional and, if given, must equal the activity's key.
+
+| Type | Does |
+|---|---|
+| `human` | Shows a form and waits for a person to submit it |
+| `compute` | Runs JavaScript |
+| `api` | Makes an HTTP request, then optionally runs JavaScript on the response |
+| `sequence` | Runs activities in order |
+| `switch` | Chooses the next activity |
+| `terminate` | Ends the run |
+
+### human
+
+```json
+"capsuleData": {
+  "type": "human",
+  "name": "Capsule Data",
+  "prompt": "Measure the capsule:",
+  "fields": [
+    { "name": "frontCapacitance", "type": "number", "label": "Front capacitance", "units": "pF", "required": true },
+    { "name": "backCapacitance", "type": "number", "label": "Back capacitance", "units": "pF", "required": true }
+  ]
+}
+```
+
+`prompt` is shown above the form; `fields` are described [below](#fields).
+The submitted values are the activity's values: `acts.capsuleData.frontCapacitance`.
+A human activity may have a [`passWhen`](#pass-and-fail).
+
+### compute
+
+```json
+"generateTitle": {
+  "type": "compute",
+  "code": [
+    "const facts = acts.commonFacts;",
+    "props.title = `${facts.customerName}-${facts.micBuildNumber}`;"
+  ]
+}
+```
+
+`code` is JavaScript, either one string or an array of lines (joined with
+newlines). If the code returns an object, its keys become the activity's
+values (`return { buildCode }` makes `acts.generateBuildCode.buildCode`). A
+compute activity needs `code`, a `passWhen`, or both.
+
+### api
+
+```json
+"fetchCountry": {
+  "type": "api",
+  "method": "GET",
+  "url": "https://restcountries.com/v3.1/name/{{acts.askCountry.country}}",
+  "headers": { "Accept": "application/json" },
+  "queryParams": { "fields": "name,capital" },
+  "expectedStatus": [200],
+  "retries": 2,
+  "timeout": 30,
+  "code": "return { capital: response.data[0].capital[0] };"
+}
+```
+
+| Key | Meaning |
+|---|---|
+| `method` | `GET`, `POST`, `PUT` or `DELETE` (required) |
+| `url` | Request URL (required) |
+| `headers`, `queryParams` | Maps of strings |
+| `body` | JSON request body |
+| `expectedStatus` | Status codes that count as success (default `[200]`) |
+| `retries` | Extra attempts after a failure (default 0) |
+| `timeout` | Seconds (default 30) |
+| `code` | Runs after a successful request; sees the result as `response` (`status`, `statusText`, `headers`, `data`) |
+| `passWhen` | See [Pass and fail](#pass-and-fail) |
+
+`url`, `headers`, `queryParams` and the strings in `body` may contain
+[templates](#api-templates).
+
+### sequence
+
+```json
+"main": { "type": "sequence", "activities": ["collect", "check", "finish"] }
+```
+
+Runs each activity in turn. When the last one completes, the sequence
+completes and its parent continues.
+
+### switch
+
+A switch evaluates an expression and runs the activity for the matching case:
+
+```json
+"micTypeDecision": {
+  "type": "switch",
+  "expression": "acts.commonFacts.microphoneCategory",
+  "cases": { "LDC": "ldcMic", "SDC": "sdcMic" },
+  "default": "otherMic"
+}
+```
+
+The value is converted to a string to look up `cases`. With no match and no
+`default`, the activity fails.
+
+For a yes/no decision, use `condition`, `then` and optionally `else`:
+
+```json
+"bodyOriginCondition": {
+  "type": "switch",
+  "condition": "acts.commonFacts.bodyOrigin === 'CUSTOMER_REBUILD'",
+  "then": "intakeInspection"
+}
+```
+
+If the condition is false and there is no `else`, the switch completes
+without running anything. Either way, the switch completes when the chosen
+activity does, and its parent continues.
+
+### terminate
+
+```json
+"end": { "type": "terminate", "reason": "Build rejected", "result": "failure" }
+```
+
+Ends the run. `result` is `success` (the default; the run completes) or
+`failure` (the run fails).
+
+## Fields
+
+A human activity's `fields` describe its form:
+
+| Key | Meaning |
+|---|---|
+| `name` | Required. Read in code as `acts.<activity>.<name>` |
+| `type` | Required: `text`, `textarea`, `number`, `boolean`, `select`, `date` or `file` |
+| `label`, `hint`, `placeholder`, `description` | Shown with the field |
+| `required` | The form can't be submitted without a value |
+| `defaultValue` | Initial value |
+| `options` | For `select`: `[{ "value": "K47", "label": "K47 capsule" }]` |
+| `min`, `max` | `number`: the allowed range. `text` and `textarea`: the allowed length |
+| `units` | Shown after a number, e.g. `pF` |
+| `pattern`, `patternDescription` | Regular expression a text value must match, and how to explain it |
+| `fileSpec` | For `file`: `{ "extensions": [".jpg"], "fileType": "image/*" }` (MIME types or families, comma-separated) |
+| `dataGenerator` | `{ "generatorId", "autoPopulate"?, "allowManualEdit"? }`: fill the field from a generator |
+
+A `file` field's value is a reference to the stored file (its metadata, a URL
+and, for images, a thumbnail URL), not the file's content.
+
+### Data generators
+
+```json
+"dataGenerators": [
+  {
+    "id": "mic-build-number",
+    "strategy": "serial",
+    "scope": "tenant",
+    "parameters": { "initial": 248, "increment": 1, "length": 4, "zeroPad": "left" }
+  }
+]
+```
+
+`strategy` is `serial`, `random`, `uuid` or `timestamp`. A `serial`
+generator issues `initial + increment` first. `scope` is `tenant` (one
+sequence shared by all of a tenant's processes; the default) or `process`.
+Other parameters: `prefix`, `suffix`, `characterSet` (`random`:
+`alphanumeric`, `numeric`, `alphabetic` or `hex`) and `format` (`timestamp`,
+e.g. `YYYYMMDD-HHmmss`).
+
+## Code and expressions
+
+Compute and API `code`, switch `expression` and `condition`, and `passWhen`
+are JavaScript. They see three objects:
+
+| Name | Holds | Writable |
+|---|---|---|
+| `vars` | Process variables: `vars.greeting` | yes |
+| `props` | Run properties: `props.title` | yes |
+| `acts` | Every activity's values: `acts.capsuleData.frontCapacitance` | no |
+
+API code also sees `response`. `console.log(...)` writes to the engine's log.
+
+`acts.<id>` holds an activity's values: a human activity's submitted fields,
+or the object a compute or API activity's code returned. Use brackets for IDs
+that aren't JavaScript names: `acts["990Facts"].donor`. `acts` is read-only;
+an activity sets its own values by returning an object.
+
+`code` is the body of a function, so `return` ends it. `expression`,
+`condition` and `passWhen` are single expressions. Code runs in strict mode:
+assigning to an undeclared name is an error, not a new global.
+
+### What code can do
+
+Code runs in a sandbox. It is plain JavaScript with the standard built-ins
+(`Math`, `JSON`, `Date`, `Array`, `String` and so on) and `console.log`.
+There is no I/O: no `fetch`, `require`, `import`, file system, timers or
+`async`. Use an `api` activity to call another system. An engine limits how
+long code may run and how much memory it may use (Qonfident: 1 second and
+32 MB). Code that throws, or exceeds a limit, fails its activity and the run.
+
+## API templates
+
+`{{...}}` in an API activity's `url`, `headers`, `queryParams` and body
+strings is replaced with a value:
+
+| Template | Value |
+|---|---|
+| `{{vars.name}}` | A process variable |
+| `{{props.id}}` | A run property |
+| `{{acts.activity.field}}` | An activity's value |
+| `{{env.NAME}}` | An environment variable of the engine (Qonfident allows only names starting `JPEL_`) |
+
+Templates are paths, not code. A template whose value is undefined is left
+as it is.
+
+## Pass and fail
+
+A human, compute or API activity may declare `passWhen`, an expression
+evaluated when the activity completes (after its code, so it can use the
+values the code returned):
+
+```json
+"ldcCapsuleDataValidation": {
+  "type": "compute",
+  "name": "Capsule match",
+  "passWhen": "Math.abs(acts.capsuleData.frontCapacitance - acts.capsuleData.backCapacitance) <= 10"
+}
+```
+
+True records `passFail: "pass"` on the activity, false records `"fail"`.
+Because the rule is declared rather than buried in code, a UI can show it and
+the values it read. When a run completes, it records `aggregatePassFail`:
+`any_fail` if any activity failed, otherwise `all_pass` if at least one
+passed.
+
+## Runs
+
+A run (see `schema/instance.schema.json`) holds:
+
+- `status`: `running`, `completed`, `failed` or `cancelled`
+- `variables` and `properties`: the current values of `vars` and `props`
+- `title`: the run's name, kept equal to `props.title`
+- `activities`: for each activity, its definition plus its state: `status`,
+  `passFail`, times, `error`, and `fields`. For a human activity, `fields`
+  are its form fields with a `value` each; for compute and API activities,
+  they are the values the code returned. A switch also records
+  `expressionValue`, `matchedCase` (`then`, `else`, a case key or `default`)
+  and `nextActivity`.
+- `executionContext`: where the run is (a call stack of activities)
+
+## Using the schema
+
+`schema/process.schema.json` validates definitions;
+`schema/instance.schema.json` describes runs. Both are JSON Schema draft-07
+and compile with [Ajv](https://ajv.js.org) in strict mode. Activities use
+Ajv's `discriminator` keyword, so enable it to get errors for the right
+activity type:
+
+```js
+import Ajv from 'ajv';
+import schema from 'jpel/schema/process.schema.json' with { type: 'json' };
+
+const validate = new Ajv({ allErrors: true, strict: true, discriminator: true }).compile(schema);
+```
+
+To use the schema and samples from another project, install this repository
+as a dependency: `npm install github:bobdamit/jpel`. The lockfile pins the
+commit; `npm update jpel` moves to the latest.
+
+The schema checks shape only. An engine should also check that every
+activity a definition refers to exists, as `test/samples.test.mjs` does.
+
+### Working on the spec
+
 ```
 npm install
-npm run build && npm run test
-npm start
-```
-2. Visit localhost:3000 in a browser to open the Runner Demo UI
-3. Choose one of the sample processes and start a new Instance
-
-## � Activity examples (lifted from /runner-node/samples)
-
-Below are short, focused examples of common activity definitions used in JPEL processes, taken from the repository `runner-node/samples` and annotated with what each field does. These are *snippets* (not full process files) intended to illustrate typical usage.
-
-### 1) Human activity (form input)
-From `employee-onboarding.json` — collects structured user input with validation and options.
-
-```json
-{
-	"name": "Collect Employee Information",
-	"type": "human",
-	"prompt": "Please provide new employee details:",
-	"inputs": [
-		{
-			"name": "employeeName",
-			"type": "text",
-			"label": "Employee Name",
-			"required": true,
-			"placeholder": "Full name",
-			"pattern": "^['.\\-a-zA-Z\\s]{3,50}$",
-			"patternDescription": "Name must be 3-50 characters"
-		},
-		{
-			"name": "department",
-			"type": "select",
-			"label": "Department",
-			"required": true,
-			"options": [
-				{ "value": "Engineering", "label": "Engineering" },
-				{ "value": "Sales", "label": "Sales" }
-			]
-		}
-	]
-}
+npm run build   # regenerate schema/*.json from schema/*.yaml
+npm test        # check the JSON is current, validate the samples, test the schema
 ```
 
-Explanation:
-- `type: human` - marks the activity as a user-facing task that waits for input.
-- `prompt` - text shown to the user.
-- `inputs` - an array of `Variable`-like definitions describing fields to collect (name, type, label, validation).
-- `pattern` and `patternDescription` provide client-side validation guidance.
+Edit the YAML, never the generated JSON. `samples/` holds example processes;
+`mic-build.json` is a real microphone build process.
 
-### 2) API activity (external call)
-From `api-demo.json` — calls a third-party REST API and processes the response in `code`.
+## Changes from the earlier markup
 
-```json
-{
-	"name": "Fetch Country Information",
-	"type": "api",
-	"method": "GET",
-	"url": "https://restcountries.com/v3.1/name/a:getUserInput.v:country",
-	"queryParams": { "fields": "name,capital,population,area" },
-	"expectedStatus": [200],
-	"retries": 3,
-	"code": [
-		"// response.data is available",
-		"const countries = response.data;",
-		"if (!countries || countries.length === 0) throw new Error('No country found');",
-		"v:countryData = JSON.stringify(countries[0]);",
-		"return countries[0];"
-	]
-}
-```
+JPEL used to rewrite its own tokens into JavaScript. Code now uses plain
+objects, and each thing has one spelling:
 
-Explanation:
-- `type: api` - performs an HTTP request.
-- `url` and `method` - request details; URL may reference process/activity variables using `a:...` or `v:...` syntax.
-- `expectedStatus` - list of acceptable HTTP status codes.
-- `retries` and `timeout` control resilience.
-- `code` (optional) - post-processing script that runs after a successful response; it can store values in process variables (`v:`) or return a structured result.
+| Before | Now |
+|---|---|
+| `a:step.v:field`, `activities.step.v.field` | `acts.step.field` |
+| `v:name`, `var:name`, `process.name` | `vars.name` |
+| `p:name`, `properties.name` | `props.name` |
+| `$title` | `props.title` |
+| `a:self.passFail = cond ? 'pass' : 'fail'` | `"passWhen": "cond"` |
+| `a:self.x = value`, `this.x = value` | `return { x: value }` |
+| `a:step.v:field` in API URLs and headers | `{{acts.step.field}}` |
+| `env:NAME` | `{{env.NAME}}` |
+| `"start": "a:main"` (and in sequences and switches) | `"start": "main"` |
+| `"inputs"` on human activities, `"variables"` on a run's activities | `"fields"` |
+| `"type": "branch"` | `"type": "switch"` with `condition`/`then`/`else` |
+| `"version"` | Removed; runs are pinned to the definition they started from |
+| `"code"` as an array only | A string or an array of lines |
+| Field type `string`, `"multiline": true`, `minLength` | `text`, `textarea`, `min` |
 
-### 3) Compute activity (inline transformation)
-From `api-demo.json` — generates a formatted report from process variables.
+The Node.js reference runner that used to live here has been removed;
+Qonfident is the engine.
 
-```json
-{
-	"name": "Generate Country Report",
-	"type": "compute",
-	"code": [
-		"const countryData = JSON.parse(process.countryData);",
-		"const infoType = activities.getUserInput.v.infoType;",
-		"let report = [];",
-		"if (infoType === 'general') report = [`COUNTRY: ${countryData.name}`, `Capital: ${countryData.capital}`];",
-		"v:countryReport = report.join('\n');",
-		"return { reportType: infoType, reportText: v:countryReport };"
-	]
-}
-```
+## License
 
-Explanation:
-- `type: compute` - runs JavaScript on the engine to compute or transform data.
-- Access process variables via `process` or the convenience `activities.<id>.v:<name>` notation.
-- `v:...` assignment persists data into process-scoped variables.
-
-### 4) Sequence and control flow (ordered steps)
-From `approval-workflow.json` — `sequence` groups ordered activities.
-
-```json
-{
-	"name": "Document Approval Sequence",
-	"type": "sequence",
-	"activities": [
-		"a:submitDocument",
-		"a:reviewDocument",
-		"a:processDecision"
-	]
-}
-```
-
-Explanation:
-- `type: sequence` - executes child activities in order.
-- Child entries reference activity IDs (prefixed with `a:` in full process documents).
-
-### 5) Branch / Approval (conditional routing)
-From `approval-workflow.json` — use `branch` or `switch` to route based on decisions.
-
-```json
-{
-	"name": "Process Decision",
-	"type": "branch",
-	"condition": "activities.reviewDocument.v:approved === true",
-	"then": "a:welcomeEmployee",
-	"else": "a:requestChanges"
-}
-```
-
-Explanation:
-- `type: branch` - evaluates a boolean `condition` and selects the next activity.
-- `condition` may reference activity variables or process variables.
-- `then` / `else` are the next activity IDs to execute.
-
-Where these examples came from
-- `runner-node/samples/employee-onboarding.json` — human, sequence examples
-- `runner-node/samples/api-demo.json` — api + compute examples
-- `runner-node/samples/approval-workflow.json` — branch / approval examples
-
-Use these snippets as reference when authoring your own activities — they show the typical fields and how the engine expects data to be structured. For full process examples, open the sample files listed under `runner-node/samples`.
-
-## �📚 Documentation
-
-- [Process Schema](design/schema-process.json) - Complete JSON schema reference
-- [API Reference](runner-node/README.md) - REST API documentation
-
-## 🤝 Contributing
-
-JPEL welcomes contributions! Whether you're fixing bugs, adding features, or improving documentation, your help makes business process automation better for everyone. Any non-backward compatible breaking changes, or changes that are not covered by unit tests will probably not be merged in.
-
-## 📄 License
-
-MIT License - see [LICENSE](LICENSE) file for details.
-
----
-
-**JPEL** - Making business processes simple, structured, and automated! 🎯
+MIT; see [LICENSE](LICENSE).

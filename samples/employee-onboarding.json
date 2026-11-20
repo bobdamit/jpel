@@ -1,0 +1,125 @@
+{
+  "id": "employee-onboarding",
+  "name": "Employee Onboarding Process",
+  "description": "Complete employee onboarding workflow with parallel tasks and API integration",
+  "start": "onboardingSequence",
+  "variables": [
+    {
+      "name": "onboardingComplete",
+      "type": "boolean",
+      "description": "Whether onboarding is complete"
+    }
+  ],
+  "activities": {
+    "onboardingSequence": {
+      "name": "Employee Onboarding Sequence",
+      "type": "sequence",
+      "activities": [
+        "collectEmployeeInfo",
+        "assignEquipment",
+        "createAccounts",
+        "verifySetup",
+        "welcomeEmployee"
+      ]
+    },
+    "collectEmployeeInfo": {
+      "name": "Collect Employee Information",
+      "type": "human",
+      "prompt": "Please provide new employee details:",
+      "fields": [
+        {
+          "name": "employeeName",
+          "type": "text",
+          "label": "Employee Name",
+          "required": true,
+          "placeholder": "Full name",
+          "pattern": "^['\\.\\-a-zA-Z\\s]{3,50}$",
+          "patternDescription": "Name must be 3-50 characters"
+        },
+        {
+          "name": "department",
+          "type": "select",
+          "label": "Department",
+          "required": true,
+          "options": [
+            {
+              "value": "Engineering",
+              "label": "Engineering"
+            },
+            {
+              "value": "Sales",
+              "label": "Sales"
+            },
+            {
+              "value": "Marketing",
+              "label": "Marketing"
+            },
+            {
+              "value": "HR",
+              "label": "HR"
+            },
+            {
+              "value": "Finance",
+              "label": "Finance"
+            }
+          ]
+        },
+        {
+          "name": "startDate",
+          "type": "date",
+          "label": "Start Date",
+          "required": true
+        }
+      ]
+    },
+    "assignEquipment": {
+      "name": "Assign Equipment",
+      "type": "human",
+      "prompt": "Please assign equipment to the new employee:",
+      "fields": [
+        {
+          "name": "equipmentAssigned",
+          "type": "boolean",
+          "label": "Equipment has been assigned",
+          "required": true
+        }
+      ]
+    },
+    "createAccounts": {
+      "name": "Create User Accounts",
+      "type": "human",
+      "prompt": "Please create necessary user accounts:",
+      "fields": [
+        {
+          "name": "accountsCreated",
+          "type": "boolean",
+          "label": "User accounts have been created",
+          "required": true
+        }
+      ]
+    },
+    "verifySetup": {
+      "name": "Verify Setup Complete",
+      "type": "compute",
+      "code": [
+        "// Check if both setup tasks are complete",
+        "const equipmentDone = acts.assignEquipment.equipmentAssigned;",
+        "const accountsDone = acts.createAccounts.accountsCreated;",
+        "vars.onboardingComplete = equipmentDone && accountsDone;"
+      ]
+    },
+    "welcomeEmployee": {
+      "name": "Welcome New Employee",
+      "type": "human",
+      "prompt": "Send welcome message to the new employee:",
+      "fields": [
+        {
+          "name": "welcomeSent",
+          "type": "boolean",
+          "label": "Welcome message sent",
+          "required": true
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,23 @@
+{
+	"name": "jpel",
+	"version": "1.0.0",
+	"private": true,
+	"description": "JPEL (JSON Process Execution Language): the specification, its JSON Schemas and sample processes",
+	"license": "MIT",
+	"repository": "github:bobdamit/jpel",
+	"files": [
+		"schema/",
+		"samples/"
+	],
+	"scripts": {
+		"build": "node scripts/build.mjs",
+		"test": "node scripts/build.mjs --check && node --test"
+	},
+	"devDependencies": {
+		"ajv": "^8.20.0",
+		"js-yaml": "^4.1.0"
+	},
+	"engines": {
+		"node": ">=22"
+	}
+}
