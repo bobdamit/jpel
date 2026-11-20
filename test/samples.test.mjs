@@ -58,7 +58,7 @@ for (const name of samples) {
 
 test('the README examples are valid', () => {
 	const readme = readFileSync(fileURLToPath(new URL('../README.md', import.meta.url)), 'utf8');
-	const blocks = [...readme.matchAll(/```json\n([\s\S]*?)```/g)].map(m => m[1].trim());
+	const blocks = [...readme.matchAll(/```json\r?\n([\s\S]*?)```/g)].map(m => m[1].trim());
 	// Whole processes validate as they are; activity snippets ("id": {...}) inside a minimal process
 	let checked = 0;
 	for (const block of blocks) {
