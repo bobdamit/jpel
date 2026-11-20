@@ -1,0 +1,31 @@
+name: Publish
+
+# Publishes @rockscience/jpel to npm when a GitHub release is published.
+# Uses npm trusted publishing (OIDC), so no token is stored: configure it once
+# on npmjs.com under the package's Settings > Trusted publishing, naming this
+# repository and the workflow file publish.yml.
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: https://registry.npmjs.org
+      # Trusted publishing needs npm 11.5.1 or later
+      - run: npm install -g npm@latest
+      - run: npm ci
+      - run: npm test
+      - name: Check the release tag matches package.json
+        run: test "${GITHUB_REF_NAME#v}" = "$(node -p "require('./package.json').version")"
+      - run: npm publish
