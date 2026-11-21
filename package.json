@@ -1,6 +1,6 @@
 {
 	"name": "@rockscience/jpel",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"description": "JPEL (JSON Process Execution Language): the specification, its JSON Schemas and sample processes",
 	"keywords": [
 		"jpel",
@@ -20,14 +20,19 @@
 	},
 	"type": "module",
 	"main": "./index.js",
+	"types": "./index.d.ts",
 	"exports": {
-		".": "./index.js",
+		".": {
+			"types": "./index.d.ts",
+			"default": "./index.js"
+		},
 		"./schema/*": "./schema/*",
 		"./samples/*": "./samples/*",
 		"./package.json": "./package.json"
 	},
 	"files": [
 		"index.js",
+		"index.d.ts",
 		"schema/*.json",
 		"samples/"
 	],

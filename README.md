@@ -355,7 +355,8 @@ import { processSchema, instanceSchema } from '@rockscience/jpel';
 const validate = new Ajv({ allErrors: true, strict: true, discriminator: true }).compile(processSchema);
 ```
 
-The files can also be imported directly, for example
+The package includes TypeScript declarations for these exports. The files can
+also be imported directly, for example
 `@rockscience/jpel/schema/process.schema.json` or
 `@rockscience/jpel/samples/hello-world.json` (with `{ type: 'json' }`).
 
