@@ -1,6 +1,6 @@
 {
 	"name": "@rockscience/jpel",
-	"version": "1.0.1",
+	"version": "1.0.2",
 	"description": "JPEL (JSON Process Execution Language): the specification, its JSON Schemas and sample processes",
 	"keywords": [
 		"jpel",
