@@ -252,6 +252,28 @@ Other parameters: `prefix`, `suffix`, `characterSet` (`random`:
 `alphanumeric`, `numeric`, `alphabetic` or `hex`) and `format` (`timestamp`,
 e.g. `YYYYMMDD-HHmmss`).
 
+## Extensions
+
+The process, its activities and their fields may carry properties whose names
+start with `x-`. They are not part of JPEL: engines ignore them and keep them
+as they are, and tools use them for their own features, such as presentation.
+Any other unknown key is still rejected, so a typo like `desciption` is caught.
+
+```json
+"inspect": {
+  "type": "human",
+  "fields": [
+    { "name": "finish", "type": "number", "label": "Paint finish", "min": 1, "max": 10, "x-display": "scale" },
+    { "name": "cost", "type": "number", "label": "Parts cost", "x-report": { "hidden": true } }
+  ]
+}
+```
+
+A definition must still work in an engine that knows none of its extensions:
+one that has never heard of `x-display` shows `finish` as an ordinary number
+input. Use a name specific to the tool when two tools might mean different
+things by the same name.
+
 ## Code and expressions
 
 Compute and API `code`, switch `expression` and `condition`, and `passWhen`
