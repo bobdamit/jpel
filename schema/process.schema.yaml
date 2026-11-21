@@ -8,6 +8,9 @@ title: JPEL process definition
 type: object
 required: [id, name, start, activities]
 additionalProperties: false
+patternProperties: &extensions
+  "^x-":
+    description: "An extension: ignored by engines and kept as it is, for tools (Qonfident uses x-display and x-report on fields). See README, Extensions."
 properties:
   id:
     type: string
@@ -146,6 +149,7 @@ definitions:
     description: A form field of a human activity
     required: [name, type]
     additionalProperties: false
+    patternProperties: *extensions
     properties:
       name:
         type: string
@@ -235,6 +239,7 @@ definitions:
     type: object
     required: [type]
     additionalProperties: false
+    patternProperties: *extensions
     properties:
       id: &id
         type: string
@@ -264,6 +269,7 @@ definitions:
       - required: [passWhen]
         properties: { passWhen: true }
     additionalProperties: false
+    patternProperties: *extensions
     properties:
       id: *id
       name: *name
@@ -278,6 +284,7 @@ definitions:
     type: object
     required: [type, method, url]
     additionalProperties: false
+    patternProperties: *extensions
     properties:
       id: *id
       name: *name
@@ -316,6 +323,7 @@ definitions:
     type: object
     required: [type, activities]
     additionalProperties: false
+    patternProperties: *extensions
     properties:
       id: *id
       name: *name
@@ -343,6 +351,7 @@ definitions:
       then: [condition]
       else: [condition]
     additionalProperties: false
+    patternProperties: *extensions
     properties:
       id: *id
       name: *name
@@ -370,6 +379,7 @@ definitions:
     type: object
     required: [type]
     additionalProperties: false
+    patternProperties: *extensions
     properties:
       id: *id
       name: *name

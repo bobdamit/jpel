@@ -43,3 +43,12 @@ test('unknown keys are rejected', () => {
 	assert.ok(!valid(process({ a: { type: 'human', fields: [{ name: 'x', type: 'text', multiline: true }] } })));
 	assert.ok(!valid(process({ a: { type: 'human', fields: [{ name: 'x', type: 'string' }] } })));
 });
+
+test('x- extensions are allowed on the process, activities and fields', () => {
+	const field = { name: 'finish', type: 'number', min: 1, max: 10, 'x-display': 'scale', 'x-report': { hidden: true } };
+	const definition = { ...process({ a: { type: 'human', fields: [field], 'x-color': 'blue' }, b: { type: 'switch', condition: 'true', then: 'a', 'x-note': 1 } }), 'x-tool': { v: 2 } };
+	assert.ok(valid(definition), JSON.stringify(validate.errors));
+	// Only x-: other unknown keys are still typos
+	assert.ok(!valid(process({ a: { type: 'human', fields: [{ ...field, display: 'scale' }] } })));
+	assert.ok(!valid(process({ a: { type: 'human', 'X-upper': 1 } })));
+});
