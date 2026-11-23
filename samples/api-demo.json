@@ -136,8 +136,10 @@
       "code": [
         "// mrnev=1 asks for the most recent year that has a value",
         "const body = response.data;",
+        "if (Array.isArray(body) && body[0]?.message?.[0]?.value) {",
+        "  throw new Error('World Bank API: ' + body[0].message[0].value);",
+        "}",
         "const latest = Array.isArray(body) && Array.isArray(body[1]) ? body[1][0] : null;",
-        "",
         "// Add the population to what the previous step stored",
         "const countryData = JSON.parse(vars.countryData);",
         "countryData.population = latest?.value ?? null;",
