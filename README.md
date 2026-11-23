@@ -138,13 +138,13 @@ compute activity needs `code`, a `passWhen`, or both.
 "fetchCountry": {
   "type": "api",
   "method": "GET",
-  "url": "https://restcountries.com/v3.1/name/{{acts.askCountry.country}}",
+  "url": "https://api.worldbank.org/v2/country/{{acts.askCountry.isoCode}}",
   "headers": { "Accept": "application/json" },
-  "queryParams": { "fields": "name,capital" },
+  "queryParams": { "format": "json" },
   "expectedStatus": [200],
   "retries": 2,
   "timeout": 30,
-  "code": "return { capital: response.data[0].capital[0] };"
+  "code": "const body = response.data; const country = body?.[1]?.[0]; if (!country) { const problem = body?.[0]?.message?.[0]?.value; throw new Error(problem ? 'World Bank API: ' + problem : 'No country found for that code'); } return { capital: country.capitalCity };"
 }
 ```
 
