@@ -144,7 +144,7 @@ compute activity needs `code`, a `passWhen`, or both.
   "expectedStatus": [200],
   "retries": 2,
   "timeout": 30,
-  "code": "return { capital: response.data[1][0].capitalCity };"
+  "code": "const body = response.data; const country = body?.[1]?.[0]; if (!country) { const problem = body?.[0]?.message?.[0]?.value; throw new Error(problem ? 'World Bank API: ' + problem : 'No country found for that code'); } return { capital: country.capitalCity };"
 }
 ```
 
