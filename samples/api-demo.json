@@ -1,13 +1,13 @@
 {
   "id": "api-demo",
   "name": "Country Information API Demo",
-  "description": "Demonstrates API activities using the free REST Countries API with data processing",
+  "description": "Demonstrates chained API activities using the free World Bank API (no key needed), with data processing",
   "start": "mainSequence",
   "variables": [
     {
       "name": "countryData",
       "type": "text",
-      "description": "Country information from the REST Countries API"
+      "description": "Country information from the World Bank API"
     },
     {
       "name": "countryReport",
@@ -22,6 +22,7 @@
       "activities": [
         "getUserInput",
         "fetchCountryInfo",
+        "fetchPopulation",
         "processResponse",
         "showResults"
       ]
@@ -29,15 +30,29 @@
     "getUserInput": {
       "name": "Get Country Input",
       "type": "human",
-      "prompt": "Let's explore country information using the REST Countries API!",
+      "prompt": "Let's explore country information using the World Bank API!",
       "fields": [
         {
           "name": "country",
-          "type": "text",
-          "label": "Country Name",
+          "type": "select",
+          "label": "Country",
           "required": true,
-          "placeholder": "Enter a country name (e.g., Japan, Germany, Brazil)",
-          "description": "The country to get information about"
+          "description": "The country to get information about",
+          "options": [
+            { "label": "Australia", "value": "AU" },
+            { "label": "Brazil", "value": "BR" },
+            { "label": "Canada", "value": "CA" },
+            { "label": "France", "value": "FR" },
+            { "label": "Germany", "value": "DE" },
+            { "label": "India", "value": "IN" },
+            { "label": "Japan", "value": "JP" },
+            { "label": "Kenya", "value": "KE" },
+            { "label": "Mexico", "value": "MX" },
+            { "label": "New Zealand", "value": "NZ" },
+            { "label": "South Africa", "value": "ZA" },
+            { "label": "United Kingdom", "value": "GB" },
+            { "label": "United States", "value": "US" }
+          ]
         },
         {
           "name": "infoType",
@@ -50,12 +65,8 @@
               "value": "general"
             },
             {
-              "label": "Geographic Details",
-              "value": "geography"
-            },
-            {
-              "label": "Cultural Information",
-              "value": "culture"
+              "label": "Location",
+              "value": "location"
             }
           ],
           "defaultValue": "general"
@@ -66,64 +77,88 @@
       "name": "Fetch Country Information",
       "type": "api",
       "method": "GET",
-      "url": "https://restcountries.com/v3.1/name/{{acts.getUserInput.country}}",
+      "url": "https://api.worldbank.org/v2/country/{{acts.getUserInput.country}}",
       "queryParams": {
-        "fullText": "false",
-        "fields": "name,capital,population,area,region,subregion,languages,currencies,timezones,borders,flags,coatOfArms,maps"
+        "format": "json"
       },
       "headers": {
         "Accept": "application/json",
         "User-Agent": "JPEL-Process-Engine/1.0"
       },
-      "timeout": 10,
-      "retries": 3,
+      "timeout": 15,
+      "retries": 2,
       "expectedStatus": [
         200
       ],
       "code": [
-        "// Process the REST Countries API response",
-        "console.log('Countries API Response:', response.data);",
-        "",
-        "// The API returns an array, get the first country match",
-        "const countries = response.data;",
-        "if (!countries || countries.length === 0) {",
-        "  throw new Error('No country found with that name');",
+        "// The World Bank API answers [paging, [country]] on success,",
+        "// and [{ message: [...] }] (still HTTP 200) for a code it doesn't know",
+        "const body = response.data;",
+        "const country = Array.isArray(body) && Array.isArray(body[1]) ? body[1][0] : null;",
+        "if (!country) {",
+        "  const problem = body?.[0]?.message?.[0]?.value;",
+        "  throw new Error(problem ? `World Bank API: ${problem}` : 'No country found for that code');",
         "}",
         "",
-        "const country = countries[0];",
-        "",
-        "// Extract comprehensive country information",
         "const result = {",
-        "  name: country.name.common,",
-        "  officialName: country.name.official,",
-        "  capital: country.capital ? country.capital[0] : 'N/A',",
-        "  population: country.population,",
-        "  area: country.area,",
-        "  region: country.region,",
-        "  subregion: country.subregion,",
-        "  languages: country.languages ? Object.values(country.languages) : [],",
-        "  currencies: country.currencies ? Object.keys(country.currencies) : [],",
-        "  timezones: country.timezones || [],",
-        "  borders: country.borders || [],",
-        "  flag: country.flags?.png || '',",
-        "  maps: country.maps?.googleMaps || '',",
-        "  fetchedAt: new Date().toISOString()",
+        "  name: country.name,",
+        "  isoCode: country.iso2Code,",
+        "  capital: country.capitalCity || 'N/A',",
+        "  region: (country.region?.value || '').trim(),",
+        "  incomeLevel: country.incomeLevel?.value || 'N/A',",
+        "  latitude: Number(country.latitude),",
+        "  longitude: Number(country.longitude)",
         "};",
         "",
-        "// Store in process variable",
+        "// Store in a process variable for the next steps",
         "vars.countryData = JSON.stringify(result);",
-        "",
-        "console.log('Processed country data:', result.name);",
         "return result;"
+      ]
+    },
+    "fetchPopulation": {
+      "name": "Fetch Population",
+      "type": "api",
+      "method": "GET",
+      "url": "https://api.worldbank.org/v2/country/{{acts.getUserInput.country}}/indicator/SP.POP.TOTL",
+      "queryParams": {
+        "format": "json",
+        "mrnev": "1"
+      },
+      "headers": {
+        "Accept": "application/json",
+        "User-Agent": "JPEL-Process-Engine/1.0"
+      },
+      "timeout": 15,
+      "retries": 2,
+      "expectedStatus": [
+        200
+      ],
+      "code": [
+        "// mrnev=1 asks for the most recent year that has a value",
+        "const body = response.data;",
+        "const latest = Array.isArray(body) && Array.isArray(body[1]) ? body[1][0] : null;",
+        "",
+        "// Add the population to what the previous step stored",
+        "const countryData = JSON.parse(vars.countryData);",
+        "countryData.population = latest?.value ?? null;",
+        "countryData.populationYear = latest?.date ?? null;",
+        "vars.countryData = JSON.stringify(countryData);",
+        "",
+        "return { population: countryData.population, populationYear: countryData.populationYear };"
       ]
     },
     "processResponse": {
       "name": "Generate Country Report",
       "type": "compute",
       "code": [
-        "// Get the country data from the API call",
+        "// Get the country data from the API calls",
         "const countryData = JSON.parse(vars.countryData);",
         "const infoType = acts.getUserInput.infoType;",
+        "// Group thousands by hand: the sandbox's toLocaleString() doesn't",
+        "const withCommas = n => String(n).replace(/\\B(?=(\\d{3})+(?!\\d))/g, ',');",
+        "const population = countryData.population != null",
+        "  ? `${withCommas(countryData.population)} people (${countryData.populationYear})`",
+        "  : 'N/A';",
         "",
         "// Generate different reports based on user selection",
         "let report = [];",
@@ -131,32 +166,18 @@
         "if (infoType === 'general') {",
         "  report = [",
         "    `📍 COUNTRY OVERVIEW: ${countryData.name}`,",
-        "    `Official Name: ${countryData.officialName}`,",
         "    `Capital: ${countryData.capital}`,",
-        "    `Population: ${countryData.population.toLocaleString()} people`,",
-        "    `Area: ${countryData.area.toLocaleString()} km²`,",
-        "    `Region: ${countryData.region} (${countryData.subregion})`,",
-        "    `Languages: ${countryData.languages.join(', ')}`,",
-        "    `Currencies: ${countryData.currencies.join(', ')}`,",
-        "  ];",
-        "} else if (infoType === 'geography') {",
-        "  const density = (countryData.population / countryData.area).toFixed(1);",
-        "  report = [",
-        "    `🌍 GEOGRAPHIC DETAILS: ${countryData.name}`,",
-        "    `Total Area: ${countryData.area.toLocaleString()} km²`,",
-        "    `Population Density: ${density} people/km²`,",
-        "    `Time Zones: ${countryData.timezones.join(', ')}`,",
-        "    `Bordering Countries: ${countryData.borders.length > 0 ? countryData.borders.join(', ') : 'None (island or isolated)'}`,",
-        "    `Map: ${countryData.maps}`,",
-        "  ];",
-        "} else if (infoType === 'culture') {",
-        "  report = [",
-        "    `🎭 CULTURAL INFORMATION: ${countryData.name}`,",
-        "    `Official Languages: ${countryData.languages.join(', ')}`,",
-        "    `Currency: ${countryData.currencies.join(', ')}`,",
+        "    `Population: ${population}`,",
         "    `Region: ${countryData.region}`,",
-        "    `Subregion: ${countryData.subregion}`,",
-        "    `Flag: ${countryData.flag}`,",
+        "    `Income Level: ${countryData.incomeLevel}`,",
+        "  ];",
+        "} else if (infoType === 'location') {",
+        "  const { latitude, longitude } = countryData;",
+        "  report = [",
+        "    `🌍 LOCATION: ${countryData.name}`,",
+        "    `Region: ${countryData.region}`,",
+        "    `Capital: ${countryData.capital} (${latitude.toFixed(2)}, ${longitude.toFixed(2)})`,",
+        "    `Map: https://www.openstreetmap.org/?mlat=${latitude}&mlon=${longitude}#map=6/${latitude}/${longitude}`,",
         "  ];",
         "}",
         "",
@@ -165,14 +186,13 @@
         "// Store the formatted report",
         "vars.countryReport = reportText;",
         "",
-        "console.log('Generated report type:', infoType);",
         "return { reportType: infoType, reportText };"
       ]
     },
     "showResults": {
       "name": "Show Country Information",
       "type": "human",
-      "prompt": "Here's the country information from the REST Countries API. Please review and provide feedback:",
+      "prompt": "Here's the country information from the World Bank API. Please review and provide feedback:",
       "fields": [
         {
           "name": "feedback",
