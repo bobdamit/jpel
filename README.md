@@ -9,8 +9,9 @@ turns a definition into a **run** (a process instance), which collects the
 data and records what happened.
 
 This repository holds the specification (this file), the JSON Schemas and
-sample processes. Qonfident is the engine that runs it. The schemas and
-samples are published to npm as
+sample processes. It defines the language and its data types; it does not
+include an engine, and any engine can be built to run JPEL definitions. The
+schemas and samples are published to npm as
 [`@rockscience/jpel`](https://www.npmjs.com/package/@rockscience/jpel)
 (`npm install @rockscience/jpel`); see [Using the schema](#using-the-schema).
 
@@ -80,7 +81,8 @@ process ID. Wherever a definition refers to an activity (`start`, a sequence's
 `activities`, a switch's targets) it uses the bare ID.
 
 A definition has no version number. An engine should pin each run to the
-definition it started from (Qonfident stores a content-addressed snapshot), so
+definition it started from (for example, by storing a content-addressed
+snapshot), so
 editing a definition never changes runs already under way.
 
 ## Activities
@@ -302,7 +304,7 @@ Code runs in a sandbox. It is plain JavaScript with the standard built-ins
 (`Math`, `JSON`, `Date`, `Array`, `String` and so on) and `console.log`.
 There is no I/O: no `fetch`, `require`, `import`, file system, timers or
 `async`. Use an `api` activity to call another system. An engine limits how
-long code may run and how much memory it may use (Qonfident: 1 second and
+long code may run and how much memory it may use (for example, 1 second and
 32 MB). Code that throws, or exceeds a limit, fails its activity and the run.
 
 ## API templates
@@ -315,7 +317,7 @@ strings is replaced with a value:
 | `{{vars.name}}` | A process variable |
 | `{{props.id}}` | A run property |
 | `{{acts.activity.field}}` | An activity's value |
-| `{{env.NAME}}` | An environment variable of the engine (Qonfident allows only names starting `JPEL_`) |
+| `{{env.NAME}}` | An environment variable of the engine (an engine should expose only an allowed set, for example names starting `JPEL_`) |
 
 Templates are paths, not code. A template whose value is undefined is left
 as it is.
@@ -422,8 +424,8 @@ objects, and each thing has one spelling:
 | `"code"` as an array only | A string or an array of lines |
 | Field type `string`, `"multiline": true`, `minLength` | `text`, `textarea`, `min` |
 
-The Node.js reference runner that used to live here has been removed;
-Qonfident is the engine.
+The Node.js reference runner that used to live here has been removed; this
+repository defines the language only.
 
 ## License
 

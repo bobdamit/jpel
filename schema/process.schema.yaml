@@ -10,7 +10,7 @@ required: [id, name, start, activities]
 additionalProperties: false
 patternProperties: &extensions
   "^x-":
-    description: "An extension: ignored by engines and kept as it is, for tools (Qonfident uses x-display and x-report on fields). See README, Extensions."
+    description: "An extension: ignored by engines and kept as it is, for tools (for example, x-display and x-report on fields). See README, Extensions."
 properties:
   id:
     type: string
