@@ -35,13 +35,27 @@ test('each run event, with what it carries', () => {
 	}
 });
 
-test('every event has an id, a type, a time and a run', () => {
-	for (const key of ['id', 'type', 'at', 'run']) {
-		const e = event('run.started');
+test('every event has an id, a type and a time; every run event has a run', () => {
+	for (const key of ['id', 'type', 'at']) {
+		const e = event('approval.decided');
 		delete e[key];
 		assert.ok(!valid(e), key);
 	}
+	for (const type of ['run.started', 'step.completed', 'check.failed', 'run.completed', 'run.stopped']) {
+		const e = event(type, { step, data: { rule: 'x', status: 'failed' } });
+		assert.ok(valid(e), `${type}: ${JSON.stringify(validate.errors)}`);
+		delete e.run;
+		assert.ok(!valid(e), `${type} without run`);
+	}
 	assert.ok(!valid(event('run.started', { run: { id: 'r-1' } })), 'run.processId');
+});
+
+test("an engine's own types needn't be about a run", () => {
+	const changed = event('definition.updated', { process: { id: 'winterize', name: 'Winterize the sailboat' } });
+	delete changed.run;
+	assert.ok(valid(changed), JSON.stringify(validate.errors));
+	// A run, when there is one, is still checked
+	assert.ok(!valid(event('approval.decided', { run: { id: 'r-1' } })), 'run.processId');
 });
 
 test('what each type requires', () => {

@@ -515,7 +515,7 @@ describes them.
 | `id` | Unique to the event. An event may be delivered more than once, always with the same `id`, so a receiver can drop repeats. |
 | `type` | What happened (below) |
 | `at` | When (ISO 8601 time). It orders a run's events; deliveries may arrive in another order. |
-| `run` | `{ id, processId, processName?, title? }`: `id` is the run's `instanceId` |
+| `run` | `{ id, processId, processName?, title? }`: `id` is the run's `instanceId`. Present on every run event (below). |
 | `step` | The activity it's about: `{ id, name? }`. Present on `step.completed` and `check.failed`. |
 | `data` | What the type carries |
 
@@ -532,7 +532,9 @@ when a receiver has asked not to get them, so a receiver shouldn't count on
 them. A file is sent as a file reference.
 
 An engine may add keys (who caused the event, links to the run) and event
-types of its own. A receiver ignores keys and types it doesn't know.
+types of its own. Its own types needn't be about a run (a definition was
+changed, say), and then have no `run`; they still have an `id`, a `type` and
+an `at`. A receiver ignores keys and types it doesn't know.
 
 ## Using the schema
 

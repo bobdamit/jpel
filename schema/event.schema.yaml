@@ -1,15 +1,15 @@
 # JPEL run event schema (JSON Schema draft-07, written as YAML).
 # This file is the source; `npm run build` writes event.schema.json.
-# An event is something that happened in a run, in the shape an engine sends
-# it to other systems. How events are delivered is up to the engine. Engines
-# may add their own keys and event types, so objects stay open.
-# See README.md, Events.
+# An event is something that happened, usually in a run, in the shape an
+# engine sends it to other systems. How events are delivered is up to the
+# engine. Engines may add their own keys and event types, so objects stay
+# open; an engine's own types needn't be about a run. See README.md, Events.
 
 $schema: http://json-schema.org/draft-07/schema#
 $id: https://github.com/bobdamit/jpel/schema/event.schema.json
 title: JPEL run event
 type: object
-required: [id, type, at, run]
+required: [id, type, at]
 properties:
   id:
     type: string
@@ -24,6 +24,7 @@ properties:
     description: When it happened (ISO 8601 time). Orders a run's events; deliveries may arrive in another order.
   run:
     type: object
+    description: The run the event is about. Every run event has one; an engine's own types may leave it out when they aren't about a run.
     required: [id, processId]
     properties:
       id:
@@ -52,6 +53,16 @@ properties:
     description: What the event's type carries
 
 allOf:
+  # The five run events are about a run
+  - if:
+      properties:
+        type:
+          enum: [run.started, step.completed, check.failed, run.completed, run.stopped]
+    then:
+      required: [run]
+      properties:
+        run: true
+
   - if:
       properties: { type: { const: run.started } }
     then:

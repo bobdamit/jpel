@@ -6,8 +6,7 @@
 	"required": [
 		"id",
 		"type",
-		"at",
-		"run"
+		"at"
 	],
 	"properties": {
 		"id": {
@@ -26,6 +25,7 @@
 		},
 		"run": {
 			"type": "object",
+			"description": "The run the event is about. Every run event has one; an engine's own types may leave it out when they aren't about a run.",
 			"required": [
 				"id",
 				"processId"
@@ -70,6 +70,29 @@
 		}
 	},
 	"allOf": [
+		{
+			"if": {
+				"properties": {
+					"type": {
+						"enum": [
+							"run.started",
+							"step.completed",
+							"check.failed",
+							"run.completed",
+							"run.stopped"
+						]
+					}
+				}
+			},
+			"then": {
+				"required": [
+					"run"
+				],
+				"properties": {
+					"run": true
+				}
+			}
+		},
 		{
 			"if": {
 				"properties": {
