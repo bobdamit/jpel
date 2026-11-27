@@ -30,6 +30,39 @@ test('switch takes expression + cases or condition + then, not both', () => {
 	assert.ok(!valid(process({ a: { type: 'switch', expression: 'vars.k', cases: { x: 'b' }, else: 'b' }, b: { type: 'terminate' } })));
 });
 
+test('a receive activity takes fields, a timeout, code and passWhen', () => {
+	const receive = {
+		type: 'receive',
+		name: 'Lab result',
+		fields: [{ name: 'ironPpm', type: 'number', units: 'ppm', required: true }],
+		timeout: 'P14D',
+		code: 'return { worn: received.ironPpm > 100 };',
+		passWhen: '!acts.a.worn',
+		'x-note': 'kept'
+	};
+	assert.ok(valid(process({ a: receive })), JSON.stringify(validate.errors));
+	assert.ok(valid(process({ a: { type: 'receive' } })), 'everything but type is optional');
+	assert.ok(!valid(process({ a: { ...receive, method: 'POST' } })), 'api keys');
+	assert.ok(!valid(process({ a: { ...receive, prompt: 'Waiting' } })), 'human keys');
+});
+
+test('receive timeouts are ISO 8601 durations, without years or months', () => {
+	const timeout = value => valid(process({ a: { type: 'receive', timeout: value } }));
+	for (const ok of ['PT30M', 'PT8H', 'P14D', 'P2W', 'PT90S', 'P1DT12H', 'P1W2DT3H4M5S']) {
+		assert.ok(timeout(ok), ok);
+	}
+	for (const bad of ['P', 'PT', 'P1DT', '14D', 'P1M', 'P1Y', 'P1.5D', 'PT8h', 'p14d', 'P14D ', 3600]) {
+		assert.ok(!timeout(bad), String(bad));
+	}
+});
+
+test('a property may be required', () => {
+	const withProperty = property => ({ ...process({ a: { type: 'terminate' } }), properties: [{ id: 'title', name: 'Boat', ...property }] });
+	assert.ok(valid(withProperty({ required: true })));
+	assert.ok(valid(withProperty({ required: false, defaultValue: 'Unnamed' })));
+	assert.ok(!valid(withProperty({ required: 'yes' })));
+});
+
 test('old forms are rejected', () => {
 	assert.ok(!valid({ ...process({ a: { type: 'terminate' } }), start: 'a:a' }), 'a: prefix');
 	assert.ok(!valid({ ...process({ a: { type: 'terminate' } }), version: '1.0.0' }), 'version');

@@ -14,3 +14,6 @@ export declare const processSchema: JsonSchema;
 
 /** Describes JPEL process runs (instances). */
 export declare const instanceSchema: JsonSchema;
+
+/** Validates JPEL run events, as engines send them to other systems. */
+export declare const eventSchema: JsonSchema;

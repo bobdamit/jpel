@@ -128,6 +128,7 @@
 						"human",
 						"compute",
 						"api",
+						"receive",
 						"sequence",
 						"switch",
 						"terminate"
@@ -142,7 +143,8 @@
 						"failed",
 						"cancelled",
 						"timeout"
-					]
+					],
+					"description": "running: under way, or waiting (a human activity for a person, a receive activity for another system); timeout: a receive activity's wait ran out"
 				},
 				"passFail": {
 					"type": "string",
@@ -164,7 +166,7 @@
 				},
 				"fields": {
 					"type": "array",
-					"description": "The activity's values: a human activity's form fields, or the object a compute or api activity's code returned (acts.<id> in code)",
+					"description": "The activity's values (acts.<id> in code): a human activity's form fields; a receive activity's fields with the values received, plus any its code returned; or the object a compute or api activity's code returned",
 					"items": {
 						"$ref": "#/definitions/FieldValue"
 					}

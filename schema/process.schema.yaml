@@ -98,6 +98,9 @@ definitions:
         description: Display name
       defaultValue:
         type: string
+      required:
+        type: boolean
+        description: A run can't start without a value for this property (a defaultValue counts)
       includeInSummary:
         type: boolean
         description: Show this property in lists of runs
@@ -144,9 +147,17 @@ definitions:
             type: string
             description: "timestamp: e.g. YYYYMMDD-HHmmss"
 
+  Duration:
+    type: string
+    # Weeks, days, hours, minutes and seconds, in whole numbers. Years and
+    # months are left out: their length varies, and P1M (a month) is too
+    # easily mistaken for PT1M (a minute).
+    pattern: "^P(?=\\d|T\\d)(\\d+W)?(\\d+D)?(T(?=\\d)(\\d+H)?(\\d+M)?(\\d+S)?)?$"
+    description: "An ISO 8601 duration in weeks, days, hours, minutes and seconds: PT30M, PT8H, P14D, P1DT12H"
+
   Field:
     type: object
-    description: A form field of a human activity
+    description: A field of a human or receive activity
     required: [name, type]
     additionalProperties: false
     patternProperties: *extensions
@@ -224,13 +235,14 @@ definitions:
     properties:
       type:
         type: string
-        enum: [human, compute, api, sequence, switch, terminate]
+        enum: [human, compute, api, receive, sequence, switch, terminate]
     discriminator:
       propertyName: type
     oneOf:
       - $ref: "#/definitions/HumanActivity"
       - $ref: "#/definitions/ComputeActivity"
       - $ref: "#/definitions/ApiActivity"
+      - $ref: "#/definitions/ReceiveActivity"
       - $ref: "#/definitions/SequenceActivity"
       - $ref: "#/definitions/SwitchActivity"
       - $ref: "#/definitions/TerminateActivity"
@@ -317,6 +329,31 @@ definitions:
       code:
         $ref: "#/definitions/Code"
         description: Runs after the request; sees the result as `response`
+      passWhen: *passWhen
+
+  ReceiveActivity:
+    type: object
+    description: Waits for another system to send values, as a human activity waits for a person
+    required: [type]
+    additionalProperties: false
+    patternProperties: *extensions
+    properties:
+      id: *id
+      name: *name
+      description: *description
+      type:
+        const: receive
+      fields:
+        type: array
+        description: The values it expects, checked as a human activity's are
+        items:
+          $ref: "#/definitions/Field"
+      timeout:
+        $ref: "#/definitions/Duration"
+        description: How long to wait before the activity times out (no limit if absent)
+      code:
+        $ref: "#/definitions/Code"
+        description: Runs when values arrive; sees them as `received`
       passWhen: *passWhen
 
   SequenceActivity:

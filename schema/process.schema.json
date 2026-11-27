@@ -142,6 +142,10 @@
 				"defaultValue": {
 					"type": "string"
 				},
+				"required": {
+					"type": "boolean",
+					"description": "A run can't start without a value for this property (a defaultValue counts)"
+				},
 				"includeInSummary": {
 					"type": "boolean",
 					"description": "Show this property in lists of runs"
@@ -226,9 +230,14 @@
 				}
 			}
 		},
+		"Duration": {
+			"type": "string",
+			"pattern": "^P(?=\\d|T\\d)(\\d+W)?(\\d+D)?(T(?=\\d)(\\d+H)?(\\d+M)?(\\d+S)?)?$",
+			"description": "An ISO 8601 duration in weeks, days, hours, minutes and seconds: PT30M, PT8H, P14D, P1DT12H"
+		},
 		"Field": {
 			"type": "object",
-			"description": "A form field of a human activity",
+			"description": "A field of a human or receive activity",
 			"required": [
 				"name",
 				"type"
@@ -358,6 +367,7 @@
 						"human",
 						"compute",
 						"api",
+						"receive",
 						"sequence",
 						"switch",
 						"terminate"
@@ -376,6 +386,9 @@
 				},
 				{
 					"$ref": "#/definitions/ApiActivity"
+				},
+				{
+					"$ref": "#/definitions/ReceiveActivity"
 				},
 				{
 					"$ref": "#/definitions/SequenceActivity"
@@ -552,6 +565,53 @@
 				"code": {
 					"$ref": "#/definitions/Code",
 					"description": "Runs after the request; sees the result as `response`"
+				},
+				"passWhen": {
+					"$ref": "#/definitions/Expression",
+					"description": "The activity passes when this is true and fails otherwise"
+				}
+			}
+		},
+		"ReceiveActivity": {
+			"type": "object",
+			"description": "Waits for another system to send values, as a human activity waits for a person",
+			"required": [
+				"type"
+			],
+			"additionalProperties": false,
+			"patternProperties": {
+				"^x-": {
+					"description": "An extension: ignored by engines and kept as it is, for tools (for example, x-display and x-report on fields). See README, Extensions."
+				}
+			},
+			"properties": {
+				"id": {
+					"type": "string",
+					"description": "Optional; always the activity's key in the activities map"
+				},
+				"name": {
+					"type": "string"
+				},
+				"description": {
+					"type": "string"
+				},
+				"type": {
+					"const": "receive"
+				},
+				"fields": {
+					"type": "array",
+					"description": "The values it expects, checked as a human activity's are",
+					"items": {
+						"$ref": "#/definitions/Field"
+					}
+				},
+				"timeout": {
+					"$ref": "#/definitions/Duration",
+					"description": "How long to wait before the activity times out (no limit if absent)"
+				},
+				"code": {
+					"$ref": "#/definitions/Code",
+					"description": "Runs when values arrive; sees them as `received`"
 				},
 				"passWhen": {
 					"$ref": "#/definitions/Expression",

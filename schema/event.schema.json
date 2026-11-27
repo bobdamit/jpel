@@ -1,0 +1,226 @@
+{
+	"$schema": "http://json-schema.org/draft-07/schema#",
+	"$id": "https://github.com/bobdamit/jpel/schema/event.schema.json",
+	"title": "JPEL run event",
+	"type": "object",
+	"required": [
+		"id",
+		"type",
+		"at",
+		"run"
+	],
+	"properties": {
+		"id": {
+			"type": "string",
+			"minLength": 1,
+			"description": "Unique to the event, and the same if it is delivered again, so a receiver can drop repeats"
+		},
+		"type": {
+			"type": "string",
+			"pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$",
+			"description": "What happened: run.started, step.completed, check.failed, run.completed, run.stopped, or an engine's own type"
+		},
+		"at": {
+			"type": "string",
+			"description": "When it happened (ISO 8601 time). Orders a run's events; deliveries may arrive in another order."
+		},
+		"run": {
+			"type": "object",
+			"required": [
+				"id",
+				"processId"
+			],
+			"properties": {
+				"id": {
+					"type": "string",
+					"description": "The run's instanceId"
+				},
+				"processId": {
+					"type": "string",
+					"description": "The definition the run was started from"
+				},
+				"processName": {
+					"type": "string"
+				},
+				"title": {
+					"type": "string",
+					"description": "The run's name (props.title)"
+				}
+			}
+		},
+		"step": {
+			"type": "object",
+			"description": "The activity the event is about",
+			"required": [
+				"id"
+			],
+			"properties": {
+				"id": {
+					"type": "string",
+					"description": "The activity's ID"
+				},
+				"name": {
+					"type": "string"
+				}
+			}
+		},
+		"data": {
+			"type": "object",
+			"description": "What the event's type carries"
+		}
+	},
+	"allOf": [
+		{
+			"if": {
+				"properties": {
+					"type": {
+						"const": "run.started"
+					}
+				}
+			},
+			"then": {
+				"properties": {
+					"data": {
+						"type": "object",
+						"properties": {
+							"properties": {
+								"type": "object",
+								"description": "The run's starting property values, by id (may be left out)"
+							},
+							"variables": {
+								"type": "object",
+								"description": "The run's starting variable values, by name (may be left out)"
+							}
+						}
+					}
+				}
+			}
+		},
+		{
+			"if": {
+				"properties": {
+					"type": {
+						"const": "step.completed"
+					}
+				}
+			},
+			"then": {
+				"required": [
+					"step"
+				],
+				"properties": {
+					"step": true,
+					"data": {
+						"type": "object",
+						"properties": {
+							"values": {
+								"$ref": "#/definitions/Values"
+							}
+						}
+					}
+				}
+			}
+		},
+		{
+			"if": {
+				"properties": {
+					"type": {
+						"const": "check.failed"
+					}
+				}
+			},
+			"then": {
+				"required": [
+					"step",
+					"data"
+				],
+				"properties": {
+					"step": true,
+					"data": {
+						"type": "object",
+						"required": [
+							"rule"
+						],
+						"properties": {
+							"rule": {
+								"type": "string",
+								"description": "The activity's passWhen"
+							},
+							"values": {
+								"type": "object",
+								"description": "The values the rule read, by the path it read them with: { \"acts.capsuleData.frontCapacitance\": 512 } (may be left out)"
+							}
+						}
+					}
+				}
+			}
+		},
+		{
+			"if": {
+				"properties": {
+					"type": {
+						"const": "run.completed"
+					}
+				}
+			},
+			"then": {
+				"properties": {
+					"data": {
+						"type": "object",
+						"properties": {
+							"outcome": {
+								"type": "string",
+								"enum": [
+									"all_pass",
+									"any_fail"
+								],
+								"description": "The run's aggregatePassFail; absent if it has none"
+							}
+						}
+					}
+				}
+			}
+		},
+		{
+			"if": {
+				"properties": {
+					"type": {
+						"const": "run.stopped"
+					}
+				}
+			},
+			"then": {
+				"required": [
+					"data"
+				],
+				"properties": {
+					"data": {
+						"type": "object",
+						"required": [
+							"status"
+						],
+						"properties": {
+							"status": {
+								"type": "string",
+								"enum": [
+									"failed",
+									"cancelled"
+								]
+							},
+							"error": {
+								"type": "string",
+								"description": "Why the run failed"
+							}
+						}
+					}
+				}
+			}
+		}
+	],
+	"definitions": {
+		"Values": {
+			"type": "object",
+			"description": "An activity's values (acts.<id>), by name. A file is a file reference. May be left out."
+		}
+	}
+}

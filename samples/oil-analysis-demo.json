@@ -1,0 +1,92 @@
+{
+  "id": "oil-analysis-demo",
+  "name": "Engine Oil Analysis",
+  "description": "Take an engine oil sample, register it with a lab, and wait for the lab to send its result (a receive activity)",
+  "start": "main",
+  "properties": [
+    { "id": "title", "name": "Boat", "required": true, "includeInSummary": true },
+    { "id": "engineSerial", "name": "Engine serial number", "required": true, "includeInSummary": true }
+  ],
+  "activities": {
+    "main": {
+      "type": "sequence",
+      "activities": ["takeSample", "sendSample", "labResult", "reviewResult"]
+    },
+    "takeSample": {
+      "type": "human",
+      "name": "Take the sample",
+      "prompt": "Run the engine to temperature, then draw the sample through the dipstick tube.",
+      "fields": [
+        {
+          "name": "bottleId",
+          "type": "text",
+          "label": "Sample bottle number",
+          "required": true,
+          "pattern": "^[A-Z]{2}\\d{6}$",
+          "patternDescription": "Two letters and six digits, as printed on the bottle"
+        },
+        { "name": "engineHours", "type": "number", "label": "Engine hours", "required": true, "min": 0 },
+        { "name": "hoursOnOil", "type": "number", "label": "Hours since the last oil change", "min": 0 }
+      ]
+    },
+    "sendSample": {
+      "type": "api",
+      "name": "Register the sample",
+      "description": "Tells the lab the sample is on its way, and where to send the result",
+      "method": "POST",
+      "url": "https://lab.example.com/v1/samples",
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer {{env.JPEL_LAB_TOKEN}}"
+      },
+      "body": {
+        "bottleId": "{{acts.takeSample.bottleId}}",
+        "boat": "{{props.title}}",
+        "engineSerial": "{{props.engineSerial}}",
+        "engineHours": "{{acts.takeSample.engineHours}}",
+        "resultUrl": "{{receive.labResult}}"
+      },
+      "expectedStatus": [201, 202],
+      "retries": 2
+    },
+    "labResult": {
+      "type": "receive",
+      "name": "Lab result",
+      "description": "The lab sends its result when the sample has been tested, usually within a week",
+      "fields": [
+        { "name": "bottleId", "type": "text", "required": true },
+        { "name": "ironPpm", "type": "number", "units": "ppm", "required": true, "min": 0 },
+        { "name": "copperPpm", "type": "number", "units": "ppm", "required": true, "min": 0 },
+        { "name": "siliconPpm", "type": "number", "units": "ppm", "required": true, "min": 0 },
+        { "name": "waterPercent", "type": "number", "units": "%", "min": 0, "max": 100 },
+        { "name": "reportUrl", "type": "text" }
+      ],
+      "timeout": "P21D",
+      "code": [
+        "const worn = received.ironPpm > 100 || received.copperPpm > 50;",
+        "const dirty = received.siliconPpm > 20 || (received.waterPercent ?? 0) > 0.2;",
+        "return { worn, dirty, sameBottle: received.bottleId === acts.takeSample.bottleId };"
+      ],
+      "passWhen": "acts.labResult.sameBottle && !acts.labResult.worn && !acts.labResult.dirty"
+    },
+    "reviewResult": {
+      "type": "human",
+      "name": "Review the result",
+      "prompt": "Read the lab's report and decide what to do.",
+      "fields": [
+        {
+          "name": "action",
+          "type": "select",
+          "label": "Action",
+          "required": true,
+          "options": [
+            { "value": "none", "label": "Nothing: the oil is healthy" },
+            { "value": "change", "label": "Change the oil early" },
+            { "value": "inspect", "label": "Inspect the engine" }
+          ]
+        },
+        { "name": "notes", "type": "textarea", "label": "Notes" }
+      ]
+    }
+  }
+}
